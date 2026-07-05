@@ -1,13 +1,14 @@
 # claude-agent
 
-A little belated Independence Day surprise: an animated ASCII fireworks
-show for your terminal.
+This repository is focused on Pokémon Champions dataset research and source
+collection.
 
-## Run it
+## Dataset resources
 
-```
-python3 fireworks.py
-```
+- `DATASET.md` — curated external sources for canonical Pokémon data,
+  Pokémon Champions format data, tournament results, and team-building
+  references
+- `champions-business-case.md` — supporting business case document
 
-Requires only the Python standard library (`curses`). Press `q` or
-`Ctrl+C` to exit. Best viewed in a terminal at least 60 columns wide.
+Use `DATASET.md` as the primary starting point when gathering competitive
+Pokémon Champions data.
