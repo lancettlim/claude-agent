@@ -16,6 +16,7 @@ snapshots, and tournament usage records.
 - `DATASET.md` — curated external sources and extraction notes
 - `PRD.md` — product requirements for the competitive data platform
 - `champions-business-case.md` — supporting business case document
+- `TODO.md` — outstanding work items toward the v1 release
 
 ## Repository structure
 

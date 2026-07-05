@@ -1,0 +1,107 @@
+{
+  "dataset_version": "0.1.0",
+  "published_at_utc": "1970-01-01T00:00:00Z",
+  "sources": [
+    {
+      "source_name": "PokéAPI",
+      "source_url": "https://github.com/PokeAPI/pokeapi",
+      "extracted_at_utc": "1970-01-01T00:00:00Z",
+      "record_count": 0
+    },
+    {
+      "source_name": "OP.GG Pokémon Champions",
+      "source_url": "https://op.gg/pokemon-champions/pokedex",
+      "extracted_at_utc": "1970-01-01T00:00:00Z",
+      "record_count": 0
+    },
+    {
+      "source_name": "MunchStats",
+      "source_url": "https://github.com/PizzaTimeJoshua/munchstats",
+      "extracted_at_utc": "1970-01-01T00:00:00Z",
+      "record_count": 0
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "pokemon",
+      "file_name": "pokemon.csv",
+      "primary_key": "pokemon_key",
+      "row_count": 0
+    },
+    {
+      "table_name": "pokemon_stat_canonical",
+      "file_name": "pokemon_stat_canonical.csv",
+      "primary_key": "pokemon_stat_canonical_key",
+      "row_count": 0
+    },
+    {
+      "table_name": "pokemon_stat_champions",
+      "file_name": "pokemon_stat_champions.csv",
+      "primary_key": "pokemon_stat_champions_key",
+      "row_count": 0
+    },
+    {
+      "table_name": "pokemon_stat_delta",
+      "file_name": "pokemon_stat_delta.csv",
+      "primary_key": "pokemon_stat_delta_key",
+      "row_count": 0
+    },
+    {
+      "table_name": "legality_snapshot",
+      "file_name": "legality_snapshot.csv",
+      "primary_key": "legality_snapshot_key",
+      "row_count": 0
+    },
+    {
+      "table_name": "tournament_event",
+      "file_name": "tournament_event.csv",
+      "primary_key": "event_id",
+      "row_count": 0
+    },
+    {
+      "table_name": "tournament_team",
+      "file_name": "tournament_team.csv",
+      "primary_key": "team_id",
+      "row_count": 0
+    },
+    {
+      "table_name": "tournament_team_member",
+      "file_name": "tournament_team_member.csv",
+      "primary_key": "team_member_id",
+      "row_count": 0
+    }
+  ],
+  "quality_checks": [
+    {
+      "check_name": "opgg_legal_pool_coverage",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": ">=0.95"
+    },
+    {
+      "check_name": "tournament_team_member_mapping_coverage",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": ">=0.90"
+    },
+    {
+      "check_name": "required_field_null_rate",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": "<=0.01"
+    },
+    {
+      "check_name": "duplicate_primary_key_violations",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": "=0"
+    },
+    {
+      "check_name": "referential_integrity",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": "all resolve"
+    }
+  ],
+  "known_limitations": []
+}
