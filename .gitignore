@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+
+/data/raw/**
+/data/staging/**
+/data/normalized/**
+/data/releases/**
+/data/manifests/**
+!/data/raw/**/.gitkeep
+!/data/staging/**/.gitkeep
+!/data/normalized/.gitkeep
+!/data/releases/.gitkeep
+!/data/manifests/.gitkeep

@@ -106,3 +106,28 @@ manageable for v1.
 - `PRD.md` — product requirements document for the Pokémon Champions
   competitive data platform
 - `champions-business-case.md` — supporting business case document
+
+## Implementation scaffold
+
+The repository now includes a runnable Python scaffold for the v1 dataset pipeline.
+
+### Scaffold components
+
+- `pyproject.toml` — project packaging and CLI entrypoint
+- `configs/pipeline.json` — central source metadata and refresh settings
+- `src/champions_dataset/` — ingestion, normalization, export, validation, and shared runtime modules
+- `schemas/v1/` — versioned contracts for core entities and run manifests
+- `docs/implementation-scaffold.md` — implementation layout and phase mapping
+- `docs/data-dictionary-template.md` — starter data dictionary for required fields
+- `.github/workflows/` — validation and scheduled-refresh placeholders
+
+### Quickstart
+
+```bash
+python -m pip install -e .
+champions-dataset --phase all --dry-run
+champions-dataset --phase validate --dry-run
+```
+
+The current CLI emits planned manifests and validation results so implementation can proceed phase-by-phase without live extraction logic yet.
+

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pokémon Champions v1 Core Entities",
+  "type": "object",
+  "properties": {
+    "dataset_version": {
+      "const": "v1"
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "required_fields"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "enum": [
+              "pokemon",
+              "pokemon_stat_canonical",
+              "pokemon_stat_champions",
+              "pokemon_stat_delta",
+              "legality_snapshot",
+              "tournament_event",
+              "tournament_team",
+              "tournament_team_member"
+            ]
+          },
+          "required_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "contains": {
+              "const": "source_name"
+            }
+          }
+        }
+      }
+    }
+  },
+  "required": ["dataset_version", "entities"]
+}

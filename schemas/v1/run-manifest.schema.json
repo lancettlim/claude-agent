@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Pokémon Champions Scaffold Run Manifest",
+  "type": "object",
+  "required": [
+    "dataset_version",
+    "requested_phase",
+    "selected_sources",
+    "dry_run",
+    "generated_at_utc",
+    "phase_runs",
+    "validation_results"
+  ],
+  "properties": {
+    "dataset_version": {
+      "type": "string"
+    },
+    "requested_phase": {
+      "type": "string",
+      "enum": ["ingest", "normalize", "publish", "validate", "all"]
+    },
+    "selected_sources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "dry_run": {
+      "type": "boolean"
+    },
+    "generated_at_utc": {
+      "type": "string"
+    },
+    "phase_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "phase", "status", "outputs", "notes"],
+        "properties": {
+          "component": {"type": "string"},
+          "phase": {"type": "string"},
+          "status": {"type": "string"},
+          "outputs": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "notes": {
+            "type": "array",
+            "items": {"type": "string"}
+          },
+          "source_url": {"type": ["string", "null"]},
+          "cadence": {"type": ["string", "null"]},
+          "record_count": {"type": ["integer", "null"]}
+        }
+      }
+    },
+    "validation_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "message"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"type": "string"},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}

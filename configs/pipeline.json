@@ -1,0 +1,58 @@
+{
+  "dataset_version": "v1",
+  "default_phase": "all",
+  "sources": {
+    "pokeapi": {
+      "url": "https://github.com/PokeAPI/pokeapi/tree/master/data/v2/csv",
+      "cadence": "weekly",
+      "description": "Canonical base stats and reference data.",
+      "raw_targets": [
+        "raw/pokeapi/pokemon_stats.csv",
+        "raw/pokeapi/moves.csv",
+        "raw/pokeapi/items.csv"
+      ],
+      "staging_targets": [
+        "staging/pokeapi/pokemon_stats.parquet",
+        "staging/pokeapi/moves.parquet",
+        "staging/pokeapi/items.parquet"
+      ],
+      "normalized_targets": [
+        "normalized/pokemon.parquet",
+        "normalized/pokemon_stat_canonical.parquet"
+      ]
+    },
+    "opgg": {
+      "url": "https://op.gg/pokemon-champions/pokedex",
+      "cadence": "daily change check",
+      "description": "Champions legal pool and rebalanced stat data.",
+      "raw_targets": [
+        "raw/opgg/pokedex.html"
+      ],
+      "staging_targets": [
+        "staging/opgg/legal_pool.parquet",
+        "staging/opgg/champions_stats.parquet"
+      ],
+      "normalized_targets": [
+        "normalized/pokemon_stat_champions.parquet",
+        "normalized/legality_snapshot.parquet"
+      ]
+    },
+    "munchstats": {
+      "url": "https://github.com/PizzaTimeJoshua/munchstats",
+      "cadence": "daily new-event check",
+      "description": "Tournament results, rosters, and team usage records.",
+      "raw_targets": [
+        "raw/munchstats/events.json"
+      ],
+      "staging_targets": [
+        "staging/munchstats/events.parquet",
+        "staging/munchstats/team_members.parquet"
+      ],
+      "normalized_targets": [
+        "normalized/tournament_event.parquet",
+        "normalized/tournament_team.parquet",
+        "normalized/tournament_team_member.parquet"
+      ]
+    }
+  }
+}
