@@ -15,6 +15,7 @@ Create a centralized, versioned Pokémon Champions data product that:
 - Tracks regulatory/meta changes over time
 - Enables faster, repeatable analytics and insight generation
 - Serves as the core data layer for future premium products
+- Powers dashboard analytics for near-real-time metagame visibility
 
 ## Strategic fit
 This initiative supports:
@@ -27,6 +28,7 @@ This initiative supports:
 - Publish a documented dataset with clear schemas, provenance, and refresh cadences.
 - Add a change-tracking layer for canonical-vs-Champions deltas and regulation-specific legality.
 - Provide packaged exports for analysts and downstream product teams.
+- Deliver a dashboard analytics layer with ranked trends, usage shifts, and regulation-aware filters.
 
 ## Value drivers
 1. **Operational efficiency**
@@ -37,6 +39,8 @@ This initiative supports:
    - Enables rapid meta analysis, trend tracking, and content generation.
 4. **Revenue enablement**
    - Supports future monetizable products (premium analytics, subscriptions, B2B data feeds).
+5. **Decision support**
+   - Dashboard analytics shorten time from data updates to actionable competitive decisions.
 
 ## Cost profile (qualitative)
 - **Initial costs**
@@ -53,6 +57,7 @@ This initiative supports:
 - Improved consistency and confidence of competitive insights.
 - Faster launch path for data-driven community products.
 - Reusable data contracts that lower marginal cost of new features.
+- Self-serve dashboards reduce repeated ad hoc reporting requests.
 
 ## Risks and mitigations
 - **Source volatility**: upstream HTML/API structures may change.
@@ -73,10 +78,11 @@ This initiative supports:
    - Higher upfront investment with the best long-term leverage.
 
 ## Recommendation
-Proceed with a phased build of the centralized Pokémon Champions data platform, starting with high-confidence core sources and a governed schema. This provides immediate efficiency gains while creating strategic infrastructure for future analytics and monetization initiatives.
+Proceed with a phased build of the centralized Pokémon Champions data platform, starting with high-confidence core sources, a governed schema, and an initial dashboard analytics release. This provides immediate efficiency gains while creating strategic infrastructure for future analytics and monetization initiatives.
 
 ## Success criteria
 - Core source coverage established and documented.
 - Regular refresh cadence achieved with low critical error rates.
 - Reusable dataset consumed by multiple internal/external workflows.
 - Measurable reduction in time-to-insight for competitive analysis tasks.
+- Dashboard adoption by analysts/creators with recurring usage on core KPI views.

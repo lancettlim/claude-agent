@@ -17,6 +17,7 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - Reduce manual data collection effort for users by at least 80%.
 - Enable repeatable analysis for legality, balance deltas, usage trends, and team composition patterns.
 - Publish predictable update cadences aligned with format and tournament changes.
+- Deliver dashboard analytics for rapid metagame monitoring and decision support.
 
 ## Non-goals
 - Building a full public consumer-facing battle simulator.
@@ -52,6 +53,10 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
   - Data dictionary
   - Source lineage and extraction notes
   - Refresh cadence and known limitations
+- Dashboard analytics module:
+  - KPI overview cards (usage, win-rate proxies, legality changes)
+  - Trend views by regulation window and tournament period
+  - Drill-down by Pokémon, team core, move, and item usage
 
 ### Out of scope (Phase 1)
 - Advanced predictive modeling APIs
@@ -66,6 +71,8 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 5. System must preserve tournament provenance (event/source/date) for all team and placement records.
 6. System must produce exportable flat files for analysis use (CSV/JSON).
 7. System must publish schema and field definitions with every release.
+8. System must provide dashboard-ready aggregate tables for trend and ranking visualizations.
+9. System must support filtered dashboard analytics by regulation, date range, and tournament tier.
 
 ## Non-functional requirements
 - **Reliability**: deterministic transformations; reproducible outputs.
@@ -78,6 +85,7 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - As a team builder, I can filter legal Pokémon by current regulation and item constraints.
 - As a creator, I can query top-used cores and moves from recent tournaments.
 - As a data consumer, I can trust that each field has clear definitions and provenance.
+- As a competitive strategist, I can use dashboards to monitor usage and trend shifts without manual data prep.
 
 ## Milestones
 1. **M1 – Data contract definition**
@@ -90,6 +98,8 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
    - Integrate event/team/player structures.
 5. **M5 – Release readiness**
    - Publish v1 dataset package + documentation.
+6. **M6 – Dashboard analytics release**
+   - Launch first-party analytics dashboard views on top of v1 dataset outputs.
 
 ## Risks and mitigations
 - **Source structure changes** → Add source-specific validation checks and fallback parsing.
@@ -101,3 +111,4 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - What is the minimum acceptable refresh cadence per source?
 - Which downstream interface is prioritized first (files only vs query endpoint)?
 - What governance is needed for schema versioning and deprecations?
+- Which dashboard tool stack and hosting model should be used for Phase 1?
