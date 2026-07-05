@@ -8,6 +8,8 @@ collection.
 - `DATASET.md` — curated external sources for canonical Pokémon data,
   Pokémon Champions format data, tournament results, and team-building
   references
+- `PRD.md` — product requirements document for the Pokémon Champions
+  competitive data platform
 - `champions-business-case.md` — supporting business case document
 
 Use `DATASET.md` as the primary starting point when gathering competitive
