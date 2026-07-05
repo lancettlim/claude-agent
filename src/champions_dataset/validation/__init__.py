@@ -59,7 +59,11 @@ def _validate_storage_layout(config: PipelineConfig) -> ValidationResult:
 
 
 def _validate_schema_files(schema_dir: Path) -> ValidationResult:
-    missing = [str(schema_dir / relative_path) for relative_path in REQUIRED_SCHEMA_FILES if not (schema_dir / relative_path).exists()]
+    missing = []
+    for relative_path in REQUIRED_SCHEMA_FILES:
+        schema_path = schema_dir / relative_path
+        if not schema_path.exists():
+            missing.append(str(schema_path))
     if missing:
         return ValidationResult(
             name="schema-contracts",

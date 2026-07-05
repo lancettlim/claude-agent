@@ -23,7 +23,7 @@ def run_pipeline(
     if not dry_run:
         ensure_storage_layout(config.storage)
 
-    source_names = list(selected_sources or config.sources.keys())
+    source_names = list(selected_sources) if selected_sources else list(config.sources)
     phase_runs: list[SourceRun] = []
 
     if phase in {"ingest", "all"}:
