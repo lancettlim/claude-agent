@@ -1,3 +1,15 @@
+## V1 selected source scope
+
+To deliver the first usable dataset artifact with manageable complexity, the v1
+build scope is limited to:
+
+1. **PokéAPI** (canonical baseline)
+2. **OP.GG Pokémon Champions** (format-specific legal pool and stat changes)
+3. **MunchStats** (tournament and roster usage records)
+
+Other listed sources remain important for future phases, but are out of v1
+ingestion scope until the core schema and refresh pipeline stabilize.
+
 ## 1. PokéAPI Raw CSV Backends
 **Best for:** Raw, unmodified game data and canonical Pokédex information
 
