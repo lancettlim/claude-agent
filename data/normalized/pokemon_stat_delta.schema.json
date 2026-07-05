@@ -1,0 +1,24 @@
+{
+  "table_name": "pokemon_stat_delta",
+  "purpose": "derived canonical-vs-Champions stat change output",
+  "primary_key": "pokemon_stat_delta_key",
+  "join_keys": ["pokemon_key", "pokemon_id"],
+  "fields": [
+    {"name": "pokemon_stat_delta_key", "type": "string", "required": true, "description": "Primary key for this delta row"},
+    {"name": "pokemon_key", "type": "string", "required": true, "description": "Foreign key to pokemon.pokemon_key"},
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "Canonical Pokédex identifier"},
+    {"name": "hp_delta", "type": "integer", "required": true, "description": "Champions HP minus canonical HP"},
+    {"name": "attack_delta", "type": "integer", "required": true, "description": "Champions Attack minus canonical Attack"},
+    {"name": "defense_delta", "type": "integer", "required": true, "description": "Champions Defense minus canonical Defense"},
+    {"name": "sp_attack_delta", "type": "integer", "required": true, "description": "Champions Special Attack minus canonical Special Attack"},
+    {"name": "sp_defense_delta", "type": "integer", "required": true, "description": "Champions Special Defense minus canonical Special Defense"},
+    {"name": "speed_delta", "type": "integer", "required": true, "description": "Champions Speed minus canonical Speed"},
+    {"name": "stat_total_delta", "type": "integer", "required": true, "description": "Champions stat_total minus canonical stat_total"},
+    {"name": "canonical_dataset_version", "type": "string", "required": true, "description": "Dataset version of the canonical stat row used in this delta"},
+    {"name": "champions_dataset_version", "type": "string", "required": true, "description": "Dataset version of the Champions stat row used in this delta"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant identifying this as a derived output"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Reference URL for the derivation logic or originating sources"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC timestamp the delta was computed"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}
