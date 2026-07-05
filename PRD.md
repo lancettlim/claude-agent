@@ -4,7 +4,7 @@
 Pokémon Champions Competitive Data Platform
 
 ## Document status
-Draft v1.0
+Draft v1.1
 
 ## Problem statement
 Competitive Pokémon Champions data is fragmented across canonical game sources, format-specific balance sources, and tournament/team archives. Analysts, creators, and players must manually gather and normalize this information before they can run useful competitive analysis.
@@ -41,30 +41,32 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - Source ingestion from:
   - PokéAPI (canonical data)
   - OP.GG Pokémon Champions (format-specific balance/legal pool)
-  - PokéBase app (regulation and restrictions context)
-  - MunchStats / Limitless / Victory Road (tournament and team data)
+  - MunchStats (tournament and team data)
 - Normalized core entities:
-  - Pokémon, forms, stats, moves, items, abilities, legal status
+  - Pokémon, forms, canonical stats, Champions stats, stat deltas, legal status
   - Tournament event, player, team, team member, placements
 - Change-tracking layer:
   - Canonical vs Champions stat deltas
-  - Regulation-aware legality snapshots
+  - Daily legality snapshots for the OP.GG legal pool
 - Documentation:
   - Data dictionary
   - Source lineage and extraction notes
-  - Refresh cadence and known limitations
+  - Refresh cadence, release package contents, and known limitations
 - Dashboard analytics module:
   - KPI overview cards (usage, win-rate proxies, legality changes)
   - Trend views by regulation window and tournament period
   - Drill-down by Pokémon, team core, move, and item usage
 
 ### Out of scope (Phase 1)
+- PokéBase app ingestion
+- Limitless ingestion
+- Victory Road ingestion
 - Advanced predictive modeling APIs
 - Full web application UX
 - Community write-back/edit workflows
 
 ## Functional requirements
-1. System must ingest each source into staging with source timestamp metadata.
+1. System must ingest each in-scope source into staging with source timestamp metadata.
 2. System must normalize records into consistent IDs and join keys.
 3. System must store both canonical values and Champions-modified values where relevant.
 4. System must expose regulation-aware legality fields by snapshot date.
@@ -73,6 +75,8 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 7. System must publish schema and field definitions with every release.
 8. System must provide dashboard-ready aggregate tables for trend and ranking visualizations.
 9. System must support filtered dashboard analytics by regulation, date range, and tournament tier.
+10. System must publish a versioned release manifest and changelog for every dataset release.
+11. System must enforce documented release gates for coverage, null-rate, duplicate-key, and referential-integrity checks.
 
 ## Non-functional requirements
 - **Reliability**: deterministic transformations; reproducible outputs.
@@ -89,15 +93,15 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 
 ## Milestones
 1. **M1 – Data contract definition**
-   - Finalize schema and entity relationships.
+   - Finalize schema, primary keys, join keys, provenance rules, and release package contract.
 2. **M2 – Source ingestion baseline**
-   - Land repeatable extraction for all identified sources.
+   - Land repeatable extraction for PokéAPI, OP.GG, and MunchStats.
 3. **M3 – Normalization and delta layer**
    - Deliver canonical-vs-Champions diff outputs.
 4. **M4 – Tournament enrichment**
    - Integrate event/team/player structures.
 5. **M5 – Release readiness**
-   - Publish v1 dataset package + documentation.
+   - Publish v1 dataset package, manifest, changelog, and documentation.
 6. **M6 – Dashboard analytics release**
    - Launch first-party analytics dashboard views on top of v1 dataset outputs.
 
@@ -108,7 +112,6 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - **Coverage gaps in tournament data** → Use multi-source triangulation and completeness scoring.
 
 ## Open questions
-- What is the minimum acceptable refresh cadence per source?
 - Which downstream interface is prioritized first (files only vs query endpoint)?
 - What governance is needed for schema versioning and deprecations?
 - Which dashboard tool stack and hosting model should be used for Phase 1?
