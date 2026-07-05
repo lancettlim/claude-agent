@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-This repository (`lancettlim/claude-agent`) is currently empty — no commits, source files, README, or configuration exist yet. There is no established build system, test suite, or architecture to document.
+This repository contains a single self-contained script:
 
-When code is added to this repository, update this file to describe:
-- Build, lint, and test commands (including how to run a single test)
-- The high-level architecture and how major components fit together
-- Project-specific conventions not obvious from the code itself
+- `fireworks.py` — a terminal ASCII fireworks animation built on Python's
+  standard-library `curses` module. No external dependencies, no build
+  step. Run with `python3 fireworks.py`; quit with `q` or `Ctrl+C`.
+
+There is no test suite or build system yet — the script is small enough
+to verify by running it directly in a terminal.
