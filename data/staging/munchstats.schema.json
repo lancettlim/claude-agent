@@ -1,0 +1,30 @@
+{
+  "source_name": "MunchStats",
+  "source_url": "https://github.com/PizzaTimeJoshua/munchstats",
+  "refresh_cadence": "daily check; publish after new tournament/event detection",
+  "records_captured": [
+    "tournament metadata",
+    "team metadata",
+    "team-member Pokémon rows"
+  ],
+  "fields": [
+    {"name": "event_id", "type": "string", "required": true, "description": "Upstream tournament event identifier"},
+    {"name": "event_name", "type": "string", "required": true, "description": "Tournament event name"},
+    {"name": "event_date", "type": "string", "required": true, "description": "ISO-8601 event date"},
+    {"name": "team_id", "type": "string", "required": true, "description": "Upstream team identifier"},
+    {"name": "player_id", "type": "string", "required": true, "description": "Upstream player identifier"},
+    {"name": "placement", "type": "integer", "required": true, "description": "Final placement for the team in the event"},
+    {"name": "slot_number", "type": "integer", "required": true, "description": "Roster slot (1-6) for the team member row"},
+    {"name": "pokemon_name", "type": "string", "required": true, "description": "Roster Pokémon name as reported by MunchStats"},
+    {"name": "form_name", "type": "string", "required": false, "description": "Roster form label prior to normalization, if reported"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Page or endpoint the record was extracted from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MunchStats record/row identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "Incomplete tournament coverage",
+    "Roster naming inconsistencies that reduce automated match confidence"
+  ]
+}

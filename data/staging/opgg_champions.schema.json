@@ -1,0 +1,32 @@
+{
+  "source_name": "OP.GG Pokémon Champions",
+  "source_url": "https://op.gg/pokemon-champions/pokedex",
+  "refresh_cadence": "daily change detection; publish only on legal pool or stat change",
+  "records_captured": [
+    "legal pool membership",
+    "rebalanced stat values for each listed Pokémon/form"
+  ],
+  "fields": [
+    {"name": "pokemon_id", "type": "integer", "required": false, "description": "Canonical numeric ID when directly available; null if only name/form mapping applies"},
+    {"name": "pokemon_name", "type": "string", "required": true, "description": "Species name as reported by OP.GG"},
+    {"name": "form_name", "type": "string", "required": true, "description": "OP.GG form label prior to normalization"},
+    {"name": "is_legal", "type": "boolean", "required": true, "description": "Whether the Pokémon/form is in the current legal pool"},
+    {"name": "hp", "type": "integer", "required": true, "description": "Champions-format HP stat"},
+    {"name": "attack", "type": "integer", "required": true, "description": "Champions-format Attack stat"},
+    {"name": "defense", "type": "integer", "required": true, "description": "Champions-format Defense stat"},
+    {"name": "sp_attack", "type": "integer", "required": true, "description": "Champions-format Special Attack stat"},
+    {"name": "sp_defense", "type": "integer", "required": true, "description": "Champions-format Special Defense stat"},
+    {"name": "speed", "type": "integer", "required": true, "description": "Champions-format Speed stat"},
+    {"name": "stat_total", "type": "integer", "required": true, "description": "Sum of the six Champions-format stats"},
+    {"name": "regulation_code", "type": "string", "required": false, "description": "Regulation identifier associated with this legality snapshot, if published"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: OP.GG Pokémon Champions"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Page or endpoint the record was extracted from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream OP.GG record/row identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "HTML structure volatility",
+    "Custom form labels that may not match canonical naming"
+  ]
+}

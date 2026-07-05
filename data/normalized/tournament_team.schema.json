@@ -1,0 +1,17 @@
+{
+  "table_name": "tournament_team",
+  "purpose": "team-level tournament metadata",
+  "primary_key": "team_id",
+  "join_keys": ["event_id", "player_id", "team_id"],
+  "fields": [
+    {"name": "team_id", "type": "string", "required": true, "description": "Primary key; upstream team identifier"},
+    {"name": "event_id", "type": "string", "required": true, "description": "Foreign key to tournament_event.event_id"},
+    {"name": "player_id", "type": "string", "required": true, "description": "Upstream player identifier"},
+    {"name": "placement", "type": "integer", "required": true, "description": "Final placement for the team in the event"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MunchStats team identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

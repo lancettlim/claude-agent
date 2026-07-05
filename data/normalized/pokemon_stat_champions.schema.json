@@ -1,0 +1,24 @@
+{
+  "table_name": "pokemon_stat_champions",
+  "purpose": "Champions-format stat snapshot from OP.GG",
+  "primary_key": "pokemon_stat_champions_key",
+  "join_keys": ["pokemon_key", "pokemon_id"],
+  "fields": [
+    {"name": "pokemon_stat_champions_key", "type": "string", "required": true, "description": "Primary key for this stat snapshot row"},
+    {"name": "pokemon_key", "type": "string", "required": true, "description": "Foreign key to pokemon.pokemon_key"},
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "Canonical Pokédex identifier"},
+    {"name": "hp", "type": "integer", "required": true, "description": "Champions-format HP stat"},
+    {"name": "attack", "type": "integer", "required": true, "description": "Champions-format Attack stat"},
+    {"name": "defense", "type": "integer", "required": true, "description": "Champions-format Defense stat"},
+    {"name": "sp_attack", "type": "integer", "required": true, "description": "Champions-format Special Attack stat"},
+    {"name": "sp_defense", "type": "integer", "required": true, "description": "Champions-format Special Defense stat"},
+    {"name": "speed", "type": "integer", "required": true, "description": "Champions-format Speed stat"},
+    {"name": "stat_total", "type": "integer", "required": true, "description": "Sum of the six Champions-format stats"},
+    {"name": "is_legal", "type": "boolean", "required": true, "description": "Whether the Pokémon/form is in the current legal pool"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: OP.GG Pokémon Champions"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream OP.GG record identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

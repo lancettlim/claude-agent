@@ -1,0 +1,16 @@
+{
+  "table_name": "tournament_event",
+  "purpose": "normalized tournament metadata from MunchStats",
+  "primary_key": "event_id",
+  "join_keys": ["event_id"],
+  "fields": [
+    {"name": "event_id", "type": "string", "required": true, "description": "Primary key; upstream tournament event identifier"},
+    {"name": "event_name", "type": "string", "required": true, "description": "Tournament event name"},
+    {"name": "event_date", "type": "string", "required": true, "description": "ISO-8601 event date"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MunchStats event identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

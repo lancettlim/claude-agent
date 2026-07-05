@@ -1,0 +1,17 @@
+{
+  "table_name": "pokemon",
+  "purpose": "canonical identity table for Pokémon and form references used by all downstream entities",
+  "primary_key": "pokemon_key",
+  "join_keys": ["pokemon_id", "form_name"],
+  "fields": [
+    {"name": "pokemon_key", "type": "string", "required": true, "description": "Normalized cross-source identifier for one Pokémon/form record"},
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "Canonical Pokédex identifier (PokéAPI numeric ID)"},
+    {"name": "pokemon_name", "type": "string", "required": true, "description": "Canonical species name"},
+    {"name": "form_name", "type": "string", "required": true, "description": "Normalized form label; default form uses the base species name"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Originating source for this identity record"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream record identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

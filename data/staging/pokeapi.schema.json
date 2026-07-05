@@ -1,0 +1,30 @@
+{
+  "source_name": "PokéAPI",
+  "source_url": "https://github.com/PokeAPI/pokeapi",
+  "refresh_cadence": "weekly",
+  "records_captured": [
+    "pokemon/form identity rows",
+    "base stat rows for all Pokémon in the mapped Champions pool"
+  ],
+  "fields": [
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "PokéAPI numeric ID, treated as the canonical pokemon_id"},
+    {"name": "pokemon_name", "type": "string", "required": true, "description": "Species name as reported by PokéAPI"},
+    {"name": "form_name", "type": "string", "required": true, "description": "Normalized form label; default form uses the base species name"},
+    {"name": "hp", "type": "integer", "required": true, "description": "Base HP stat"},
+    {"name": "attack", "type": "integer", "required": true, "description": "Base Attack stat"},
+    {"name": "defense", "type": "integer", "required": true, "description": "Base Defense stat"},
+    {"name": "sp_attack", "type": "integer", "required": true, "description": "Base Special Attack stat"},
+    {"name": "sp_defense", "type": "integer", "required": true, "description": "Base Special Defense stat"},
+    {"name": "speed", "type": "integer", "required": true, "description": "Base Speed stat"},
+    {"name": "stat_total", "type": "integer", "required": true, "description": "Sum of the six base stats"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéAPI"},
+    {"name": "source_url", "type": "string", "required": true, "description": "API endpoint the record was extracted from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéAPI resource ID"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "Form-name mismatches between canonical and format-specific sources",
+    "Multi-form species that need explicit mapping rather than name-only joins"
+  ]
+}

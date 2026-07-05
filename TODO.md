@@ -8,10 +8,10 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Create placeholder directories for staging, normalized, manifests,
   changelogs, and validation reports (`data/`, `releases/`, `reports/`)
 - [x] Add a `manifest.json` starter template (`releases/manifests/manifest.template.json`)
-- [ ] Add a `CHANGELOG.md` starter template (`releases/changelogs/`)
-- [ ] Add example/schema files for staging snapshots (`data/staging/`)
-- [ ] Add example/schema files for normalized tables (`data/normalized/`)
-- [ ] Add a validation report template (`reports/validation/`)
+- [x] Add a `CHANGELOG.md` starter template (`releases/changelogs/CHANGELOG.template.md`)
+- [x] Add example/schema files for staging snapshots (`data/staging/*.schema.json`)
+- [x] Add example/schema files for normalized tables (`data/normalized/*.schema.json`)
+- [x] Add a validation report template (`reports/validation/validation_report.template.json`)
 
 ## Phase 1 — Ingestion
 

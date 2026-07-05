@@ -1,0 +1,158 @@
+{
+  "dataset_version": "0.1.0",
+  "generated_at_utc": "1970-01-01T00:00:00Z",
+  "coverage_checks": [
+    {
+      "check_name": "opgg_legal_pool_coverage",
+      "description": "Share of OP.GG legal pool rows mapped to a canonical pokemon_id",
+      "threshold": ">=0.95",
+      "metric_value": null,
+      "status": "pending"
+    },
+    {
+      "check_name": "tournament_team_member_mapping_coverage",
+      "description": "Share of tournament roster rows mapped to normalized team tables",
+      "threshold": ">=0.90",
+      "metric_value": null,
+      "status": "pending"
+    }
+  ],
+  "null_rate_checks": [
+    {
+      "table_name": "pokemon",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_canonical",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_champions",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_delta",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "legality_snapshot",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_event",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_team",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_team_member",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    }
+  ],
+  "duplicate_key_checks": [
+    {
+      "table_name": "pokemon",
+      "primary_key": "pokemon_key",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_canonical",
+      "primary_key": "pokemon_stat_canonical_key",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_champions",
+      "primary_key": "pokemon_stat_champions_key",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_stat_delta",
+      "primary_key": "pokemon_stat_delta_key",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "legality_snapshot",
+      "primary_key": "legality_snapshot_key",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_event",
+      "primary_key": "event_id",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_team",
+      "primary_key": "team_id",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "tournament_team_member",
+      "primary_key": "team_member_id",
+      "duplicate_count": null,
+      "status": "pending"
+    }
+  ],
+  "referential_integrity_checks": [
+    {
+      "check_name": "pokemon_stat_canonical_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "pokemon_stat_champions_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "pokemon_stat_delta_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "legality_snapshot_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "tournament_team_resolves_to_tournament_event",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "tournament_team_member_resolves_to_tournament_team",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "tournament_team_member_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    }
+  ],
+  "release_blocking_findings": []
+}

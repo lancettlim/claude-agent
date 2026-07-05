@@ -1,0 +1,19 @@
+{
+  "table_name": "tournament_team_member",
+  "purpose": "one row per Pokémon on a normalized tournament team",
+  "primary_key": "team_member_id",
+  "join_keys": ["team_id", "event_id", "pokemon_key", "pokemon_id"],
+  "fields": [
+    {"name": "team_member_id", "type": "string", "required": true, "description": "Primary key for this roster row"},
+    {"name": "team_id", "type": "string", "required": true, "description": "Foreign key to tournament_team.team_id"},
+    {"name": "event_id", "type": "string", "required": true, "description": "Foreign key to tournament_event.event_id"},
+    {"name": "pokemon_key", "type": "string", "required": true, "description": "Foreign key to pokemon.pokemon_key"},
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "Canonical Pokédex identifier"},
+    {"name": "slot_number", "type": "integer", "required": true, "description": "Roster slot (1-6) for this team member"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MunchStats roster row identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}
