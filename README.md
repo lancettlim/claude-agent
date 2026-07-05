@@ -16,3 +16,11 @@ snapshots, and tournament usage records.
 - `DATASET.md` — curated external sources and extraction notes
 - `PRD.md` — product requirements for the competitive data platform
 - `champions-business-case.md` — supporting business case document
+
+## Repository structure
+
+- `data/staging/` — raw source snapshots before normalization
+- `data/normalized/` — normalized tables and derived outputs
+- `releases/manifests/` — versioned dataset manifests
+- `releases/changelogs/` — versioned dataset changelogs
+- `reports/validation/` — validation artifacts for release gates
