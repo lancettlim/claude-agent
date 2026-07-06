@@ -29,8 +29,10 @@ previous:
   notes, including which are in v1 scope vs. deferred to later phases
 - `docs/todo.md` — outstanding work items and the v1 definition-of-done
   checklist
-- `docs/loop.md` — how to use the `/loop` skill across four modes:
-  implementation, backlog grooming, tech debt, and future-goal design
+
+`.claude/loop.md` is Claude-Code-specific operating guidance (not part of
+the docs/ narrative above): it defines four `/loop` modes for this repo —
+implementation, backlog grooming, tech debt, and future-goal design.
 
 When these documents disagree on scope or details, `docs/dataset-spec.md` is
 the most current source of truth for the v1 build; `docs/prd.md` is the

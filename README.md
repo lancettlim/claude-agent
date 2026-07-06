@@ -20,9 +20,10 @@ See `docs/` for the full document set:
 - `docs/business-case.md` — supporting business case document
 - `docs/todo.md` — outstanding work items and definition of done for the v1
   release
-- `docs/loop.md` — how to use Claude Code's `/loop` skill for iterative
-  implementation, backlog grooming, tech-debt cleanup, and future-goal
-  design
+
+`.claude/loop.md` documents how to use Claude Code's `/loop` skill against
+this repo (implementation, backlog grooming, tech-debt cleanup, and
+future-goal design loops).
 
 ## Repository structure
 
