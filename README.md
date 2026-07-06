@@ -11,12 +11,15 @@ snapshots, and tournament usage records.
 
 ## Repository documents
 
-- `V1-DATASET-SPEC.md` — v1 dataset scope, schema, refresh policy, execution
-  roadmap, and definition of done
-- `DATASET.md` — curated external sources and extraction notes
-- `PRD.md` — product requirements for the competitive data platform
-- `champions-business-case.md` — supporting business case document
-- `TODO.md` — outstanding work items toward the v1 release
+See `docs/` for the full document set:
+
+- `docs/dataset-spec.md` — v1 dataset scope, schema, refresh policy, execution
+  roadmap, and validation gates (source of truth for the v1 build)
+- `docs/data-sources.md` — curated external sources and extraction notes
+- `docs/prd.md` — product requirements for the competitive data platform
+- `docs/business-case.md` — supporting business case document
+- `docs/todo.md` — outstanding work items and definition of done for the v1
+  release
 
 ## Repository structure
 

@@ -1,7 +1,7 @@
 # V1 Dataset Spec
 
-This document separates the detailed v1 dataset artifact plan from the
-repository `README.md`.
+This document is the authoritative v1 dataset artifact plan, distinct from
+the repository-level overview in `README.md`.
 
 ## Immediate objective
 
@@ -13,7 +13,7 @@ repository `README.md`.
 
 ## V1 scope (selected high-confidence sources)
 
-The v1 scope is intentionally limited to three sources from `DATASET.md`:
+The v1 scope is intentionally limited to three sources from `data-sources.md`:
 
 1. **PokéAPI** (canonical base data)
 2. **OP.GG Pokémon Champions** (format-specific legal pool and rebalanced data)
@@ -231,24 +231,9 @@ Every release entry must summarize:
 
 ## Phased execution roadmap
 
-### Phase 1 — Ingestion
-
-- Implement source extraction contracts for PokéAPI, OP.GG, and MunchStats.
-- Land staging outputs with raw snapshots and extraction metadata.
-- Validate source availability and row-level parsing success thresholds.
-
-### Phase 2 — Normalization
-
-- Standardize IDs and join keys across canonical, Champions, and tournament
-  datasets.
-- Build canonical vs Champions delta outputs.
-- Generate regulation-aware legality snapshots.
-
-### Phase 3 — Analytics and dashboard outputs
-
-- Publish flat analytical exports and summary aggregates.
-- Provide dashboard-ready trend tables for usage, legality, and stat changes.
-- Document KPI views and filter dimensions (regulation/date/tournament tier).
+v1 delivery is sequenced into three phases — **ingestion**, **normalization**,
+and **analytics/dashboard outputs**. See `todo.md` for the task-level
+checklist and current status of each phase.
 
 ## Validation and release gates
 
@@ -266,22 +251,8 @@ Every release entry must summarize:
   - `tournament_team_member` rows must resolve to both `tournament_team` and
     `pokemon`
 
-## V1 definition of done
-
-- [ ] **Coverage**
-  - [ ] >=95% of OP.GG legal pool mapped to canonical `pokemon_id`
-  - [ ] >=90% of targeted tournament records mapped to normalized team tables
-- [ ] **Data quality checks**
-  - [ ] Required-field null rate <=1% for core tables
-  - [ ] Duplicate primary-key violations = 0
-  - [ ] Referential integrity checks pass for Pokémon/team/event joins
-- [ ] **Export package**
-  - [ ] Versioned CSV outputs for all core entities
-  - [ ] Versioned JSON metadata manifest with source lineage + run stats
-- [ ] **Example analysis queries validated**
-  - [ ] Which Pokémon gained/lost the most total stats vs canonical?
-  - [ ] Which legal Pokémon appear most in recent tournament teams?
-  - [ ] Which regulations show the largest legal-pool changes over time?
+The v1 definition-of-done checklist that tracks these gates, plus export and
+example-query validation, lives in `todo.md`.
 
 ## Next implementation task
 
