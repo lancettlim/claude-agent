@@ -1,7 +1,7 @@
 # TODO
 
 Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
-`V1-DATASET-SPEC.md` and `PRD.md`.
+`dataset-spec.md` and `prd.md`.
 
 ## Repository scaffolding
 
@@ -52,6 +52,6 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## Deferred (post-v1)
 
-- [ ] PokéBase app ingestion (regulation-specific restrictions)
-- [ ] Limitless VGC ingestion (historical event coverage)
-- [ ] Victory Road ingestion (moveset/EV enrichment)
+See "Deferred sources" in `dataset-spec.md` for the list of sources
+(PokéBase app, Limitless VGC, Victory Road) and the rationale for deferring
+each one past v1.
