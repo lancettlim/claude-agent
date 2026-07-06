@@ -1,0 +1,11 @@
+# Local-only DuckDB profile — no credentials, no remote warehouse.
+# The database file is a build artifact (gitignored); rebuild it any time
+# with `make dbt-build`.
+pokemon_champions:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: "data/warehouse.duckdb"
+      threads: 4
+      external_root: "../data/normalized"

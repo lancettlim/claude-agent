@@ -10,11 +10,12 @@ is supposed to finish.
 
 ## Why a loop
 
-This repo has no build system or test suite to gate work yet, so the safest
-unit of agentic progress is one change per iteration: do it, verify it,
-record it, commit. Running that as a `/loop` lets unattended iterations make
-steady, reviewable progress instead of one large uncontrolled batch of
-changes.
+This repo now has a build/test scaffold (`make check` — see CLAUDE.md's
+"Development workflow"), but Phase 1+ ingestion/normalization logic is still
+unwritten, so the safest unit of agentic progress is one change per
+iteration: do it, verify it, record it, commit. Running that as a `/loop`
+lets unattended iterations make steady, reviewable progress instead of one
+large uncontrolled batch of changes.
 
 ## Implementation loop
 
@@ -24,8 +25,9 @@ Ships items already on the `docs/todo.md` checklist.
    (Phase 1 before Phase 2 before Phase 3, then release-readiness items).
 2. Implement just that item, consulting `docs/dataset-spec.md` for the
    relevant schema, key, or contract details.
-3. Verify the change (run any available lint/test/validation step; for
-   docs-only changes, re-read the edited file for consistency).
+3. Verify the change: run `make check` for any change touching `pipelines/`
+   or `dbt/`; for docs-only changes, re-read the edited file for
+   consistency.
 4. Check the item off in `docs/todo.md` and commit.
 5. Stop the iteration there — one checklist item per turn, not a batch.
 

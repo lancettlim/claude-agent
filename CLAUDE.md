@@ -8,8 +8,10 @@ This repository holds planning, specification, and directory scaffolding for
 the **Pokémon Champions Competitive Data Platform** — a project to build a
 unified, versioned dataset combining canonical Pokémon game data,
 Champions-format balance changes, legality snapshots, and tournament usage
-data. The repository is currently documentation- and scaffolding-only: there
-is no ingestion code, no test suite, and no build system yet.
+data. The repository is currently documentation and scaffolding: the v1 build
+has a working scaffold (`pipelines/` + `dbt/`, see "Development workflow"
+below) but no real extraction/normalization logic has been implemented yet —
+that is Phase 1+ work tracked in `docs/todo.md`.
 
 ## Document map
 
@@ -94,9 +96,30 @@ published to `releases/`.
 
 ## Development workflow
 
-There is no build system, package manifest, or test suite in this repository
-yet — it is documentation and directory scaffolding. When source ingestion
-code is added, prefer placing it under a new top-level directory (e.g.
-`src/` or `pipelines/`) that writes into `data/staging/` and
-`data/normalized/`, and update this file with the actual run/test commands
-at that point.
+Python, managed with `uv`. Setup and the standard dev loop:
+
+```
+make setup      # uv sync + playwright install --with-deps chromium
+make check      # lint + unit tests + dbt build/test + validation report
+```
+
+Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
+(`cd dbt && dbt build`), `make validate` (runs dbt build, then writes
+`reports/validation/validation_report.json`).
+
+- `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG, MunchStats)
+  that writes provenance-tagged rows into `data/staging/`. Currently stubs
+  (`NotImplementedError`) — implementing these is Phase 1 work.
+- `dbt/` — a dbt-duckdb project that reads `data/staging/*.csv` as sources,
+  normalizes into `data/normalized/*.csv` (external-materialized models,
+  currently typed empty stubs pending Phase 2), and encodes the
+  `docs/dataset-spec.md` release gates (coverage, null-rate, duplicate-key,
+  referential-integrity) as singular tests under `dbt/tests/singular/`.
+- `pipelines/validate/report.py` — reshapes dbt's test results into
+  `reports/validation/validation_report.json`, matching
+  `reports/validation/validation_report.template.json`'s shape exactly.
+- `tests/` — pytest unit tests, mirroring the `pipelines/` package.
+
+Playwright is a project dependency (`make setup` installs Chromium) for the
+OP.GG extractor's JS-rendered page — the scraping logic itself is still
+unimplemented (Phase 1 work).

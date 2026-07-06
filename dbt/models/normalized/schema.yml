@@ -1,0 +1,19 @@
+version: 2
+
+models:
+  - name: pokemon
+    description: "Canonical identity table for Pokémon and form references. See data/normalized/pokemon.schema.json."
+  - name: pokemon_stat_canonical
+    description: "Canonical PokéAPI stat snapshot. See data/normalized/pokemon_stat_canonical.schema.json."
+  - name: pokemon_stat_champions
+    description: "Champions-format stat snapshot from OP.GG. See data/normalized/pokemon_stat_champions.schema.json."
+  - name: pokemon_stat_delta
+    description: "Derived canonical-vs-Champions stat change output. See data/normalized/pokemon_stat_delta.schema.json."
+  - name: legality_snapshot
+    description: "Time-sliced legal status for the Champions pool. See data/normalized/legality_snapshot.schema.json."
+  - name: tournament_event
+    description: "Normalized tournament metadata from MunchStats. See data/normalized/tournament_event.schema.json."
+  - name: tournament_team
+    description: "Team-level tournament metadata. See data/normalized/tournament_team.schema.json."
+  - name: tournament_team_member
+    description: "One row per Pokémon on a normalized tournament team. See data/normalized/tournament_team_member.schema.json."

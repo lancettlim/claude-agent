@@ -13,6 +13,23 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Add example/schema files for normalized tables (`data/normalized/*.schema.json`)
 - [x] Add a validation report template (`reports/validation/validation_report.template.json`)
 
+## Tooling
+
+- [x] Add `pyproject.toml`/`uv.lock`-managed Python environment (pandas,
+  requests, dbt-core, dbt-duckdb, pytest, ruff)
+- [x] Add `pipelines/` package skeleton (`extract/` stubs per source,
+  `validate/report.py`, `cli.py`)
+- [x] Add `dbt/` project: staging sources, typed-empty normalized stub
+  models, and singular tests encoding the coverage/null-rate/duplicate-key/
+  referential-integrity gates from `dataset-spec.md`
+- [x] Add `Makefile` with `setup`/`lint`/`test`/`dbt-build`/`validate`/`check`
+  targets
+- [x] Update `CLAUDE.md` and `.claude/loop.md` to reflect the build/test
+  system
+- [x] Add the Playwright dependency and browser-install step (`make setup`
+  installs Chromium); implementing the OP.GG scraper itself is tracked
+  under "Phase 1 — Ingestion" below
+
 ## Phase 1 — Ingestion
 
 - [ ] Implement extraction contract for PokéAPI (pokemon identity + base stats)
