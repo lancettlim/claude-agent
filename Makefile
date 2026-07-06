@@ -2,6 +2,7 @@
 
 setup:
 	uv sync
+	uv run playwright install --with-deps chromium
 
 lint:
 	uv run ruff check .

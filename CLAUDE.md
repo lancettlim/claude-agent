@@ -99,7 +99,7 @@ published to `releases/`.
 Python, managed with `uv`. Setup and the standard dev loop:
 
 ```
-make setup      # uv sync
+make setup      # uv sync + playwright install --with-deps chromium
 make check      # lint + unit tests + dbt build/test + validation report
 ```
 
@@ -120,5 +120,6 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   `reports/validation/validation_report.template.json`'s shape exactly.
 - `tests/` — pytest unit tests, mirroring the `pipelines/` package.
 
-Playwright (needed for OP.GG's JS-rendered page) is deliberately not a
-dependency yet — add it when the OP.GG extractor is actually implemented.
+Playwright is a project dependency (`make setup` installs Chromium) for the
+OP.GG extractor's JS-rendered page — the scraping logic itself is still
+unimplemented (Phase 1 work).

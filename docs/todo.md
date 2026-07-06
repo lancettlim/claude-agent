@@ -26,8 +26,9 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   targets
 - [x] Update `CLAUDE.md` and `.claude/loop.md` to reflect the build/test
   system
-- [ ] Add the Playwright dependency and browser-install step once the OP.GG
-  extractor in `pipelines/extract/opgg.py` is actually implemented
+- [x] Add the Playwright dependency and browser-install step (`make setup`
+  installs Chromium); implementing the OP.GG scraper itself is tracked
+  under "Phase 1 — Ingestion" below
 
 ## Phase 1 — Ingestion
 
