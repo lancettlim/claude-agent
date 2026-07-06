@@ -32,7 +32,7 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## Phase 1 — Ingestion
 
-- [ ] Implement extraction contract for PokéAPI (pokemon identity + base stats)
+- [x] Implement extraction contract for PokéAPI (pokemon identity + base stats)
 - [ ] Implement extraction contract for OP.GG Pokémon Champions (legal pool +
   rebalanced stats)
 - [ ] Implement extraction contract for MunchStats (tournament/team/roster data)
