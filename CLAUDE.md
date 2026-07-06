@@ -29,6 +29,8 @@ previous:
   notes, including which are in v1 scope vs. deferred to later phases
 - `docs/todo.md` — outstanding work items and the v1 definition-of-done
   checklist
+- `docs/loop.md` — how to drive `docs/todo.md` forward iteratively using the
+  `/loop` skill
 
 When these documents disagree on scope or details, `docs/dataset-spec.md` is
 the most current source of truth for the v1 build; `docs/prd.md` is the

@@ -20,6 +20,8 @@ See `docs/` for the full document set:
 - `docs/business-case.md` — supporting business case document
 - `docs/todo.md` — outstanding work items and definition of done for the v1
   release
+- `docs/loop.md` — how to drive `todo.md` forward iteratively with Claude
+  Code's `/loop` skill
 
 ## Repository structure
 
