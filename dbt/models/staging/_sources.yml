@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: staging
+    meta:
+      external_location: "../data/staging/{name}.csv"
+    tables:
+      - name: pokeapi
+        description: "Raw PokéAPI identity + base stat rows. See data/staging/pokeapi.schema.json."
+      - name: opgg_champions
+        description: "Raw OP.GG Pokémon Champions legal pool + rebalanced stats. See data/staging/opgg_champions.schema.json."
+      - name: munchstats
+        description: "Raw MunchStats tournament/team/roster rows. See data/staging/munchstats.schema.json."

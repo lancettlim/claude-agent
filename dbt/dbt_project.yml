@@ -1,0 +1,23 @@
+name: "pokemon_champions"
+version: "1.0.0"
+config-version: 2
+
+profile: "pokemon_champions"
+
+model-paths: ["models"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+
+target-path: "target"
+log-path: "logs"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  pokemon_champions:
+    staging:
+      +materialized: view
+    normalized:
+      +materialized: external
+      +format: csv
