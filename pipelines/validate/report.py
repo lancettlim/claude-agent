@@ -14,12 +14,15 @@ carry a hash suffix. `name` -> `unique_id` comes from manifest.json;
 `unique_id` -> pass/fail/failure-count comes from run_results.json.
 
 Null-rate and coverage checks need an actual ratio (not just a failing-row
-count) in `metric_value`. Those singular tests are written to always return
-exactly one row containing the computed ratio, with a `fail_calc` config
-override (e.g. `fail_calc = "max(null_rate)"`) so dbt's reported `failures`
-number *is* the ratio itself, not a row count. Duplicate-key and
-referential-integrity checks use dbt's default `fail_calc` (`count(*)`),
-so `failures` is already the duplicate/violation count the report wants.
+count) in `metric_value`. dbt's run_results.json schema requires `failures`
+to be an integer, so those singular tests can't report a raw ratio directly
+(a fractional `fail_calc` result crashes dbt's results serialization) —
+instead they report the ratio in basis points (1.0 == 10000 bps) via a
+`fail_calc` override (e.g. `fail_calc = "max(null_rate_bps)"`), and
+`_ratio_from_bps` below divides back down to a ratio for `metric_value`.
+Duplicate-key and referential-integrity checks use dbt's default
+`fail_calc` (`count(*)`), so `failures` is already the duplicate/violation
+count the report wants.
 """
 
 from __future__ import annotations
@@ -118,6 +121,13 @@ def _test_name_to_result(
     }
 
 
+def _ratio_from_bps(result: dict[str, Any] | None) -> float | None:
+    """Recover a 0-1 ratio from a fail_calc result reported in basis points."""
+    if result is None or result["failures"] is None:
+        return None
+    return result["failures"] / 10000.0
+
+
 def _status_for(result: dict[str, Any] | None) -> str:
     if result is None:
         return "skipped"
@@ -144,7 +154,7 @@ def build_report(
                 "check_name": check_name,
                 "description": description,
                 "threshold": threshold,
-                "metric_value": result["failures"] if result else None,
+                "metric_value": _ratio_from_bps(result),
                 "status": _status_for(result),
             }
         )
@@ -155,7 +165,7 @@ def build_report(
         null_rate_checks.append(
             {
                 "table_name": table_name,
-                "metric_value": result["failures"] if result else None,
+                "metric_value": _ratio_from_bps(result),
                 "threshold": "<=0.01",
                 "status": _status_for(result),
             }

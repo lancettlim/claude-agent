@@ -36,16 +36,27 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Implement extraction contract for OP.GG Pokémon Champions (legal pool +
   rebalanced stats)
 - [x] Implement extraction contract for MunchStats (tournament/team/roster data)
-- [ ] Land staging outputs with raw snapshots and extraction metadata
-- [ ] Validate source availability and row-level parsing success thresholds
+- [x] Land staging outputs with raw snapshots and extraction metadata
+- [x] Validate source availability and row-level parsing success thresholds
+  (see `reports/validation/extraction_summary.json`: 100% request success
+  and 0% required-field null rate across all three sources)
 
 ## Phase 2 — Normalization
 
-- [ ] Standardize IDs and join keys (`pokemon_key`, `pokemon_id`) across
-  canonical, Champions, and tournament data
-- [ ] Build `pokemon_stat_delta` (canonical vs Champions) outputs
-- [ ] Generate regulation-aware `legality_snapshot` outputs
-- [ ] Normalize `tournament_event`, `tournament_team`, `tournament_team_member`
+- [x] Standardize IDs and join keys (`pokemon_key`, `pokemon_id`) across
+  canonical, Champions, and tournament data (`dbt/models/normalized/pokemon.sql`
+  + `dbt/models/intermediate/`; PokéAPI extraction now covers Mega/regional/
+  alternate forms too, and `dbt/seeds/*.csv` hold the controlled OP.GG- and
+  MunchStats-name-to-PokéAPI-form mappings dataset-spec.md calls for)
+- [x] Build `pokemon_stat_delta` (canonical vs Champions) outputs
+- [x] Generate regulation-aware `legality_snapshot` outputs (`regulation_code`
+  is currently always null — OP.GG's Champions Pokédex page doesn't publish
+  regulation codes, a pre-existing known risk in
+  `data/staging/opgg_champions.schema.json` — so this table's null-rate gate
+  fails until a regulation-code source is added; tracked below)
+- [x] Normalize `tournament_event`, `tournament_team`, `tournament_team_member`
+  (`dbt/models/intermediate/int_munchstats_deduped.sql` also resolves 9
+  upstream MunchStats teams that were double-recorded under two placements)
 
 ## Phase 3 — Analytics and dashboard outputs
 
@@ -55,14 +66,20 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## Release readiness (v1 definition of done)
 
-- [ ] Coverage: >=95% of OP.GG legal pool mapped to canonical `pokemon_id`
-- [ ] Coverage: >=90% of targeted tournament records mapped to normalized team
-  tables
+- [x] Coverage: >=95% of OP.GG legal pool mapped to canonical `pokemon_id`
+  (currently 98.4%, 312/317 legal-pool rows; see
+  `reports/validation/validation_report.json`)
+- [x] Coverage: >=90% of targeted tournament records mapped to normalized team
+  tables (currently ~99.9%)
 - [ ] Data quality: required-field null rate <=1% for core tables
-- [ ] Data quality: zero duplicate primary-key violations
-- [ ] Data quality: referential integrity checks pass for Pokémon/team/event
+  (`legality_snapshot` fails at ~9.1% — `regulation_code` is always null,
+  pending a regulation-code source; every other core table passes)
+- [x] Data quality: zero duplicate primary-key violations
+- [x] Data quality: referential integrity checks pass for Pokémon/team/event
   joins
-- [ ] Export: versioned CSV outputs for all core entities
+- [ ] Export: versioned CSV outputs for all core entities (normalized tables
+  exist under `data/normalized/`; still need the actual `releases/` package
+  build step)
 - [ ] Export: versioned JSON manifest with source lineage and run stats
 - [ ] Validate example analysis queries (top stat gainers/losers, most-used
   legal Pokémon, largest legal-pool changes by regulation)

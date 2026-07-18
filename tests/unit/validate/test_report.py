@@ -37,14 +37,14 @@ def test_build_report_matches_template_shape():
     run_results = {
         "results": [
             _run_result("test.pokemon_champions.assert_duplicate_key_pokemon.abc123", "pass", 0),
-            _run_result("test.pokemon_champions.assert_null_rate_pokemon.def456", "fail", 0.02),
+            _run_result("test.pokemon_champions.assert_null_rate_pokemon.def456", "fail", 200),
             _run_result(
                 "test.pokemon_champions.assert_pokemon_stat_canonical_resolves_to_pokemon.ghi789",
                 "pass",
                 0,
             ),
             _run_result(
-                "test.pokemon_champions.assert_opgg_legal_pool_coverage.jkl012", "pass", 1.0
+                "test.pokemon_champions.assert_opgg_legal_pool_coverage.jkl012", "pass", 10000
             ),
         ]
     }
@@ -76,6 +76,11 @@ def test_build_report_matches_template_shape():
     pokemon_null_check = next(c for c in result["null_rate_checks"] if c["table_name"] == "pokemon")
     assert pokemon_null_check["status"] == "fail"
     assert pokemon_null_check["metric_value"] == 0.02
+
+    opgg_coverage_check = next(
+        c for c in result["coverage_checks"] if c["check_name"] == "opgg_legal_pool_coverage"
+    )
+    assert opgg_coverage_check["metric_value"] == 1.0
 
     assert "pokemon: status=fail" in result["release_blocking_findings"]
 

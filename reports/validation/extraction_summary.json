@@ -1,0 +1,40 @@
+{
+  "description": "Phase 1 ingestion check: source availability and row-level parsing success for each staging extractor. Distinct from validation_report.json, which gates normalized-table release readiness (Phase 2/3 work) and is not yet populated because normalization hasn't been implemented.",
+  "generated_at_utc": "2026-07-18T17:07:16Z",
+  "dataset_version": "0.0.0-dev",
+  "sources": [
+    {
+      "source_name": "PokéAPI",
+      "endpoint": "https://pokeapi.co/api/v2/pokemon/{form_name} (list from https://pokeapi.co/api/v2/pokemon?limit=5000)",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 1352,
+      "requests_succeeded": 1352,
+      "request_success_rate": 1.0,
+      "rows_written": 1351,
+      "required_field_null_rate": 0.0,
+      "notes": "Covers every entry in PokéAPI's /pokemon list: base species plus Mega/regional/alternate forms, so Champions/tournament form-level rows have a canonical row to join against (Phase 2 normalization)."
+    },
+    {
+      "source_name": "OP.GG Pokémon Champions",
+      "endpoint": "https://op.gg/pokemon-champions/pokedex",
+      "availability": "reachable, HTTP 200, embedded pokemon payload located and parsed",
+      "requests_attempted": 1,
+      "requests_succeeded": 1,
+      "request_success_rate": 1.0,
+      "rows_written": 317,
+      "required_field_null_rate": 0.0,
+      "notes": "pokemon_id is null for 105/317 rows (fabricated OP.GG ids >=10000 for Mega/regional/alternate forms); expected per schema contract (pokemon_id required: false). regulation_code blank for all rows; expected, not published on this page (required: false)."
+    },
+    {
+      "source_name": "MunchStats",
+      "endpoint": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/stats/tournaments/",
+      "availability": "reachable, HTTP 200 for tournaments_index.json and all per-tournament metadata.json/players.json fetches",
+      "requests_attempted": 63,
+      "requests_succeeded": 63,
+      "request_success_rate": 1.0,
+      "rows_written": 106134,
+      "required_field_null_rate": 0.0,
+      "notes": "31 tournaments, 17685 teams, 8844 distinct players. form_name blank for all rows; expected, not separately reported by this source (required: false)."
+    }
+  ]
+}
