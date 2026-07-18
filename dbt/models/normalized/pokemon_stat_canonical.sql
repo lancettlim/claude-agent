@@ -1,19 +1,19 @@
--- STUB: typed, empty output matching data/normalized/pokemon_stat_canonical.schema.json.
--- Phase 2 replaces this with real stg_pokeapi normalization logic.
+-- Canonical PokéAPI stat snapshot: one row per form, matching pokemon.sql's
+-- pokemon_key (form_name) 1:1.
 select
-  cast(null as varchar) as pokemon_stat_canonical_key,
-  cast(null as varchar) as pokemon_key,
-  cast(null as integer) as pokemon_id,
-  cast(null as integer) as hp,
-  cast(null as integer) as attack,
-  cast(null as integer) as defense,
-  cast(null as integer) as sp_attack,
-  cast(null as integer) as sp_defense,
-  cast(null as integer) as speed,
-  cast(null as integer) as stat_total,
-  cast(null as varchar) as source_name,
-  cast(null as varchar) as source_url,
-  cast(null as varchar) as source_record_id,
-  cast(null as varchar) as extracted_at_utc,
-  cast(null as varchar) as dataset_version
-where false
+  form_name as pokemon_stat_canonical_key,
+  form_name as pokemon_key,
+  pokemon_id,
+  hp,
+  attack,
+  defense,
+  sp_attack,
+  sp_defense,
+  speed,
+  stat_total,
+  source_name,
+  source_url,
+  source_record_id,
+  extracted_at_utc,
+  dataset_version
+from {{ ref('stg_pokeapi') }}

@@ -18,6 +18,8 @@ models:
   pokemon_champions:
     staging:
       +materialized: view
+    intermediate:
+      +materialized: view
     normalized:
       +materialized: external
       +format: csv

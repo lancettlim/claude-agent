@@ -5,14 +5,14 @@
   "sources": [
     {
       "source_name": "PokéAPI",
-      "endpoint": "https://pokeapi.co/api/v2/pokemon/{id}",
+      "endpoint": "https://pokeapi.co/api/v2/pokemon/{form_name} (list from https://pokeapi.co/api/v2/pokemon?limit=5000)",
       "availability": "reachable, HTTP 200 for all requests",
-      "requests_attempted": 1025,
-      "requests_succeeded": 1025,
+      "requests_attempted": 1352,
+      "requests_succeeded": 1352,
       "request_success_rate": 1.0,
-      "rows_written": 1025,
+      "rows_written": 1351,
       "required_field_null_rate": 0.0,
-      "notes": "IDs 1-1025 contiguous, matches DEFAULT_MAX_POKEMON_ID."
+      "notes": "Covers every entry in PokéAPI's /pokemon list: base species plus Mega/regional/alternate forms, so Champions/tournament form-level rows have a canonical row to join against (Phase 2 normalization)."
     },
     {
       "source_name": "OP.GG Pokémon Champions",

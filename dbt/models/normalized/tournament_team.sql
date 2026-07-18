@@ -1,13 +1,14 @@
--- STUB: typed, empty output matching data/normalized/tournament_team.schema.json.
--- Phase 2 replaces this with real stg_munchstats team normalization logic.
-select
-  cast(null as varchar) as team_id,
-  cast(null as varchar) as event_id,
-  cast(null as varchar) as player_id,
-  cast(null as integer) as placement,
-  cast(null as varchar) as source_name,
-  cast(null as varchar) as source_url,
-  cast(null as varchar) as source_record_id,
-  cast(null as varchar) as extracted_at_utc,
-  cast(null as varchar) as dataset_version
-where false
+-- Team-level tournament metadata from MunchStats: one row per team_id.
+-- event_id/player_id/placement/source fields are constant across a given
+-- team's roster rows in stg_munchstats, so distinct collapses them safely.
+select distinct
+  team_id,
+  event_id,
+  player_id,
+  placement,
+  source_name,
+  source_url,
+  team_id as source_record_id,
+  extracted_at_utc,
+  dataset_version
+from {{ ref('int_munchstats_deduped') }}

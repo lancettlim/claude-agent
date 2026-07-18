@@ -1,20 +1,20 @@
--- STUB: typed, empty output matching data/normalized/pokemon_stat_champions.schema.json.
--- Phase 2 replaces this with real stg_opgg_champions normalization logic.
+-- Champions-format stat snapshot from OP.GG, mapped to pokemon_key/
+-- pokemon_id by int_opgg_champions_mapped.
 select
-  cast(null as varchar) as pokemon_stat_champions_key,
-  cast(null as varchar) as pokemon_key,
-  cast(null as integer) as pokemon_id,
-  cast(null as integer) as hp,
-  cast(null as integer) as attack,
-  cast(null as integer) as defense,
-  cast(null as integer) as sp_attack,
-  cast(null as integer) as sp_defense,
-  cast(null as integer) as speed,
-  cast(null as integer) as stat_total,
-  cast(null as boolean) as is_legal,
-  cast(null as varchar) as source_name,
-  cast(null as varchar) as source_url,
-  cast(null as varchar) as source_record_id,
-  cast(null as varchar) as extracted_at_utc,
-  cast(null as varchar) as dataset_version
-where false
+  resolved_pokemon_key || '-champions' as pokemon_stat_champions_key,
+  resolved_pokemon_key as pokemon_key,
+  resolved_pokemon_id as pokemon_id,
+  hp,
+  attack,
+  defense,
+  sp_attack,
+  sp_defense,
+  speed,
+  stat_total,
+  is_legal,
+  source_name,
+  source_url,
+  source_record_id,
+  extracted_at_utc,
+  dataset_version
+from {{ ref('int_opgg_champions_mapped') }}

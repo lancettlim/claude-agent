@@ -4,12 +4,12 @@
   "refresh_cadence": "weekly",
   "records_captured": [
     "pokemon/form identity rows",
-    "base stat rows for all Pokémon in the mapped Champions pool"
+    "base stat rows for every entry in PokéAPI's /pokemon list, including Mega/regional/alternate forms"
   ],
   "fields": [
-    {"name": "pokemon_id", "type": "integer", "required": true, "description": "PokéAPI numeric ID, treated as the canonical pokemon_id"},
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "National Dex number from the form's PokéAPI species reference; shared across all forms of one species (not the form's own PokéAPI resource id, which is a non-dex internal id for Mega/regional/alternate forms)"},
     {"name": "pokemon_name", "type": "string", "required": true, "description": "Species name as reported by PokéAPI"},
-    {"name": "form_name", "type": "string", "required": true, "description": "Normalized form label; default form uses the base species name"},
+    {"name": "form_name", "type": "string", "required": true, "description": "The form's own PokéAPI slug; equals the species name for the default/base form"},
     {"name": "hp", "type": "integer", "required": true, "description": "Base HP stat"},
     {"name": "attack", "type": "integer", "required": true, "description": "Base Attack stat"},
     {"name": "defense", "type": "integer", "required": true, "description": "Base Defense stat"},
@@ -24,7 +24,6 @@
     {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
   ],
   "known_risks": [
-    "Form-name mismatches between canonical and format-specific sources",
-    "Multi-form species that need explicit mapping rather than name-only joins"
+    "Form-name mismatches between canonical and format-specific sources: this source's form_name follows PokéAPI's own slug convention, which other sources' form labels don't always match verbatim (e.g. OP.GG's \"mega-charizard-x\" vs. this source's \"charizard-mega-x\")"
   ]
 }

@@ -4,15 +4,19 @@ Contract: data/staging/pokeapi.schema.json
 Spec reference: docs/dataset-spec.md, "Source-specific extraction contracts > PokéAPI"
 
 Captures Pokémon/form identity rows and base stat rows, weekly refresh
-cadence. PokéAPI numeric IDs are treated as the canonical `pokemon_id`
-(dataset-spec.md, "Key rules"); `form_name` defaults to the species name
-until multi-form mapping is implemented (tracked as a known risk in
-dataset-spec.md).
+cadence. Fetches every entry in PokéAPI's `/pokemon` list — base species
+plus Mega/regional/alternate forms (e.g. `charizard-mega-x`,
+`raichu-alola`) — not just the base national-dex range, so that
+form-specific rows from OP.GG and MunchStats have a canonical row to join
+against (dataset-spec.md's "Multi-form species that need explicit mapping
+rather than name-only joins" known risk).
 
-The OP.GG-mapped Champions pool that should ultimately scope this extract
-isn't available yet (OP.GG extraction is still unimplemented), so this
-fetches all currently known species by default; narrowing to the mapped
-pool is Phase 2 normalization work once both sources are joined.
+`pokemon_id` is the species' National Dex number, read from each form's
+`species.url` rather than the form's own PokéAPI resource id — the latter
+is an internal, non-dex id for alt forms (e.g. `charizard-mega-x` is
+resource id 10034 but species id 6), and `pokemon_id` must stay the shared
+identifier across all forms of one species. `form_name` is the form's own
+PokéAPI slug (equal to the species name for the default/base form).
 """
 
 from __future__ import annotations
@@ -28,9 +32,9 @@ SOURCE_NAME = "PokéAPI"
 API_BASE_URL = "https://pokeapi.co/api/v2"
 DEFAULT_DATASET_VERSION = "0.0.0-dev"
 
-# PokéAPI pokemon IDs run contiguously from 1; this covers all currently
-# known species as of dataset-spec.md's last update.
-DEFAULT_MAX_POKEMON_ID = 1025
+# Large enough to cover PokéAPI's full /pokemon list (base species plus
+# Mega/regional/alternate forms) in a single page.
+_LIST_PAGE_SIZE = 5000
 
 FIELDNAMES = [
     "pokemon_id",
@@ -60,29 +64,41 @@ _STAT_NAME_TO_FIELD = {
 }
 
 
-def _fetch_pokemon(session: requests.Session, pokemon_id: int) -> dict:
-    url = f"{API_BASE_URL}/pokemon/{pokemon_id}"
+def _fetch_pokemon_list(session: requests.Session) -> list[str]:
+    url = f"{API_BASE_URL}/pokemon?limit={_LIST_PAGE_SIZE}"
+    response = session.get(url, timeout=30)
+    response.raise_for_status()
+    return [entry["name"] for entry in response.json()["results"]]
+
+
+def _fetch_pokemon(session: requests.Session, form_name: str) -> dict:
+    url = f"{API_BASE_URL}/pokemon/{form_name}"
     response = session.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
 
 
+def _species_id(payload: dict) -> int:
+    species_url = payload["species"]["url"]
+    return int(species_url.rstrip("/").rsplit("/", 1)[-1])
+
+
 def _row_from_payload(payload: dict, *, extracted_at_utc: str, dataset_version: str) -> dict:
-    pokemon_id = payload["id"]
+    form_name = payload["name"]
     stats = {
         _STAT_NAME_TO_FIELD[entry["stat"]["name"]]: entry["base_stat"]
         for entry in payload["stats"]
         if entry["stat"]["name"] in _STAT_NAME_TO_FIELD
     }
     return {
-        "pokemon_id": pokemon_id,
-        "pokemon_name": payload["name"],
-        "form_name": payload["name"],
+        "pokemon_id": _species_id(payload),
+        "pokemon_name": payload["species"]["name"],
+        "form_name": form_name,
         **stats,
         "stat_total": sum(stats.values()),
         "source_name": SOURCE_NAME,
-        "source_url": f"{API_BASE_URL}/pokemon/{pokemon_id}",
-        "source_record_id": str(pokemon_id),
+        "source_url": f"{API_BASE_URL}/pokemon/{form_name}",
+        "source_record_id": str(payload["id"]),
         "extracted_at_utc": extracted_at_utc,
         "dataset_version": dataset_version,
     }
@@ -90,7 +106,7 @@ def _row_from_payload(payload: dict, *, extracted_at_utc: str, dataset_version: 
 
 def extract(
     output_path: Path,
-    pokemon_ids: Iterable[int] | None = None,
+    pokemon_identifiers: Iterable[str | int] | None = None,
     *,
     dataset_version: str = DEFAULT_DATASET_VERSION,
     session: requests.Session | None = None,
@@ -100,20 +116,23 @@ def extract(
     including provenance fields (source_name, source_url, source_record_id,
     extracted_at_utc, dataset_version).
 
-    `pokemon_ids` defaults to 1..DEFAULT_MAX_POKEMON_ID (all known species);
-    pass an explicit iterable to scope the extract, e.g. to a mapped pool.
+    `pokemon_identifiers` defaults to every entry in PokéAPI's `/pokemon`
+    list (base species plus Mega/regional/alternate forms); pass an
+    explicit iterable of names or ids to scope the extract.
     """
-    ids = pokemon_ids if pokemon_ids is not None else range(1, DEFAULT_MAX_POKEMON_ID + 1)
     http = session if session is not None else requests.Session()
+    identifiers = (
+        pokemon_identifiers if pokemon_identifiers is not None else _fetch_pokemon_list(http)
+    )
     extracted_at_utc = datetime.now(timezone.utc).isoformat()
 
     rows = [
         _row_from_payload(
-            _fetch_pokemon(http, pokemon_id),
+            _fetch_pokemon(http, identifier),
             extracted_at_utc=extracted_at_utc,
             dataset_version=dataset_version,
         )
-        for pokemon_id in ids
+        for identifier in identifiers
     ]
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
