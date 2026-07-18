@@ -35,7 +35,7 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Implement extraction contract for PokéAPI (pokemon identity + base stats)
 - [ ] Implement extraction contract for OP.GG Pokémon Champions (legal pool +
   rebalanced stats)
-- [ ] Implement extraction contract for MunchStats (tournament/team/roster data)
+- [x] Implement extraction contract for MunchStats (tournament/team/roster data)
 - [ ] Land staging outputs with raw snapshots and extraction metadata
 - [ ] Validate source availability and row-level parsing success thresholds
 
