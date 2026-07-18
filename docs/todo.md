@@ -19,8 +19,8 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   requests, dbt-core, dbt-duckdb, pytest, ruff)
 - [x] Add `pipelines/` package skeleton (`extract/` stubs per source,
   `validate/report.py`, `cli.py`)
-- [x] Add `dbt/` project: staging sources, typed-empty normalized stub
-  models, and singular tests encoding the coverage/null-rate/duplicate-key/
+- [x] Add `dbt/` project: staging sources, normalized models (see Phase 2),
+  and singular tests encoding the coverage/null-rate/duplicate-key/
   referential-integrity gates from `dataset-spec.md`
 - [x] Add `Makefile` with `setup`/`lint`/`test`/`dbt-build`/`validate`/`check`
   targets
@@ -77,12 +77,18 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Data quality: zero duplicate primary-key violations
 - [x] Data quality: referential integrity checks pass for Pokémon/team/event
   joins
-- [ ] Export: versioned CSV outputs for all core entities (normalized tables
-  exist under `data/normalized/`; still need the actual `releases/` package
-  build step)
-- [ ] Export: versioned JSON manifest with source lineage and run stats
-- [ ] Validate example analysis queries (top stat gainers/losers, most-used
-  legal Pokémon, largest legal-pool changes by regulation)
+- [x] Export: versioned CSV outputs for all core entities (`pipelines/release/build.py`,
+  `python -m pipelines.cli release --version X.Y.Z`; correctly refuses to
+  publish right now because of the `legality_snapshot` null-rate gap above —
+  confirmed by running it)
+- [x] Export: versioned JSON manifest with source lineage and run stats (same
+  command; also writes `releases/changelogs/CHANGELOG-<version>.md`)
+- [x] Validate example analysis queries (`dbt/analyses/`, see its `README.md`):
+  top stat gainers/losers and most-used legal Pokémon both validated with
+  real, non-degenerate results; largest legal-pool changes by regulation is
+  structurally validated but currently degenerate (single null
+  `regulation_code`, single `snapshot_date` — same regulation-code gap plus
+  no second extraction run yet to diff against)
 
 ## Deferred (post-v1)
 
