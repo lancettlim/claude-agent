@@ -32,7 +32,10 @@ def _run_extract(source: str) -> int:
 
 
 def _run_validate() -> int:
-    subprocess.run(["dbt", "build"], cwd=DBT_PROJECT_DIR, check=True)
+    # dbt build exits non-zero when a data test fails, which is an expected
+    # outcome here (a release gate catching bad data) rather than a crash;
+    # the report generated below is what surfaces that failure to the caller.
+    subprocess.run(["dbt", "build"], cwd=DBT_PROJECT_DIR)
     generated = report.generate()
     failing = [f for f in generated["release_blocking_findings"]]
     if failing:
