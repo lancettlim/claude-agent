@@ -1,13 +1,33 @@
-# Dashboard prototypes (M6)
+# Dashboard prototypes (M6 / M6.1)
 
 Two prototypes for `docs/prd.md`'s M6 milestone ("Launch first-party
 analytics dashboard views on top of v1 dataset outputs") and its still-open
 question ("Which dashboard tool stack and hosting model should be used for
-Phase 1?"). Both read exclusively from `data/marts/*.csv` and cover the
-same views: KPI overview cards (legal-pool size, most-used Pokémon, highest
-win rate, top stat gainer), trend charts (legal-pool size by regulation,
-usage by tournament tier), and a Pokémon drill-down (top items/abilities,
-top moves, top team cores, win-rate proxy).
+Phase 1?"). Both read exclusively from `data/marts/*.csv` (plus
+`dashboard/game_data.py`'s static game-mechanic constants — a type chart,
+type colors, and a weather/terrain-setting ability list, none of it
+sourced/extracted data) and cover the same views:
+
+- KPI overview cards (legal-pool size, most-used Pokémon, highest win
+  rate, top stat gainer)
+- Trend charts (legal-pool size by regulation, usage by tournament tier)
+- **Speed Tier List** — all legal Pokémon by base speed (explicitly
+  Champions-format base speed; no EVs/nature/items modeled anywhere in
+  this dataset)
+- **Stat Comparison** ("stats matching") — pick two Pokémon, compare all
+  six stats + BST as paired bars, plus a type-effectiveness readout
+- **Speed Control** — Choice Scarf users, Tailwind setters, Trick Room
+  setters
+- **Weather/Terrain Setters** — ranked by usage
+- **Meta Tier List** — sortable usage-rank + win-rate table (no invented
+  letter grades)
+- Pokémon drill-down (top items/abilities, top moves, top team cores, top
+  Tera types, win-rate proxy) with images and type badges
+
+See `docs/todo.md`'s "M6.1 — VGC player-focused dashboard features"
+section for the full checklist and what's backlogged (a full team-builder
+type-matchup calculator, a damage calculator, real EV-adjusted speed
+benchmarks, item/move icon sprites, historical trend lines).
 
 ## Prototype A — Streamlit (`streamlit_app.py`)
 

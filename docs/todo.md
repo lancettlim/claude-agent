@@ -135,6 +135,61 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   dashboard-streamlit`/`make dashboard-static`) — revisit this doc if
   that changes.
 
+## M6.1 — VGC player-focused dashboard features
+
+Extends M6 with features competitive players specifically asked for:
+Pokémon images, a stat-comparison view, speed tiers, and more. PokéAPI's
+`/pokemon/{form}` response (already fetched for base stats) turned out to
+carry type(s), an official-artwork image URL, and height/weight that the
+extractor had never read — capturing them needed no new API calls.
+
+- [x] Capture Pokémon type(s), an official-artwork image URL, and
+  height/weight in `pipelines/extract/pokeapi.py`, threaded through
+  `dbt/models/normalized/pokemon.sql` as optional fields (kept out of the
+  null-rate release gate, matching this layer's existing optional-field
+  precedent)
+- [x] `pokemon_stat_profile` mart: base stats + type(s) + image per legal
+  Pokémon — powers the Speed Tier List and Stat Comparison view
+- [x] `pokemon_tera_type_usage` mart: Tera type usage per Pokémon
+  (`tournament_team_member.tera_type` was already normalized but no mart
+  surfaced it until now)
+- [x] `pokemon_ability_usage` mart: ability-only usage per Pokémon (drops
+  `pokemon_build_usage`'s item dimension) — powers the Weather/Terrain
+  Setters view
+- [x] `dashboard/game_data.py`: shared static game-mechanic constants
+  (18-type effectiveness chart, type colors, weather/terrain-setting
+  ability list) imported by both dashboards, unit-tested in
+  `tests/unit/dashboard/test_game_data.py`
+- [x] Speed Tier List view (both dashboards): all legal Pokémon by base
+  speed, explicitly labeled as Champions-format base speed — no EVs,
+  nature, or items modeled, since none of that exists anywhere in this
+  dataset
+- [x] Stat Comparison ("stats matching") view: pick two Pokémon, compare
+  all six stats + BST as paired bars, plus a type-effectiveness readout
+  between them
+- [x] Speed Control view: Choice Scarf users, Tailwind setters, Trick
+  Room setters, each ranked by usage (`pokemon_build_usage`/
+  `pokemon_move_usage`, no new extraction)
+- [x] Weather/Terrain Setters view: ranked by usage from
+  `pokemon_ability_usage`, filtered to the 8 weather/terrain-setting
+  abilities
+- [x] Meta Tier List view: sortable usage-rank + win-rate table — no
+  invented S/A/B/C letter grades, since there's no rigorous basis for one
+- [x] Tera type usage added as a 4th Pokémon drill-down column, alongside
+  the existing item/ability, move, and team-core columns
+- [ ] Full team-builder type-matchup calculator (pick up to 6 Pokémon,
+  full weakness/resistance grid vs. an opponent's typing) — same
+  `dashboard/game_data.py` type chart, meaningfully more UI/logic;
+  deferred from this pass
+- [ ] Damage calculator — needs move power/accuracy/category data, not
+  captured by any current extractor; would need a new PokéAPI `/move`
+  endpoint extraction
+- [ ] Real EV/nature-adjusted speed benchmarks — needs a new source;
+  already known-deferred per Victory Road's dataset-spec.md rationale
+- [ ] Item/move icon sprites — separate PokéAPI endpoints, new extraction
+- [ ] Historical trend lines for the new views — blocked on multiple
+  extraction snapshot_dates over time, an existing known limitation
+
 ## Release readiness (v1 definition of done)
 
 All release gates pass as of this writing (see

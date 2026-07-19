@@ -3,13 +3,14 @@
 Contract: data/staging/pokeapi.schema.json
 Spec reference: docs/dataset-spec.md, "Source-specific extraction contracts > PokéAPI"
 
-Captures Pokémon/form identity rows and base stat rows, weekly refresh
-cadence. Fetches every entry in PokéAPI's `/pokemon` list — base species
-plus Mega/regional/alternate forms (e.g. `charizard-mega-x`,
-`raichu-alola`) — not just the base national-dex range, so that
-form-specific rows from OP.GG and MunchStats have a canonical row to join
-against (dataset-spec.md's "Multi-form species that need explicit mapping
-rather than name-only joins" known risk).
+Captures Pokémon/form identity rows, base stat rows, type(s), an
+official-artwork image URL, and height/weight, weekly refresh cadence.
+Fetches every entry in PokéAPI's `/pokemon` list — base species plus
+Mega/regional/alternate forms (e.g. `charizard-mega-x`, `raichu-alola`) —
+not just the base national-dex range, so that form-specific rows from
+OP.GG and MunchStats have a canonical row to join against
+(dataset-spec.md's "Multi-form species that need explicit mapping rather
+than name-only joins" known risk).
 
 `pokemon_id` is the species' National Dex number, read from each form's
 `species.url` rather than the form's own PokéAPI resource id — the latter
@@ -47,6 +48,11 @@ FIELDNAMES = [
     "sp_defense",
     "speed",
     "stat_total",
+    "type_1",
+    "type_2",
+    "image_url",
+    "height",
+    "weight",
     "source_name",
     "source_url",
     "source_record_id",
@@ -83,6 +89,16 @@ def _species_id(payload: dict) -> int:
     return int(species_url.rstrip("/").rsplit("/", 1)[-1])
 
 
+def _official_artwork_url(payload: dict) -> str | None:
+    # `or {}` guards against explicit `None` values at any level of this
+    # path (some forms have `sprites.other.official-artwork` present but
+    # null), not just missing keys — plain `.get(k, {})` doesn't catch that.
+    sprites = payload.get("sprites") or {}
+    other = sprites.get("other") or {}
+    artwork = other.get("official-artwork") or {}
+    return artwork.get("front_default")
+
+
 def _row_from_payload(payload: dict, *, extracted_at_utc: str, dataset_version: str) -> dict:
     form_name = payload["name"]
     stats = {
@@ -90,12 +106,18 @@ def _row_from_payload(payload: dict, *, extracted_at_utc: str, dataset_version: 
         for entry in payload["stats"]
         if entry["stat"]["name"] in _STAT_NAME_TO_FIELD
     }
+    types_by_slot = {entry["slot"]: entry["type"]["name"] for entry in payload["types"]}
     return {
         "pokemon_id": _species_id(payload),
         "pokemon_name": payload["species"]["name"],
         "form_name": form_name,
         **stats,
         "stat_total": sum(stats.values()),
+        "type_1": types_by_slot.get(1),
+        "type_2": types_by_slot.get(2),
+        "image_url": _official_artwork_url(payload),
+        "height": payload["height"],
+        "weight": payload["weight"],
         "source_name": SOURCE_NAME,
         "source_url": f"{API_BASE_URL}/pokemon/{form_name}",
         "source_record_id": str(payload["id"]),

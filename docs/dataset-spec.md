@@ -55,6 +55,12 @@ from v1 ingestion and release requirements:
   - **Required fields**: `pokemon_key`, `pokemon_id`, `pokemon_name`,
     `form_name`, `source_name`, `source_url`, `source_record_id`,
     `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `type_1`, `type_2` (elemental type(s); `type_2`
+    nullable for single-type Pokémon), `image_url` (official-artwork
+    sprite URL; nullable since PokéAPI doesn't guarantee official artwork
+    for every alt form), `height`, `weight` (decimetres/hectograms,
+    PokéAPI's raw units) — all marked optional (even `type_1`, despite
+    being near-universal) to keep them out of the null-rate release gate
 - `pokemon_stat_canonical`
   - **Purpose**: canonical PokéAPI stat snapshot
   - **Primary key**: `pokemon_stat_canonical_key`
@@ -202,6 +208,9 @@ Every release entry must summarize:
 - **Records to capture**
   - Pokémon/form identity rows
   - Base stat rows for all Pokémon in the mapped Champions pool
+  - Type(s), an official-artwork image URL, and height/weight for each
+    form, read off the same `/pokemon/{form}` response already fetched
+    for base stats (no additional API calls)
 - **Refresh cadence**
   - Weekly scheduled refresh
 - **Mapping rules**

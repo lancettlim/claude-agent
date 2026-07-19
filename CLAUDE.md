@@ -15,10 +15,14 @@ normalizes it into join-ready tables with real mapping logic, and
 `data/marts/*.csv` (see "Development workflow" below). All release gates
 pass and `dataset_version 0.1.0` has been published (`releases/data/0.1.0/`,
 `releases/manifests/manifest-0.1.0.json`) — see `docs/todo.md` for current
-status. M6 (a first-party analytics dashboard on top of `data/marts/`) is
-in progress: two prototypes exist under `dashboard/` (Streamlit and static
-HTML) for the tech-stack decision `docs/prd.md`'s open questions flag as
-unresolved — see `dashboard/README.md`.
+status. M6 (a first-party analytics dashboard on top of `data/marts/`) has
+two prototypes under `dashboard/` (Streamlit and static HTML), both kept
+rather than picking one — see `dashboard/README.md`. M6.1 extends both
+with competitive-VGC-player features (Pokémon images/types, a speed-tier
+list, a stat-comparison view with type-effectiveness, speed-control and
+weather/terrain views, a meta tier list) — this pulled type(s), an
+official-artwork image URL, and height/weight into the `pokemon` entity
+from data PokéAPI already returns but the extractor hadn't captured.
 
 ## Document map
 
@@ -76,6 +80,7 @@ reports/
 dashboard/
   streamlit_app.py          # M6 dashboard prototype A (Streamlit), reads data/marts/*.csv
   build_static.py           # M6 dashboard prototype B generator; writes dashboard/static/index.html
+  game_data.py               # static game-mechanic constants (type chart/colors, weather/terrain abilities) shared by both prototypes
   static/                   # generated static-HTML dashboard output (gitignored)
 ```
 
@@ -162,11 +167,15 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   (`releases/data/<version>/*.csv`, `releases/manifests/manifest-<version>.json`,
   `releases/changelogs/CHANGELOG-<version>.md`) from `data/normalized/` and
   the validation report; refuses to publish if any release gate is failing.
-- `tests/` — pytest unit tests, mirroring the `pipelines/` package.
-- `dashboard/` — M6 dashboard prototypes, both reading only `data/marts/*.csv`:
+- `tests/` — pytest unit tests, mirroring the `pipelines/` package
+  (`tests/unit/dashboard/` mirrors `dashboard/` similarly, for
+  `game_data.py`'s pure logic).
+- `dashboard/` — M6/M6.1 dashboard prototypes, both reading only
+  `data/marts/*.csv` plus `game_data.py`'s static game-mechanic constants:
   `make dashboard-streamlit` runs the Streamlit app; `make dashboard-static`
   regenerates the self-contained `dashboard/static/index.html`. See
-  `dashboard/README.md` for the tech-stack tradeoffs being compared.
+  `dashboard/README.md` for the tech-stack tradeoffs being compared and
+  the full feature list.
 
 Playwright is a project dependency (`make setup` installs Chromium) but
 neither the OP.GG nor PokéBase extractor ended up needing it — both pages'

@@ -31,8 +31,19 @@ class _FakeSession:
 
 
 def _payload(
-    resource_id: int, name: str, stats: dict[str, int], *, species_name: str, species_id: int
+    resource_id: int,
+    name: str,
+    stats: dict[str, int],
+    *,
+    species_name: str,
+    species_id: int,
+    types: list[str] | None = None,
+    image_url: str | None = None,
+    height: int = 0,
+    weight: int = 0,
 ) -> dict:
+    types = types if types is not None else []
+    sprites = {"other": {"official-artwork": {"front_default": image_url}}}
     return {
         "id": resource_id,
         "name": name,
@@ -43,6 +54,12 @@ def _payload(
         "stats": [
             {"base_stat": value, "stat": {"name": stat_name}} for stat_name, value in stats.items()
         ],
+        "types": [
+            {"slot": slot, "type": {"name": type_name}} for slot, type_name in enumerate(types, 1)
+        ],
+        "sprites": sprites,
+        "height": height,
+        "weight": weight,
     }
 
 
@@ -61,6 +78,10 @@ def test_extract_writes_rows_with_stats_and_provenance(tmp_path):
             },
             species_name="bulbasaur",
             species_id=1,
+            types=["grass", "poison"],
+            image_url="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png",
+            height=7,
+            weight=69,
         ),
     }
     session = _FakeSession(payloads)
@@ -84,6 +105,13 @@ def test_extract_writes_rows_with_stats_and_provenance(tmp_path):
     assert row["sp_defense"] == "65"
     assert row["speed"] == "45"
     assert row["stat_total"] == "318"
+    assert row["type_1"] == "grass"
+    assert row["type_2"] == "poison"
+    assert row["image_url"] == (
+        "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/1.png"
+    )
+    assert row["height"] == "7"
+    assert row["weight"] == "69"
     assert row["source_name"] == "PokéAPI"
     assert row["source_url"] == "https://pokeapi.co/api/v2/pokemon/bulbasaur"
     assert row["source_record_id"] == "1"
@@ -219,3 +247,61 @@ def test_extract_defaults_dataset_version_when_not_provided(tmp_path):
         row = next(csv.DictReader(fh))
 
     assert row["dataset_version"] == pokeapi.DEFAULT_DATASET_VERSION
+
+
+def test_extract_captures_single_type_pokemon_with_null_type_2(tmp_path):
+    payloads = {
+        "charmander": _payload(
+            4,
+            "charmander",
+            {
+                "hp": 39,
+                "attack": 52,
+                "defense": 43,
+                "special-attack": 60,
+                "special-defense": 50,
+                "speed": 65,
+            },
+            species_name="charmander",
+            species_id=4,
+            types=["fire"],
+        ),
+    }
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi.csv"
+
+    pokeapi.extract(output_path, ["charmander"], session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert row["type_1"] == "fire"
+    assert row["type_2"] == ""
+
+
+def test_extract_handles_missing_official_artwork(tmp_path):
+    payload = _payload(
+        1,
+        "bulbasaur",
+        {
+            "hp": 45,
+            "attack": 49,
+            "defense": 49,
+            "special-attack": 65,
+            "special-defense": 65,
+            "speed": 45,
+        },
+        species_name="bulbasaur",
+        species_id=1,
+        types=["grass", "poison"],
+    )
+    payload["sprites"] = {}
+    session = _FakeSession({"bulbasaur": payload})
+    output_path = tmp_path / "pokeapi.csv"
+
+    pokeapi.extract(output_path, ["bulbasaur"], session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert row["image_url"] == ""

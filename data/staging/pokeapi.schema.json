@@ -4,7 +4,8 @@
   "refresh_cadence": "weekly",
   "records_captured": [
     "pokemon/form identity rows",
-    "base stat rows for every entry in PokéAPI's /pokemon list, including Mega/regional/alternate forms"
+    "base stat rows for every entry in PokéAPI's /pokemon list, including Mega/regional/alternate forms",
+    "type(s), an official-artwork image URL, and height/weight for every entry, read off the same /pokemon response already fetched for base stats"
   ],
   "fields": [
     {"name": "pokemon_id", "type": "integer", "required": true, "description": "National Dex number from the form's PokéAPI species reference; shared across all forms of one species (not the form's own PokéAPI resource id, which is a non-dex internal id for Mega/regional/alternate forms)"},
@@ -17,6 +18,11 @@
     {"name": "sp_defense", "type": "integer", "required": true, "description": "Base Special Defense stat"},
     {"name": "speed", "type": "integer", "required": true, "description": "Base Speed stat"},
     {"name": "stat_total", "type": "integer", "required": true, "description": "Sum of the six base stats"},
+    {"name": "type_1", "type": "string", "required": true, "description": "Primary elemental type (PokéAPI types slot 1)"},
+    {"name": "type_2", "type": "string", "required": false, "description": "Secondary elemental type (PokéAPI types slot 2); null for single-type Pokémon"},
+    {"name": "image_url", "type": "string", "required": false, "description": "Official-artwork sprite URL (sprites.other.official-artwork.front_default); null for some alt forms PokéAPI doesn't have official artwork for"},
+    {"name": "height", "type": "integer", "required": true, "description": "Height in decimetres (PokéAPI's raw unit)"},
+    {"name": "weight", "type": "integer", "required": true, "description": "Weight in hectograms (PokéAPI's raw unit)"},
     {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéAPI"},
     {"name": "source_url", "type": "string", "required": true, "description": "API endpoint the record was extracted from"},
     {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéAPI resource ID"},

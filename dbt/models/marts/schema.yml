@@ -43,6 +43,25 @@ models:
       where both members are in the current legal pool
       (pokemon_key_a < pokemon_key_b so each pair appears once). Written
       to data/marts/pokemon_team_core_usage.csv.
+  - name: pokemon_stat_profile
+    description: >
+      Stat/type/image profile per legal Pokémon: all six base stats +
+      stat_total (from pokemon_stat_champions) plus type_1/type_2/
+      image_url (from pokemon). Powers the speed-tier list, the
+      stat-comparison view, and image/type display across the
+      dashboards. Written to data/marts/pokemon_stat_profile.csv.
+  - name: pokemon_tera_type_usage
+    description: >
+      Tera type drill-down: usage count per Pokémon x tera_type,
+      restricted to the current legal pool, ranked within each Pokémon.
+      Written to data/marts/pokemon_tera_type_usage.csv.
+  - name: pokemon_ability_usage
+    description: >
+      Ability-only usage drill-down: usage count per Pokémon x ability
+      (drops pokemon_build_usage's item_name dimension), restricted to
+      the current legal pool, ranked within each Pokémon. Powers the
+      Weather/Terrain setter dashboard view. Written to
+      data/marts/pokemon_ability_usage.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
@@ -59,6 +78,10 @@ models:
 #   - move/item drill-down: pokemon_build_usage (item/ability) and
 #     pokemon_move_usage (moves)
 #   - team-core drill-down: pokemon_team_core_usage (co-occurring pairs)
+#   - stat/type/image profile: pokemon_stat_profile (speed tiers, stat
+#     comparison, images/type badges)
+#   - tera type drill-down: pokemon_tera_type_usage
+#   - ability drill-down (weather/terrain setters): pokemon_ability_usage
 #
 # All fields these depend on (event_tier, record_wins/record_losses,
 # item_name/ability/tera_type/moves) are optional in the source data — see
