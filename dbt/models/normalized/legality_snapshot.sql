@@ -1,11 +1,13 @@
--- Time-sliced legal status for the Champions pool, from OP.GG rows mapped
--- to pokemon_key/pokemon_id by int_opgg_champions_mapped. regulation_code
--- is passed through as-is (currently always null: OP.GG's Champions
--- Pokédex page doesn't publish regulation codes — a known risk documented
--- in data/staging/opgg_champions.schema.json — so this table's null-rate
--- gate is expected to fail until a regulation-code source is added).
+-- Time-sliced, regulation-aware legal status for the Champions pool, from
+-- PokéBase rows mapped to pokemon_key/pokemon_id by int_pokebase_mapped.
+-- PokéBase (not OP.GG) is the source here because it's the only in-scope
+-- source that publishes real regulation codes per Pokémon (OP.GG's
+-- Champions Pokédex page has a single regulation-agnostic legal pool,
+-- with regulation_code always null — see pokemon_stat_champions.sql,
+-- which still uses OP.GG for Champions-format stats and overall legality).
 select
-  resolved_pokemon_key || '::' || cast(extracted_at_utc as date) as legality_snapshot_key,
+  resolved_pokemon_key || '::' || regulation_code || '::' || cast(extracted_at_utc as date)
+    as legality_snapshot_key,
   resolved_pokemon_key as pokemon_key,
   resolved_pokemon_id as pokemon_id,
   regulation_code,
@@ -16,4 +18,4 @@ select
   source_record_id,
   extracted_at_utc,
   dataset_version
-from {{ ref('int_opgg_champions_mapped') }}
+from {{ ref('int_pokebase_mapped') }}

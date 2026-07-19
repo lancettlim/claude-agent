@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: pokemon_usage_summary
+    description: >
+      Total tournament-roster usage per Pokémon (restricted to the current
+      legal pool), ranked descending. Written to data/marts/pokemon_usage_summary.csv.
+  - name: legality_summary_by_regulation
+    description: >
+      Legal-pool size per regulation and snapshot_date. Written to
+      data/marts/legality_summary_by_regulation.csv.
+  - name: stat_change_leaderboard
+    description: >
+      pokemon_stat_delta reshaped with a gainer/loser direction flag and a
+      rank within that direction. Written to
+      data/marts/stat_change_leaderboard.csv.
+
+# Filter-dimension coverage for docs/todo.md's "Document KPI views and
+# filter dimensions (regulation/date/tournament tier)" item, and how it
+# maps to docs/prd.md's fuller dashboard-analytics ambition:
+#
+# Available now, with current data:
+#   - regulation: legality_snapshot.regulation_code / legality_summary_by_regulation
+#   - date: tournament_event.event_date, legality_snapshot.snapshot_date
+#   - Pokémon drill-down: pokemon_key across every mart and core entity
+#
+# Not available yet — would need Phase 1 extraction work, not just a new
+# mart, so intentionally not built/faked here:
+#   - tournament tier: MunchStats' metadata.json has a "type" field
+#     (e.g. "International") per pipelines/extract/munchstats.py's
+#     docstring, but the extractor doesn't capture it yet
+#   - win-rate proxies: MunchStats' players.json has a "record" field per
+#     player, not currently extracted
+#   - move/item drill-down: MunchStats' team member objects have
+#     "item"/"ability"/"moves" fields, not currently extracted (only
+#     "pokemon" is)

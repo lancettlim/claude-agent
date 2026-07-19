@@ -1,0 +1,25 @@
+{
+  "source_name": "PokéBase",
+  "source_url": "https://pokebase.app/pokemon-champions/pokemon",
+  "refresh_cadence": "daily change detection; publish only on regulation or legal-pool change",
+  "records_captured": [
+    "per-regulation legal pool membership for the Champions format"
+  ],
+  "fields": [
+    {"name": "pokemon_id", "type": "integer", "required": true, "description": "PokéBase's own National Dex number (nationalNumber); correct for Mega/regional/alternate forms too"},
+    {"name": "pokemon_name", "type": "string", "required": true, "description": "Display name as reported by PokéBase (species name for base forms, form-specific display name for others, e.g. \"Mega Venusaur\")"},
+    {"name": "form_name", "type": "string", "required": true, "description": "PokéBase's own slug for this form; follows PokéAPI's own form-naming convention for most entries"},
+    {"name": "regulation_code", "type": "string", "required": true, "description": "Regulation set slug this legal-pool membership applies to (e.g. \"m-a\")"},
+    {"name": "is_legal", "type": "boolean", "required": true, "description": "Constant true: PokéBase's page only lists positive (legal) regulation membership, not exclusions"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéBase"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Page the record was extracted from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéBase pokemon id + regulation id, joined with ':'"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "HTML structure volatility",
+    "Only positive (legal) regulation membership is published on this page — there's no explicit signal for a Pokémon that was legal and became illegal, so legality_snapshot rows only ever assert is_legal=true; absence of a row doesn't necessarily mean confirmed illegality, just no observed legal-pool membership",
+    "A handful of form slugs (bare species names PokéAPI splits into named sub-forms, e.g. \"lycanroc\", \"meowstic\") don't match PokéAPI's own form_name directly and are resolved via the pokebase_slug_to_pokeapi_form seed; one ambiguous case (\"meowstic-mega\", \"tauros-paldea\") is left unmapped rather than guessed"
+  ]
+}

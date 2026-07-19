@@ -67,3 +67,28 @@ seeds:
         description: stg_munchstats.pokemon_name value.
       - name: pokeapi_form_name
         description: The matching form_name in stg_pokeapi/pokemon.
+
+  - name: pokebase_slug_to_pokeapi_form
+    description: >
+      Controlled name/form mapping from every distinct `form_name` (slug)
+      value in stg_pokebase to PokéAPI's `form_name` slug. PokéBase's own
+      slug convention already matches PokéAPI's directly for the large
+      majority of entries (e.g. `charizard-mega-x`), so most rows here are
+      an identity mapping confirmed against PokéAPI's live list; 8 more are
+      the same "bare species with no default-equals-species-name PokéAPI
+      form" gap solved for OP.GG/MunchStats, resolved via PokéAPI's
+      `is_default: true` variety per species (e.g. "gourgeist" ->
+      "gourgeist-average"). Four keys were left out rather than guessed or
+      double-counted: "meowstic-mega" (ambiguous between
+      `meowstic-male-mega`/`meowstic-female-mega`), "tauros-paldea"
+      (ambiguous between the three Paldean Tauros breed forms), and
+      "aegislash"/"lycanroc" (unlike the other bare-species cases,
+      PokéBase separately lists their default sub-form directly —
+      `aegislash-shield`, `lycanroc-midday` — as its own entry, so mapping
+      the bare name too would map two distinct PokéBase rows onto the same
+      pokemon_key).
+    columns:
+      - name: pokebase_slug
+        description: stg_pokebase.form_name value.
+      - name: pokeapi_form_name
+        description: The matching form_name in stg_pokeapi/pokemon.

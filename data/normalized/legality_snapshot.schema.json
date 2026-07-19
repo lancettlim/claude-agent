@@ -1,8 +1,8 @@
 {
   "table_name": "legality_snapshot",
-  "purpose": "time-sliced legal status for the Champions pool",
+  "purpose": "time-sliced, regulation-aware legal status for the Champions pool",
   "primary_key": "legality_snapshot_key",
-  "join_keys": ["pokemon_key", "pokemon_id", "snapshot_date"],
+  "join_keys": ["pokemon_key", "pokemon_id", "regulation_code", "snapshot_date"],
   "fields": [
     {"name": "legality_snapshot_key", "type": "string", "required": true, "description": "Primary key for this legality snapshot row"},
     {"name": "pokemon_key", "type": "string", "required": true, "description": "Foreign key to pokemon.pokemon_key"},
@@ -10,7 +10,7 @@
     {"name": "regulation_code", "type": "string", "required": true, "description": "Regulation identifier this snapshot applies to"},
     {"name": "is_legal", "type": "boolean", "required": true, "description": "Whether the Pokémon/form is legal under this regulation as of snapshot_date"},
     {"name": "snapshot_date", "type": "string", "required": true, "description": "ISO-8601 date the legal-pool state was captured"},
-    {"name": "source_name", "type": "string", "required": true, "description": "Constant: OP.GG Pokémon Champions"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéBase (the in-scope source that publishes real per-Pokémon regulation codes; OP.GG's Champions Pokédex page has only a single regulation-agnostic legal pool)"},
     {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
     {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream record identifier"},
     {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},

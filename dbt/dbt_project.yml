@@ -23,3 +23,6 @@ models:
     normalized:
       +materialized: external
       +format: csv
+    marts:
+      +materialized: external
+      +format: csv

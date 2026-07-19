@@ -89,6 +89,11 @@ COVERAGE_CHECKS: dict[str, tuple[str, str, str]] = {
         "Share of tournament roster rows mapped to normalized team tables",
         "assert_tournament_team_member_mapping_coverage",
     ),
+    "pokebase_legal_pool_coverage": (
+        ">=0.95",
+        "Share of PokéBase legal-pool rows mapped to a canonical pokemon_id",
+        "assert_pokebase_legal_pool_coverage",
+    ),
 }
 
 

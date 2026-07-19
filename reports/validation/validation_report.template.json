@@ -15,6 +15,13 @@
       "threshold": ">=0.90",
       "metric_value": null,
       "status": "pending"
+    },
+    {
+      "check_name": "pokebase_legal_pool_coverage",
+      "description": "Share of PokéBase legal-pool rows mapped to a canonical pokemon_id",
+      "threshold": ">=0.95",
+      "metric_value": null,
+      "status": "pending"
     }
   ],
   "null_rate_checks": [
