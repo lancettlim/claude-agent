@@ -22,6 +22,10 @@ reports/validation/validation_report.json
 data/normalized/*.csv
 data/marts/*.csv
 
+# Static dashboard prototype build output: regenerated via
+# `make dashboard-static`, bakes in data/marts/*.csv
+dashboard/static/
+
 # Raw source snapshots: regenerable via `python -m pipelines.cli extract
 # <source>` (pokeapi | opgg | munchstats | pokebase). These grow/change on every
 # refresh per dataset-spec.md's refresh policy (daily for OP.GG/MunchStats,

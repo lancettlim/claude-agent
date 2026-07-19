@@ -118,3 +118,8 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 - Which downstream interface is prioritized first (files only vs query endpoint)?
 - What governance is needed for schema versioning and deprecations?
 - Which dashboard tool stack and hosting model should be used for Phase 1?
+  Two prototypes now exist for comparison — a Streamlit app and a static
+  self-contained HTML page, both under `dashboard/` reading
+  `data/marts/*.csv` — see `dashboard/README.md`. Still undecided: which
+  one (or both, for different audiences) becomes the canonical answer,
+  and what hosting target it runs on beyond local `make dashboard-*`.

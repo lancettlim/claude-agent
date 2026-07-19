@@ -116,14 +116,20 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## M6 — Dashboard analytics release
 
-- [ ] Stand up a first-party analytics dashboard (KPI overview cards;
+- [x] Stand up a first-party analytics dashboard (KPI overview cards;
   trend views by regulation window and tournament period; drill-down by
   Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
   `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
-  requirement — no dashboard app/UI exists yet, only the flat
-  exports/marts from Phase 3
+  requirement (added the `pokemon_team_core_usage` mart for the
+  team-core drill-down bullet, since no mart covered it yet)
 - [ ] Decide and document the dashboard's tech stack and hosting approach
-  (not specified anywhere in the repo today) before implementation starts
+  (`docs/prd.md`'s open question) — two working prototypes now exist
+  under `dashboard/` (Streamlit app; static-HTML generator), both
+  covering the same KPI/trend/drill-down views from `data/marts/*.csv`,
+  see `dashboard/README.md` for the tradeoffs. Pending a decision on
+  which to keep as the canonical M6 answer (or keep both for different
+  audiences) and, once decided, a real hosting target instead of
+  local-only `make dashboard-streamlit`/`make dashboard-static`.
 
 ## Release readiness (v1 definition of done)
 

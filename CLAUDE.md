@@ -7,14 +7,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository builds the **Pokémon Champions Competitive Data Platform** —
 a unified, versioned dataset combining canonical Pokémon game data,
 Champions-format balance changes, legality snapshots, and tournament usage
-data. Phase 1 (ingestion) and Phase 2 (normalization) are implemented: the
-extractors in `pipelines/extract/` pull real data from all four v1 sources,
-and `dbt/` normalizes it into join-ready tables with real mapping logic (see
-"Development workflow" below). All release gates pass and `dataset_version
-0.1.0` has been published (`releases/data/0.1.0/`, `releases/manifests/
-manifest-0.1.0.json`) — see `docs/todo.md` for current status. Phase 3
-(analytics/dashboard outputs beyond the example queries in `dbt/analyses/`)
-is still outstanding.
+data. Phase 1 (ingestion), Phase 2 (normalization), and Phase 3 (flat
+analytical exports/marts) are implemented: the extractors in
+`pipelines/extract/` pull real data from all four v1 sources, `dbt/`
+normalizes it into join-ready tables with real mapping logic, and
+`dbt/models/marts/` publishes dashboard-ready aggregates to
+`data/marts/*.csv` (see "Development workflow" below). All release gates
+pass and `dataset_version 0.1.0` has been published (`releases/data/0.1.0/`,
+`releases/manifests/manifest-0.1.0.json`) — see `docs/todo.md` for current
+status. M6 (a first-party analytics dashboard on top of `data/marts/`) is
+in progress: two prototypes exist under `dashboard/` (Streamlit and static
+HTML) for the tech-stack decision `docs/prd.md`'s open questions flag as
+unresolved — see `dashboard/README.md`.
 
 ## Document map
 
@@ -69,6 +73,10 @@ releases/
   changelogs/               # one changelog entry per dataset version
 reports/
   validation/               # coverage, null-rate, duplicate-key, referential-integrity reports
+dashboard/
+  streamlit_app.py          # M6 dashboard prototype A (Streamlit), reads data/marts/*.csv
+  build_static.py           # M6 dashboard prototype B generator; writes dashboard/static/index.html
+  static/                   # generated static-HTML dashboard output (gitignored)
 ```
 
 `data/staging/*.csv`, `data/normalized/*.csv`, and `data/marts/*.csv` are
@@ -155,6 +163,10 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   `releases/changelogs/CHANGELOG-<version>.md`) from `data/normalized/` and
   the validation report; refuses to publish if any release gate is failing.
 - `tests/` — pytest unit tests, mirroring the `pipelines/` package.
+- `dashboard/` — M6 dashboard prototypes, both reading only `data/marts/*.csv`:
+  `make dashboard-streamlit` runs the Streamlit app; `make dashboard-static`
+  regenerates the self-contained `dashboard/static/index.html`. See
+  `dashboard/README.md` for the tech-stack tradeoffs being compared.
 
 Playwright is a project dependency (`make setup` installs Chromium) but
 neither the OP.GG nor PokéBase extractor ended up needing it — both pages'

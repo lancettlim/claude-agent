@@ -1,4 +1,4 @@
-.PHONY: setup lint test dbt-build validate check
+.PHONY: setup lint test dbt-build validate check dashboard-streamlit dashboard-static
 
 setup:
 	uv sync
@@ -18,3 +18,9 @@ validate:
 	uv run python -m pipelines.cli validate
 
 check: lint test validate
+
+dashboard-streamlit:
+	uv run streamlit run dashboard/streamlit_app.py
+
+dashboard-static:
+	uv run python dashboard/build_static.py

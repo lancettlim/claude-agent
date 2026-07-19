@@ -36,6 +36,13 @@ models:
       tournament_team_member's pipe-delimited moves list, restricted to
       the current legal pool, ranked within each Pokémon. Written to
       data/marts/pokemon_move_usage.csv.
+  - name: pokemon_team_core_usage
+    description: >
+      Team-core drill-down: usage count per unordered pair of Pokémon that
+      appeared on the same tournament team together, restricted to pairs
+      where both members are in the current legal pool
+      (pokemon_key_a < pokemon_key_b so each pair appears once). Written
+      to data/marts/pokemon_team_core_usage.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
@@ -51,6 +58,7 @@ models:
 #     tournament_team.record_wins/record_losses
 #   - move/item drill-down: pokemon_build_usage (item/ability) and
 #     pokemon_move_usage (moves)
+#   - team-core drill-down: pokemon_team_core_usage (co-occurring pairs)
 #
 # All fields these depend on (event_tier, record_wins/record_losses,
 # item_name/ability/tera_type/moves) are optional in the source data — see
