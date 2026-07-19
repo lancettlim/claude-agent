@@ -6,6 +6,8 @@ select distinct
   event_id,
   player_id,
   placement,
+  record_wins,
+  record_losses,
   source_name,
   source_url,
   team_id as source_record_id,

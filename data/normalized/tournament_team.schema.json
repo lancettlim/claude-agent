@@ -8,6 +8,8 @@
     {"name": "event_id", "type": "string", "required": true, "description": "Foreign key to tournament_event.event_id"},
     {"name": "player_id", "type": "string", "required": true, "description": "Upstream player identifier"},
     {"name": "placement", "type": "integer", "required": true, "description": "Final placement for the team in the event"},
+    {"name": "record_wins", "type": "integer", "required": false, "description": "Player's win count for the event, if reported"},
+    {"name": "record_losses", "type": "integer", "required": false, "description": "Player's loss count for the event, if reported"},
     {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
     {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
     {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MunchStats team identifier"},

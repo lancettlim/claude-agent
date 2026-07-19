@@ -73,11 +73,15 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Normalize `tournament_event`, `tournament_team`, `tournament_team_member`
   (`dbt/models/intermediate/int_munchstats_deduped.sql` also resolves 9
   upstream MunchStats teams that were double-recorded under two placements)
-- [ ] Once the MunchStats extractor captures tier/record/item fields (see
+- [x] Once the MunchStats extractor captures tier/record/item fields (see
   Phase 1), add them to `docs/dataset-spec.md`'s entity dictionary —
   `tournament_event` (tier), `tournament_team` (win-rate/`record`),
   `tournament_team_member` (`item`/`ability`/`tera_type`/`moves`) — and
   thread them through the corresponding `dbt/models/normalized/` models
+  (new "Optional fields" bullets added to each entity, since MunchStats
+  doesn't report tier/record/build for every event/player/slot; the three
+  `dbt/tests/singular/assert_null_rate_*` gates were deliberately left
+  untouched — they track only the pre-existing required-field lists)
 
 ## Phase 3 — Analytics and dashboard outputs
 

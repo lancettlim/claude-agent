@@ -5,6 +5,7 @@ select distinct
   event_id,
   event_name,
   event_date,
+  event_tier,
   source_name,
   source_url,
   event_id as source_record_id,
