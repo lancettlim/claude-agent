@@ -42,6 +42,10 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
   - PokéAPI (canonical data)
   - OP.GG Pokémon Champions (format-specific balance/legal pool)
   - MunchStats (tournament and team data)
+  - PokéBase app (per-regulation legal-pool membership — pulled in from
+    "out of scope" once OP.GG's regulation-agnostic legal pool proved
+    insufficient to populate `legality_snapshot.regulation_code`, a locked
+    required field; see `dataset-spec.md`'s "V1 scope" section)
 - Normalized core entities:
   - Pokémon, forms, canonical stats, Champions stats, stat deltas, legal status
   - Tournament event, player, team, team member, placements
@@ -58,7 +62,6 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
   - Drill-down by Pokémon, team core, move, and item usage
 
 ### Out of scope (Phase 1)
-- PokéBase app ingestion
 - Limitless ingestion
 - Victory Road ingestion
 - Advanced predictive modeling APIs
@@ -95,7 +98,7 @@ Provide a single, trustworthy, and regularly updated data product for Pokémon C
 1. **M1 – Data contract definition**
    - Finalize schema, primary keys, join keys, provenance rules, and release package contract.
 2. **M2 – Source ingestion baseline**
-   - Land repeatable extraction for PokéAPI, OP.GG, and MunchStats.
+   - Land repeatable extraction for PokéAPI, OP.GG, MunchStats, and PokéBase.
 3. **M3 – Normalization and delta layer**
    - Deliver canonical-vs-Champions diff outputs.
 4. **M4 – Tournament enrichment**

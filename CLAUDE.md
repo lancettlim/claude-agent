@@ -8,11 +8,13 @@ This repository builds the **Pokémon Champions Competitive Data Platform** —
 a unified, versioned dataset combining canonical Pokémon game data,
 Champions-format balance changes, legality snapshots, and tournament usage
 data. Phase 1 (ingestion) and Phase 2 (normalization) are implemented: the
-extractors in `pipelines/extract/` pull real data from all three v1 sources,
+extractors in `pipelines/extract/` pull real data from all four v1 sources,
 and `dbt/` normalizes it into join-ready tables with real mapping logic (see
-"Development workflow" below). Phase 3 (analytics/dashboard outputs) and
-publishing an actual versioned release are still outstanding — see
-`docs/todo.md` for current status and the release-readiness checklist.
+"Development workflow" below). All release gates pass and `dataset_version
+0.1.0` has been published (`releases/data/0.1.0/`, `releases/manifests/
+manifest-0.1.0.json`) — see `docs/todo.md` for current status. Phase 3
+(analytics/dashboard outputs beyond the example queries in `dbt/analyses/`)
+is still outstanding.
 
 ## Document map
 
@@ -45,8 +47,8 @@ source of truth for product-level goals/non-goals.
 
 - **In-scope sources (v1)**: PokéAPI (canonical stats), OP.GG Pokémon
   Champions (legal pool + rebalanced stats), MunchStats (tournament/roster
-  usage)
-- **Deferred sources**: PokéBase app, Limitless VGC, Victory Road (see
+  usage), PokéBase (per-regulation legal-pool membership)
+- **Deferred sources**: Limitless VGC, Victory Road (see
   `docs/dataset-spec.md` for why)
 - **Core entities**: `pokemon`, `pokemon_stat_canonical`,
   `pokemon_stat_champions`, `pokemon_stat_delta`, `legality_snapshot`,
@@ -70,17 +72,17 @@ reports/
 
 `data/staging/*.csv` and `data/normalized/*.csv` are both gitignored build
 output — regenerate staging with `python -m pipelines.cli extract <source>`
-(`pokeapi` | `opgg` | `munchstats`) and normalized with `make dbt-build`.
-They're inputs/intermediate output, not deliverables (`data/staging/*.schema.json`
-carries the durable, tracked contract for each source instead), and staging
-snapshots grow on every refresh per `dataset-spec.md`'s refresh policy —
-`munchstats.csv` alone is already ~37MB — so committing them isn't
-sustainable. `releases/` stays empty until a real release is published —
-`python -m pipelines.cli release --version X.Y.Z` populates it, gated on
-`reports/validation/validation_report.json` reporting
-zero `release_blocking_findings`. Respect this layout: staging → normalized
-→ releases, with validation reports gating what may be published to
-`releases/`.
+(`pokeapi` | `opgg` | `munchstats` | `pokebase`) and normalized with
+`make dbt-build`. They're inputs/intermediate output, not deliverables
+(`data/staging/*.schema.json` carries the durable, tracked contract for
+each source instead), and staging snapshots grow on every refresh per
+`dataset-spec.md`'s refresh policy — `munchstats.csv` alone is already
+~37MB — so committing them isn't sustainable. `python -m pipelines.cli
+release --version X.Y.Z` populates `releases/`, gated on
+`reports/validation/validation_report.json` reporting zero
+`release_blocking_findings` — `dataset_version 0.1.0` is published as of
+this writing. Respect this layout: staging → normalized → releases, with
+validation reports gating what may be published to `releases/`.
 
 ## Conventions to follow when extending this repo
 
@@ -117,21 +119,23 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
 (`cd dbt && dbt build`), `make validate` (runs dbt build, then writes
 `reports/validation/validation_report.json`).
 
-- `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG, MunchStats)
-  that writes provenance-tagged rows into `data/staging/`. PokéAPI fetches
-  every entry in its `/pokemon` list (base species plus Mega/regional/
-  alternate forms); OP.GG does a plain GET against its Champions Pokédex
-  page (server-rendered, no browser automation needed despite appearing
-  JS-driven — see `pipelines/extract/opgg.py`'s docstring); MunchStats reads
-  structured JSON off GitHub.
+- `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG,
+  MunchStats, PokéBase) that writes provenance-tagged rows into
+  `data/staging/`. PokéAPI fetches every entry in its `/pokemon` list (base
+  species plus Mega/regional/alternate forms); OP.GG and PokéBase each do a
+  plain GET against their respective Champions pages (both server-rendered,
+  no browser automation needed despite appearing JS-driven — see
+  `pipelines/extract/opgg.py`'s and `pokebase.py`'s docstrings); MunchStats
+  reads structured JSON off GitHub.
 - `dbt/` — a dbt-duckdb project. `models/staging/` reads `data/staging/*.csv`
   as sources; `models/intermediate/` resolves cross-source identity mapping
-  (OP.GG/MunchStats Pokémon names/keys onto canonical `pokemon_key`, via the
-  controlled mapping seeds in `dbt/seeds/` — see their `schema.yml` for the
-  verified transform rules); `models/normalized/` (external-materialized)
-  produces the eight core entities into `data/normalized/*.csv`; the
-  `docs/dataset-spec.md` release gates (coverage, null-rate, duplicate-key,
-  referential-integrity) are singular tests under `dbt/tests/singular/`;
+  (OP.GG/MunchStats/PokéBase Pokémon names/keys onto canonical
+  `pokemon_key`, via the controlled mapping seeds in `dbt/seeds/` — see
+  their `schema.yml` for the verified transform rules); `models/normalized/`
+  (external-materialized) produces the eight core entities into
+  `data/normalized/*.csv`; the `docs/dataset-spec.md` release gates
+  (coverage, null-rate, duplicate-key, referential-integrity) are singular
+  tests under `dbt/tests/singular/`;
   `analyses/` holds the example queries from dataset-spec.md's
   "Validate example analysis queries" item (compiled, not run by `dbt build`).
 - `pipelines/validate/report.py` — reshapes dbt's test results into
@@ -143,7 +147,7 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   the validation report; refuses to publish if any release gate is failing.
 - `tests/` — pytest unit tests, mirroring the `pipelines/` package.
 
-Playwright is a project dependency (`make setup` installs Chromium) but the
-OP.GG extractor ended up not needing it — the page's data ships embedded in
-server-rendered HTML, so a plain HTTP GET is enough (see that module's
-docstring for details).
+Playwright is a project dependency (`make setup` installs Chromium) but
+neither the OP.GG nor PokéBase extractor ended up needing it — both pages'
+data ships embedded in server-rendered HTML, so a plain HTTP GET is enough
+(see those modules' docstrings for details).

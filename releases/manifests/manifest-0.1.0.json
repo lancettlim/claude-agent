@@ -1,0 +1,123 @@
+{
+  "dataset_version": "0.1.0",
+  "published_at_utc": "2026-07-19T06:22:57Z",
+  "sources": [
+    {
+      "source_name": "Pok\u00e9API",
+      "source_url": "https://github.com/PokeAPI/pokeapi",
+      "extracted_at_utc": "2026-07-18T17:21:32.693897+00:00",
+      "record_count": 1351
+    },
+    {
+      "source_name": "OP.GG Pok\u00e9mon Champions",
+      "source_url": "https://op.gg/pokemon-champions/pokedex",
+      "extracted_at_utc": "2026-07-18T17:06:37.536825+00:00",
+      "record_count": 317
+    },
+    {
+      "source_name": "MunchStats",
+      "source_url": "https://github.com/PizzaTimeJoshua/munchstats",
+      "extracted_at_utc": "2026-07-18T17:06:38.505628+00:00",
+      "record_count": 106134
+    },
+    {
+      "source_name": "Pok\u00e9Base",
+      "source_url": "https://pokebase.app/pokemon-champions/pokemon",
+      "extracted_at_utc": "2026-07-19T06:15:49.510565+00:00",
+      "record_count": 311
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "pokemon",
+      "file_name": "pokemon.csv",
+      "primary_key": "pokemon_key",
+      "row_count": 1351
+    },
+    {
+      "table_name": "pokemon_stat_canonical",
+      "file_name": "pokemon_stat_canonical.csv",
+      "primary_key": "pokemon_stat_canonical_key",
+      "row_count": 1351
+    },
+    {
+      "table_name": "pokemon_stat_champions",
+      "file_name": "pokemon_stat_champions.csv",
+      "primary_key": "pokemon_stat_champions_key",
+      "row_count": 312
+    },
+    {
+      "table_name": "pokemon_stat_delta",
+      "file_name": "pokemon_stat_delta.csv",
+      "primary_key": "pokemon_stat_delta_key",
+      "row_count": 312
+    },
+    {
+      "table_name": "legality_snapshot",
+      "file_name": "legality_snapshot.csv",
+      "primary_key": "legality_snapshot_key",
+      "row_count": 307
+    },
+    {
+      "table_name": "tournament_event",
+      "file_name": "tournament_event.csv",
+      "primary_key": "event_id",
+      "row_count": 31
+    },
+    {
+      "table_name": "tournament_team",
+      "file_name": "tournament_team.csv",
+      "primary_key": "team_id",
+      "row_count": 17685
+    },
+    {
+      "table_name": "tournament_team_member",
+      "file_name": "tournament_team_member.csv",
+      "primary_key": "team_member_id",
+      "row_count": 106080
+    }
+  ],
+  "quality_checks": [
+    {
+      "check_name": "opgg_legal_pool_coverage",
+      "status": "pass",
+      "metric_value": 0.0,
+      "threshold": ">=0.95"
+    },
+    {
+      "check_name": "tournament_team_member_mapping_coverage",
+      "status": "pass",
+      "metric_value": 0.0,
+      "threshold": ">=0.90"
+    },
+    {
+      "check_name": "pokebase_legal_pool_coverage",
+      "status": "pass",
+      "metric_value": 0.0,
+      "threshold": ">=0.95"
+    },
+    {
+      "check_name": "required_field_null_rate",
+      "status": "pass",
+      "metric_value": 0.0,
+      "threshold": "<=0.01"
+    },
+    {
+      "check_name": "duplicate_primary_key_violations",
+      "status": "pass",
+      "metric_value": 0,
+      "threshold": "=0"
+    },
+    {
+      "check_name": "referential_integrity",
+      "status": "pass",
+      "metric_value": 0,
+      "threshold": "all resolve"
+    }
+  ],
+  "known_limitations": [
+    "Only positive (legal) regulation membership is published by Pok\u00e9Base \u2014 absence of a row doesn't necessarily confirm a Pok\u00e9mon is illegal, just that no legal membership was observed.",
+    "pokemon_stat_champions/pokemon_stat_delta show zero stat deltas for every mapped Pok\u00e9mon in this snapshot \u2014 OP.GG's Champions stats currently match Pok\u00e9API's canonical base stats exactly; not a bug, see dbt/analyses/README.md.",
+    "OP.GG's 'mega-meowstic' and Pok\u00e9Base's 'meowstic-mega'/'tauros-paldea' entries are excluded from mapping: genuinely ambiguous between multiple Pok\u00e9API forms, not guessed."
+  ]
+}

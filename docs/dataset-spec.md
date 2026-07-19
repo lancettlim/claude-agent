@@ -13,23 +13,33 @@ the repository-level overview in `README.md`.
 
 ## V1 scope (selected high-confidence sources)
 
-The v1 scope is intentionally limited to three sources from `data-sources.md`:
+The v1 scope covers four sources from `data-sources.md`:
 
 1. **PokéAPI** (canonical base data)
 2. **OP.GG Pokémon Champions** (format-specific legal pool and rebalanced data)
 3. **MunchStats** (structured tournament roster/usage data)
+4. **PokéBase app** (per-regulation legal-pool membership)
 
-These three sources provide strong coverage of canonical values, format
-modifications, and real competitive usage while keeping ingestion complexity
-manageable for v1.
+PokéBase was originally deferred ("defer until regulation-specific
+restrictions are needed beyond the OP.GG legal pool snapshot") but was
+pulled into v1 once that need became concrete: OP.GG's Champions Pokédex
+page publishes only a single regulation-agnostic legal pool, so
+`legality_snapshot.regulation_code` — a locked required field — had no
+in-scope source and was permanently null. PokéBase's page embeds real,
+per-Pokémon regulation-set membership and turned out to be scriptable the
+same way OP.GG is (see `pipelines/extract/pokebase.py`'s docstring), so it
+now supplies `legality_snapshot` directly; OP.GG remains the source for
+`pokemon_stat_champions`'s stats and overall legal-pool flag.
+
+These four sources provide strong coverage of canonical values, format
+modifications, regulation-aware legality, and real competitive usage while
+keeping ingestion complexity manageable for v1.
 
 ## Deferred sources
 
 The following sources remain useful for later phases but are explicitly deferred
 from v1 ingestion and release requirements:
 
-- **PokéBase app** — defer until regulation-specific restrictions are needed
-  beyond the OP.GG legal pool snapshot
 - **Limitless VGC** — defer until historical event coverage expansion
 - **Victory Road** — defer until detailed moveset/EV enrichment is prioritized
 
@@ -71,9 +81,10 @@ from v1 ingestion and release requirements:
     `canonical_dataset_version`, `champions_dataset_version`, `source_name`,
     `source_url`, `extracted_at_utc`, `dataset_version`
 - `legality_snapshot`
-  - **Purpose**: time-sliced legal status for the Champions pool
+  - **Purpose**: time-sliced, regulation-aware legal status for the
+    Champions pool, sourced from PokéBase (see "PokéBase" below)
   - **Primary key**: `legality_snapshot_key`
-  - **Join keys**: `pokemon_key`, `pokemon_id`, `snapshot_date`
+  - **Join keys**: `pokemon_key`, `pokemon_id`, `regulation_code`, `snapshot_date`
   - **Required fields**: `legality_snapshot_key`, `pokemon_key`, `pokemon_id`,
     `regulation_code`, `is_legal`, `snapshot_date`, `source_name`,
     `source_url`, `source_record_id`, `extracted_at_utc`, `dataset_version`
@@ -221,10 +232,35 @@ Every release entry must summarize:
   - Incomplete tournament coverage
   - Roster naming inconsistencies that reduce automated match confidence
 
+### PokéBase
+
+- **Records to capture**
+  - Per-regulation legal-pool membership for the Champions format
+    (`legality_snapshot`'s sole source — see "V1 scope" above for why OP.GG
+    doesn't cover this)
+- **Refresh cadence**
+  - Daily change detection; publish only on regulation or legal-pool change
+- **Mapping rules**
+  - Use PokéBase's own `nationalNumber` directly as `pokemon_id` (correct
+    for Mega/regional/alternate forms too, unlike OP.GG's fabricated
+    per-form ids)
+  - Join to canonical records by form slug, which already matches PokéAPI's
+    own form-naming convention for the large majority of entries; fall back
+    to controlled name/form mappings (PokéAPI's designated default variety
+    per species) for the remainder
+- **Known risks**
+  - HTML structure volatility
+  - Only positive (legal) regulation membership is published — there's no
+    explicit "removed from this regulation" signal, so a Pokémon's absence
+    from a snapshot isn't distinguishable from "not yet observed" versus
+    "confirmed illegal"
+
 ### Confidence requirements
 
 - OP.GG legal-pool mapping coverage must reach at least 95% before release.
 - Tournament team-member mapping coverage must reach at least 90% before
+  release.
+- PokéBase legal-pool mapping coverage must reach at least 95% before
   release.
 - Any unmapped or low-confidence rows must be documented in the manifest and
   excluded from release tables unless explicitly approved.
@@ -240,6 +276,7 @@ checklist and current status of each phase.
 - **Coverage**
   - `>=95%` of OP.GG legal pool mapped to canonical `pokemon_id`
   - `>=90%` of targeted tournament records mapped to normalized team tables
+  - `>=95%` of PokéBase legal-pool rows mapped to canonical `pokemon_id`
 - **Null-rate gate**
   - Required-field null rate must be `<=1%` for every core table
 - **Duplicate-key gate**

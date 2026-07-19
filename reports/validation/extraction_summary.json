@@ -1,6 +1,6 @@
 {
-  "description": "Phase 1 ingestion check: source availability and row-level parsing success for each staging extractor. Distinct from validation_report.json, which gates normalized-table release readiness (Phase 2/3 work) and is not yet populated because normalization hasn't been implemented.",
-  "generated_at_utc": "2026-07-18T17:07:16Z",
+  "description": "Phase 1 ingestion check: source availability and row-level parsing success for each staging extractor. Distinct from validation_report.json, which gates normalized-table release readiness.",
+  "generated_at_utc": "2026-07-19T06:15:49Z",
   "dataset_version": "0.0.0-dev",
   "sources": [
     {
@@ -35,6 +35,17 @@
       "rows_written": 106134,
       "required_field_null_rate": 0.0,
       "notes": "31 tournaments, 17685 teams, 8844 distinct players. form_name blank for all rows; expected, not separately reported by this source (required: false)."
+    },
+    {
+      "source_name": "PokéBase",
+      "endpoint": "https://pokebase.app/pokemon-champions/pokemon",
+      "availability": "reachable, HTTP 200, embedded pokemon payload located and parsed",
+      "requests_attempted": 1,
+      "requests_succeeded": 1,
+      "request_success_rate": 1.0,
+      "rows_written": 311,
+      "required_field_null_rate": 0.0,
+      "notes": "One row per (pokemon, regulation) pair for the 310 pokemon entries (of 1360 total in PokéBase's database) currently in the Champions legal pool; 272 rows under regulation m-a, 39 under m-b."
     }
   ]
 }

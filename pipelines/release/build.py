@@ -41,6 +41,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "PokéAPI": ("https://github.com/PokeAPI/pokeapi", "pokeapi.csv"),
     "OP.GG Pokémon Champions": ("https://op.gg/pokemon-champions/pokedex", "opgg_champions.csv"),
     "MunchStats": ("https://github.com/PizzaTimeJoshua/munchstats", "munchstats.csv"),
+    "PokéBase": ("https://pokebase.app/pokemon-champions/pokemon", "pokebase.csv"),
 }
 
 CHANGELOG_TEMPLATE = (REPO_ROOT / "releases" / "changelogs" / "CHANGELOG.template.md").read_text()
@@ -174,6 +175,7 @@ def _write_changelog(
         .replace(
             "{MUNCHSTATS_EXTRACTED_AT_UTC}", str(source_by_name["MunchStats"]["extracted_at_utc"])
         )
+        .replace("{POKEBASE_EXTRACTED_AT_UTC}", str(source_by_name["PokéBase"]["extracted_at_utc"]))
     )
     limitations_block = (
         "\n".join(f"- {item}" for item in known_limitations) if known_limitations else "- None"

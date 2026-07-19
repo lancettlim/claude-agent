@@ -19,6 +19,12 @@
       "source_url": "https://github.com/PizzaTimeJoshua/munchstats",
       "extracted_at_utc": "1970-01-01T00:00:00Z",
       "record_count": 0
+    },
+    {
+      "source_name": "PokéBase",
+      "source_url": "https://pokebase.app/pokemon-champions/pokemon",
+      "extracted_at_utc": "1970-01-01T00:00:00Z",
+      "record_count": 0
     }
   ],
   "tables": [
@@ -83,6 +89,12 @@
       "status": "pending",
       "metric_value": null,
       "threshold": ">=0.90"
+    },
+    {
+      "check_name": "pokebase_legal_pool_coverage",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": ">=0.95"
     },
     {
       "check_name": "required_field_null_rate",

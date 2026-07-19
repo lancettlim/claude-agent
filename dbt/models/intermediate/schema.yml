@@ -2,6 +2,8 @@ version: 2
 
 models:
   - name: int_opgg_champions_mapped
-    description: "stg_opgg_champions rows resolved to pokemon_key/pokemon_id. Shared by pokemon_stat_champions and legality_snapshot."
+    description: "stg_opgg_champions rows resolved to pokemon_key/pokemon_id. Used by pokemon_stat_champions."
   - name: int_munchstats_deduped
     description: "stg_munchstats rows with upstream team/placement duplicates collapsed. Shared by tournament_event, tournament_team, and tournament_team_member."
+  - name: int_pokebase_mapped
+    description: "stg_pokebase rows resolved to pokemon_key/pokemon_id. Used by legality_snapshot."

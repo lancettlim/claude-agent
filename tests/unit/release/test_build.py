@@ -72,6 +72,10 @@ def _populate_normalized_and_staging(tmp_path):
         staging_dir / "munchstats.csv",
         [{"extracted_at_utc": "2026-01-01T02:00:00Z", "event_id": "e1"}],
     )
+    _write_csv(
+        staging_dir / "pokebase.csv",
+        [{"extracted_at_utc": "2026-01-01T03:00:00Z", "pokemon_id": "1"}],
+    )
     return normalized_dir, staging_dir
 
 
@@ -133,6 +137,7 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         "PokéAPI",
         "OP.GG Pokémon Champions",
         "MunchStats",
+        "PokéBase",
     }
 
     for table_name in build.TABLES:

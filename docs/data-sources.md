@@ -32,10 +32,13 @@ OP.GG serves as the authoritative source for the Pokémon Champions tier—a cur
 - Tier-specific items and ability adjustments
 
 **How to extract:**
-1. Visit [op.gg/pokemon-champions/pokedex](https://op.gg/pokemon-champions/pokedex)
-2. Use a browser scraper (e.g., Selenium, Puppeteer) or table capture extension
-3. Extract the full Pokédex grid with custom stats
-4. Join with PokéAPI canonical data via numeric ID to identify what was changed
+1. GET [op.gg/pokemon-champions/pokedex](https://op.gg/pokemon-champions/pokedex) directly — no
+   browser automation needed. The page is server-rendered by Next.js and ships its full Pokédex
+   dataset embedded as a JSON-string-escaped array inside a React Server Components "Flight"
+   script chunk (`self.__next_f.push([1, "..."])`), extractable with a plain HTTP client (see
+   `pipelines/extract/opgg.py`'s docstring for the exact technique)
+2. Join with PokéAPI canonical data via numeric ID (or the controlled name/form mapping for
+   fabricated-id Mega/regional forms) to identify what was changed
 
 ## 3. PokéBase App
 **Best for:** Competitive regulation rules, banned/restricted Pokémon, and official speed tiers
@@ -49,10 +52,15 @@ PokéBase aggregates competitive-specific ruleset information for Pokémon Champ
 - Mega Evolution availability
 
 **How to extract:**
-1. Visit [pokebase.app/pokemon-champions/pokemon](https://pokebase.app/pokemon-champions/pokemon)
-2. Copy the data tables from each regulation panel
-3. Paste into Excel or Google Sheets for CSV conversion
-4. Optionally use browser table export extensions for automation
+1. GET [pokebase.app/pokemon-champions/pokemon](https://pokebase.app/pokemon-champions/pokemon)
+   directly — no browser automation needed. Like OP.GG, the page is server-rendered by Next.js
+   and ships its full paginated Pokémon list embedded the same way (a React Server Components
+   "Flight" script chunk); each entry legal in the Champions pool carries a `regulationSets`
+   array naming every regulation it's legal under (see `pipelines/extract/pokebase.py`'s
+   docstring for the exact technique)
+2. Join to canonical PokéAPI records via the embedded `nationalNumber` field (correct for
+   Mega/regional/alternate forms too) or the controlled name/form mapping for the handful of
+   form slugs that don't match PokéAPI's own naming directly
 
 ## 4. MunchStats
 **Best for:** Live tournament results and player roster data
