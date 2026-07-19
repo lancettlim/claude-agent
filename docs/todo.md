@@ -43,6 +43,16 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Validate source availability and row-level parsing success thresholds
   (see `reports/validation/extraction_summary.json`: 100% request success
   and 0% required-field null rate across all four sources)
+- [x] Extend MunchStats extraction (`pipelines/extract/munchstats.py`) to
+  additionally capture `metadata.json`'s `type` field (tournament tier,
+  e.g. "International"), `players.json`'s `record` field (win-rate proxy),
+  and team-member `item`/`ability`/`tera_type`/`moves` fields — only
+  `pokemon` is captured per slot today; update
+  `data/staging/munchstats.schema.json` to match (see the gap noted in
+  `dbt/models/marts/schema.yml`)
+  (staging CSV now carries `event_tier`, `record_wins`/`record_losses`,
+  `item_name`, `ability`, `tera_type`, and pipe-delimited `moves`; still
+  raw/unmapped — Phase 2 normalizes these into the entity dictionary)
 
 ## Phase 2 — Normalization
 
@@ -63,6 +73,15 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Normalize `tournament_event`, `tournament_team`, `tournament_team_member`
   (`dbt/models/intermediate/int_munchstats_deduped.sql` also resolves 9
   upstream MunchStats teams that were double-recorded under two placements)
+- [x] Once the MunchStats extractor captures tier/record/item fields (see
+  Phase 1), add them to `docs/dataset-spec.md`'s entity dictionary —
+  `tournament_event` (tier), `tournament_team` (win-rate/`record`),
+  `tournament_team_member` (`item`/`ability`/`tera_type`/`moves`) — and
+  thread them through the corresponding `dbt/models/normalized/` models
+  (new "Optional fields" bullets added to each entity, since MunchStats
+  doesn't report tier/record/build for every event/player/slot; the three
+  `dbt/tests/singular/assert_null_rate_*` gates were deliberately left
+  untouched — they track only the pre-existing required-field lists)
 
 ## Phase 3 — Analytics and dashboard outputs
 
@@ -81,6 +100,22 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   (`type`, `record`, `item`/`ability`/`moves` are in the raw source per
   `pipelines/extract/munchstats.py`'s docstring) — documented as a gap
   rather than faked
+- [ ] Once tier/record/item fields are normalized (see Phase 2), extend
+  `dbt/models/marts/` and its `schema.yml` to support tournament-tier
+  filtering, win-rate-proxy KPIs, and move/item drill-down, closing the
+  gap this section's "Document KPI views and filter dimensions" item
+  flagged
+
+## M6 — Dashboard analytics release
+
+- [ ] Stand up a first-party analytics dashboard (KPI overview cards;
+  trend views by regulation window and tournament period; drill-down by
+  Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
+  `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
+  requirement — no dashboard app/UI exists yet, only the flat
+  exports/marts from Phase 3
+- [ ] Decide and document the dashboard's tech stack and hosting approach
+  (not specified anywhere in the repo today) before implementation starts
 
 ## Release readiness (v1 definition of done)
 

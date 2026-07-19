@@ -19,6 +19,12 @@ form label (forms like "Urshifu-Rapid-Strike" are embedded in `pokemon`
 name) — both are known risks called out in the schema contract. `player_id`
 is derived from a hash of the player's name and country; `form_name` is
 left blank pending normalization.
+
+`metadata.json`'s `type` (tournament tier, e.g. "International"/"Regional"),
+`players.json`'s `record` (win/loss count), and team-member `item`/
+`ability`/`tera_type`/`moves` are captured too, duplicated onto every
+roster-slot row like `placement` already is; `moves` is a pipe-delimited
+string since a roster slot can carry more than one.
 """
 
 from __future__ import annotations
@@ -40,12 +46,19 @@ FIELDNAMES = [
     "event_id",
     "event_name",
     "event_date",
+    "event_tier",
     "team_id",
     "player_id",
     "placement",
+    "record_wins",
+    "record_losses",
     "slot_number",
     "pokemon_name",
     "form_name",
+    "item_name",
+    "ability",
+    "tera_type",
+    "moves",
     "source_name",
     "source_url",
     "source_record_id",
@@ -91,18 +104,26 @@ def _rows_for_tournament(
     for player in players:
         team_id = _team_id(player, tournament_id)
         player_id = _player_id(player)
+        record = player.get("record") or {}
         for slot_number, member in enumerate(player.get("team", []), start=1):
             rows.append(
                 {
                     "event_id": tournament_id,
                     "event_name": metadata["name"],
                     "event_date": metadata["date"],
+                    "event_tier": metadata.get("type", ""),
                     "team_id": team_id,
                     "player_id": player_id,
                     "placement": player["placement"],
+                    "record_wins": record.get("wins", ""),
+                    "record_losses": record.get("losses", ""),
                     "slot_number": slot_number,
                     "pokemon_name": member["pokemon"],
                     "form_name": "",
+                    "item_name": member.get("item", ""),
+                    "ability": member.get("ability", ""),
+                    "tera_type": member.get("tera_type", ""),
+                    "moves": "|".join(member.get("moves", [])),
                     "source_name": SOURCE_NAME,
                     "source_url": players_url,
                     "source_record_id": f"{tournament_id}:{team_id}:{slot_number}",

@@ -31,6 +31,7 @@ METADATA = {
     "id": TOURNAMENT_ID,
     "name": "2026 Melbourne Pokémon VGC Regional Championships",
     "date": "2026-05-23",
+    "type": "Regional",
     "format": "gen9vgc2026regi",
 }
 
@@ -40,7 +41,13 @@ PLAYERS = [
         "country": "AU",
         "placement": 1,
         "team": [
-            {"pokemon": "Miraidon", "item": "Choice Specs"},
+            {
+                "pokemon": "Miraidon",
+                "item": "Choice Specs",
+                "ability": "Hadron Engine",
+                "tera_type": "Fairy",
+                "moves": ["Electro Drift", "Draco Meteor", "Protect", "Dazzling Gleam"],
+            },
             {"pokemon": "Ursaluna", "item": "Flame Orb"},
         ],
         "day_reached": "top8",
@@ -82,11 +89,18 @@ def test_extract_flattens_team_into_one_row_per_slot(tmp_path):
     assert row["event_id"] == TOURNAMENT_ID
     assert row["event_name"] == METADATA["name"]
     assert row["event_date"] == METADATA["date"]
+    assert row["event_tier"] == "Regional"
     assert row["team_id"] == "YV8VbSG82iS8rMz0hhwb"
     assert row["placement"] == "1"
+    assert row["record_wins"] == "14"
+    assert row["record_losses"] == "2"
     assert row["slot_number"] == "1"
     assert row["pokemon_name"] == "Miraidon"
     assert row["form_name"] == ""
+    assert row["item_name"] == "Choice Specs"
+    assert row["ability"] == "Hadron Engine"
+    assert row["tera_type"] == "Fairy"
+    assert row["moves"] == "Electro Drift|Draco Meteor|Protect|Dazzling Gleam"
     assert row["source_name"] == "MunchStats"
     assert row["source_url"] == f"{DIR_URL}/players.json"
     assert row["source_record_id"] == f"{TOURNAMENT_ID}:YV8VbSG82iS8rMz0hhwb:1"
@@ -96,6 +110,13 @@ def test_extract_flattens_team_into_one_row_per_slot(tmp_path):
     assert rows[1]["slot_number"] == "2"
     assert rows[1]["pokemon_name"] == "Ursaluna"
     assert rows[1]["team_id"] == "YV8VbSG82iS8rMz0hhwb"
+    assert rows[1]["ability"] == ""
+    assert rows[1]["moves"] == ""
+
+    fallback_player_row = rows[2]
+    assert fallback_player_row["pokemon_name"] == "Incineroar"
+    assert fallback_player_row["record_wins"] == ""
+    assert fallback_player_row["record_losses"] == ""
 
 
 def test_extract_falls_back_to_synthetic_team_id_without_team_link(tmp_path):
