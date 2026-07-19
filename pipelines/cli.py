@@ -1,7 +1,7 @@
 """CLI entry point for the pipelines package.
 
 Subcommands:
-    extract <source>   Run one source extractor (pokeapi | opgg | munchstats)
+    extract <source>   Run one source extractor (pokeapi | opgg | munchstats | pokebase)
     validate           Reshape dbt's test results into a validation report
     release            Publish a versioned release package (gated on validate)
 """
@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from pipelines.extract import munchstats, opgg, pokeapi
+from pipelines.extract import munchstats, opgg, pokeapi, pokebase
 from pipelines.release import build as release_build
 from pipelines.validate import report
 
@@ -24,6 +24,7 @@ _EXTRACTORS = {
     "pokeapi": (pokeapi, REPO_ROOT / "data" / "staging" / "pokeapi.csv"),
     "opgg": (opgg, REPO_ROOT / "data" / "staging" / "opgg_champions.csv"),
     "munchstats": (munchstats, REPO_ROOT / "data" / "staging" / "munchstats.csv"),
+    "pokebase": (pokebase, REPO_ROOT / "data" / "staging" / "pokebase.csv"),
 }
 
 

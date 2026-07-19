@@ -23,7 +23,7 @@ data/normalized/*.csv
 data/marts/*.csv
 
 # Raw source snapshots: regenerable via `python -m pipelines.cli extract
-# <source>` (pokeapi | opgg | munchstats). These grow/change on every
+# <source>` (pokeapi | opgg | munchstats | pokebase). These grow/change on every
 # refresh per dataset-spec.md's refresh policy (daily for OP.GG/MunchStats,
 # weekly for PokéAPI) and munchstats.csv alone is already ~37MB, so they're
 # not committed — unlike data/normalized/, schema contracts for these live

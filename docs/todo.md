@@ -100,11 +100,19 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   (`type`, `record`, `item`/`ability`/`moves` are in the raw source per
   `pipelines/extract/munchstats.py`'s docstring) — documented as a gap
   rather than faked
-- [ ] Once tier/record/item fields are normalized (see Phase 2), extend
+- [x] Once tier/record/item fields are normalized (see Phase 2), extend
   `dbt/models/marts/` and its `schema.yml` to support tournament-tier
   filtering, win-rate-proxy KPIs, and move/item drill-down, closing the
   gap this section's "Document KPI views and filter dimensions" item
   flagged
+  (`pokemon_usage_summary` gained an `event_tier` dimension — one overall
+  row per Pokémon plus one row per tier, each ranked within its own
+  partition; new marts `pokemon_win_rate_summary` (record_wins/losses-based
+  win rate), `pokemon_build_usage` (item x ability usage), and
+  `pokemon_move_usage` (unnested move usage) cover the rest. Also fixed a
+  pre-existing gap where `pipelines/cli.py`'s `extract` subcommand never
+  registered the `pokebase` source, and updated `.gitignore`'s comment to
+  match — both silently missed when PokéBase was added in an earlier pass.)
 
 ## M6 — Dashboard analytics release
 
