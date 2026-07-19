@@ -122,14 +122,18 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
   requirement (added the `pokemon_team_core_usage` mart for the
   team-core drill-down bullet, since no mart covered it yet)
-- [ ] Decide and document the dashboard's tech stack and hosting approach
-  (`docs/prd.md`'s open question) — two working prototypes now exist
-  under `dashboard/` (Streamlit app; static-HTML generator), both
-  covering the same KPI/trend/drill-down views from `data/marts/*.csv`,
-  see `dashboard/README.md` for the tradeoffs. Pending a decision on
-  which to keep as the canonical M6 answer (or keep both for different
-  audiences) and, once decided, a real hosting target instead of
-  local-only `make dashboard-streamlit`/`make dashboard-static`.
+- [x] Decide and document the dashboard's tech stack and hosting approach
+  (`docs/prd.md`'s open question) — resolved as **keep both prototypes**,
+  each serving a different audience, rather than picking one winner:
+  Streamlit (`dashboard/streamlit_app.py`) for internal/exploratory use
+  by the data team (fastest to extend, needs a running Python process);
+  static HTML (`dashboard/build_static.py`) for shareable public
+  snapshots/embedding (zero hosting cost, no process to keep alive, but
+  every new view is hand-written JS). See `dashboard/README.md`.
+  Still open, deferred until there's an actual deployment need: a real
+  hosting target for each (currently both are local-only via `make
+  dashboard-streamlit`/`make dashboard-static`) — revisit this doc if
+  that changes.
 
 ## Release readiness (v1 definition of done)
 

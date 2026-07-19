@@ -43,8 +43,9 @@ client (currently ~1MB baked in).
 
 ## Status
 
-Both are prototypes for comparison, not yet the committed answer to
-`docs/prd.md`'s open question. See `docs/todo.md`'s M6 section for the
-decision and next steps once one is chosen (or both are kept for
-different audiences — e.g. static for a public snapshot link, Streamlit
-for internal exploration).
+Resolved (see `docs/todo.md`'s M6 section and `docs/prd.md`'s open
+questions): **both are kept**, each for a different audience — Streamlit
+for internal/exploratory use, static HTML for shareable snapshots —
+rather than picking one winner. Still open: a real hosting target for
+either, beyond local `make dashboard-streamlit`/`make dashboard-static`;
+revisit when there's an actual deployment need.
