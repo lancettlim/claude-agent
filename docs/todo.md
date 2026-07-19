@@ -43,13 +43,16 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Validate source availability and row-level parsing success thresholds
   (see `reports/validation/extraction_summary.json`: 100% request success
   and 0% required-field null rate across all four sources)
-- [ ] Extend MunchStats extraction (`pipelines/extract/munchstats.py`) to
+- [x] Extend MunchStats extraction (`pipelines/extract/munchstats.py`) to
   additionally capture `metadata.json`'s `type` field (tournament tier,
   e.g. "International"), `players.json`'s `record` field (win-rate proxy),
   and team-member `item`/`ability`/`tera_type`/`moves` fields — only
   `pokemon` is captured per slot today; update
   `data/staging/munchstats.schema.json` to match (see the gap noted in
   `dbt/models/marts/schema.yml`)
+  (staging CSV now carries `event_tier`, `record_wins`/`record_losses`,
+  `item_name`, `ability`, `tera_type`, and pipe-delimited `moves`; still
+  raw/unmapped — Phase 2 normalizes these into the entity dictionary)
 
 ## Phase 2 — Normalization
 
