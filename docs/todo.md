@@ -66,9 +66,21 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## Phase 3 — Analytics and dashboard outputs
 
-- [ ] Publish flat analytical exports and summary aggregates
-- [ ] Provide dashboard-ready trend tables (usage, legality, stat changes)
-- [ ] Document KPI views and filter dimensions (regulation/date/tournament tier)
+- [x] Publish flat analytical exports and summary aggregates
+  (`dbt/models/marts/`: `pokemon_usage_summary`, `legality_summary_by_regulation`,
+  `stat_change_leaderboard`, written to `data/marts/*.csv`)
+- [x] Provide dashboard-ready trend tables (usage, legality, stat changes)
+  (same three marts — `stat_change_leaderboard` currently shows every
+  Pokémon as a "gainer" with delta 0, consistent with the zero-stat-delta
+  snapshot noted in `releases/manifests/manifest-0.1.0.json`'s
+  `known_limitations`, not a bug)
+- [x] Document KPI views and filter dimensions (regulation/date/tournament tier)
+  (`dbt/models/marts/schema.yml`): regulation and date are available now;
+  tournament tier, win-rate proxies, and move/item drill-down (`docs/prd.md`'s
+  fuller ambition) need MunchStats extraction fields not captured yet
+  (`type`, `record`, `item`/`ability`/`moves` are in the raw source per
+  `pipelines/extract/munchstats.py`'s docstring) — documented as a gap
+  rather than faked
 
 ## Release readiness (v1 definition of done)
 
