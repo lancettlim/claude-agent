@@ -8,6 +8,7 @@ Published: {PUBLISHED_AT_UTC}
 - OP.GG Pokémon Champions: {OPGG_EXTRACTED_AT_UTC}
 - MunchStats: {MUNCHSTATS_EXTRACTED_AT_UTC}
 - PokéBase: {POKEBASE_EXTRACTED_AT_UTC}
+- Bulbagarden Archives: {BULBAGARDEN_EXTRACTED_AT_UTC}
 
 ## Schema changes
 

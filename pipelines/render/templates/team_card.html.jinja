@@ -1,0 +1,171 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    background: #10161f;
+    padding: 20px;
+  }
+  .card-wrap {
+    width: 1160px;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  }
+  .banner {
+    background: #ffffff;
+    color: #0b2a5b;
+    text-align: center;
+    padding: 14px 20px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 3px solid #0b2a5b;
+  }
+  .banner .subtitle {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: #4b5f82;
+    text-transform: none;
+    margin-top: 2px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    background: #0b2a5b;
+    padding: 6px;
+  }
+  .slot {
+    background: #dbeafe;
+    border-radius: 4px;
+    display: grid;
+    grid-template-columns: 1fr 108px;
+    overflow: hidden;
+  }
+  .slot .body {
+    padding: 10px 12px;
+  }
+  .slot-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+  .slot-header .name {
+    font-size: 17px;
+    font-weight: 800;
+    color: #0b2a5b;
+    letter-spacing: 0.5px;
+  }
+  .pill-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: #ffffff;
+    border-radius: 999px;
+    padding: 3px 10px 3px 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #0b2a5b;
+  }
+  .pill img { width: 14px; height: 14px; }
+  .pill.tera { background: #fde68a; color: #7c4a03; }
+  .move-list { display: flex; flex-direction: column; gap: 3px; }
+  .move-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #ffffff;
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #16324f;
+  }
+  .move-row .type-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .move-row .type-dot img { width: 11px; height: 11px; }
+  .sprite-cell {
+    background: #c7ddfb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sprite-cell img { width: 88px; height: 88px; image-rendering: pixelated; }
+  .sprite-cell .placeholder {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #9db8de;
+  }
+</style>
+</head>
+<body>
+  <div class="card-wrap">
+    <div class="banner">
+      {{ card.team_name }}
+      {% if card.subtitle %}<span class="subtitle">{{ card.subtitle }}</span>{% endif %}
+    </div>
+    <div class="grid">
+      {% for slot in card.slots %}
+      <div class="slot">
+        <div class="body">
+          <div class="slot-header">
+            <span class="name">{{ slot.pokemon_name }}</span>
+          </div>
+          <div class="pill-row">
+            {% if slot.ability %}<div class="pill">{{ slot.ability }}</div>{% endif %}
+            {% if slot.nature %}<div class="pill">{{ slot.nature }}</div>{% endif %}
+            {% if slot.item_name %}
+            <div class="pill">
+              {% if slot.item_icon_path %}<img src="{{ slot.item_icon_path | data_uri }}">{% endif %}
+              {{ slot.item_name }}
+            </div>
+            {% endif %}
+            {% if slot.tera_type %}<div class="pill tera">Tera {{ slot.tera_type }}</div>{% endif %}
+          </div>
+          <div class="move-list">
+            {% for move in slot.moves %}
+            {% set mt = slot.move_types[loop.index0] %}
+            <div class="move-row">
+              <span class="type-dot" style="background: {{ mt | type_color }};">
+                {% if mt and type_icons.get(mt.lower()) %}<img src="{{ type_icons.get(mt.lower()) }}">{% endif %}
+              </span>
+              {{ move }}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="sprite-cell">
+          {% if slot.sprite_path %}
+            <img src="{{ slot.sprite_path | data_uri }}">
+          {% else %}
+            <div class="placeholder"></div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</body>
+</html>

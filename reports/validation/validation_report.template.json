@@ -22,6 +22,13 @@
       "threshold": ">=0.95",
       "metric_value": null,
       "status": "pending"
+    },
+    {
+      "check_name": "bulbagarden_sprite_coverage",
+      "description": "Share of Bulbagarden sprite titles mapped to pokemon_asset rows",
+      "threshold": ">=0.85",
+      "metric_value": null,
+      "status": "pending"
     }
   ],
   "null_rate_checks": [
@@ -69,6 +76,12 @@
     },
     {
       "table_name": "tournament_team_member",
+      "metric_value": null,
+      "threshold": "<=0.01",
+      "status": "pending"
+    },
+    {
+      "table_name": "pokemon_asset",
       "metric_value": null,
       "threshold": "<=0.01",
       "status": "pending"
@@ -122,6 +135,12 @@
       "primary_key": "team_member_id",
       "duplicate_count": null,
       "status": "pending"
+    },
+    {
+      "table_name": "pokemon_asset",
+      "primary_key": "pokemon_asset_key",
+      "duplicate_count": null,
+      "status": "pending"
     }
   ],
   "referential_integrity_checks": [
@@ -157,6 +176,11 @@
     },
     {
       "check_name": "tournament_team_member_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
+    },
+    {
+      "check_name": "pokemon_asset_resolves_to_pokemon",
       "status": "pending",
       "violation_count": null
     }

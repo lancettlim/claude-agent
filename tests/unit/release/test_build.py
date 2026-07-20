@@ -58,8 +58,21 @@ def _passing_validation_report():
 def _populate_normalized_and_staging(tmp_path):
     normalized_dir = tmp_path / "normalized"
     staging_dir = tmp_path / "staging"
+    asset_cache_dir = tmp_path / "assets" / "bulbagarden"
     for table_name, primary_key in build.TABLES.items():
-        _write_csv(normalized_dir / f"{table_name}.csv", [{primary_key: "k1"}, {primary_key: "k2"}])
+        if table_name == "pokemon_asset":
+            # pokemon_asset rows need a real local_cache_path so
+            # _copy_referenced_images has something to copy.
+            rows = [
+                {primary_key: "k1", "local_cache_path": "0001.png"},
+                {primary_key: "k2", "local_cache_path": "0002.png"},
+            ]
+        else:
+            rows = [{primary_key: "k1"}, {primary_key: "k2"}]
+        _write_csv(normalized_dir / f"{table_name}.csv", rows)
+    asset_cache_dir.mkdir(parents=True, exist_ok=True)
+    (asset_cache_dir / "0001.png").write_bytes(b"fake-png-1")
+    (asset_cache_dir / "0002.png").write_bytes(b"fake-png-2")
     _write_csv(
         staging_dir / "pokeapi.csv",
         [{"extracted_at_utc": "2026-01-01T00:00:00Z", "pokemon_id": "1"}],
@@ -76,7 +89,11 @@ def _populate_normalized_and_staging(tmp_path):
         staging_dir / "pokebase.csv",
         [{"extracted_at_utc": "2026-01-01T03:00:00Z", "pokemon_id": "1"}],
     )
-    return normalized_dir, staging_dir
+    _write_csv(
+        staging_dir / "bulbagarden.csv",
+        [{"extracted_at_utc": "2026-01-01T04:00:00Z", "bulbagarden_title": "File:Menu CP 0001.png"}],
+    )
+    return normalized_dir, staging_dir, asset_cache_dir
 
 
 def test_build_raises_when_validation_report_missing(tmp_path):
@@ -113,7 +130,7 @@ def test_build_raises_when_gates_failing(tmp_path):
 def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     report_path = tmp_path / "validation_report.json"
     report_path.write_text(json.dumps(_passing_validation_report()))
-    normalized_dir, staging_dir = _populate_normalized_and_staging(tmp_path)
+    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(tmp_path)
     releases_data_dir = tmp_path / "releases" / "data"
     manifests_dir = tmp_path / "releases" / "manifests"
     changelogs_dir = tmp_path / "releases" / "changelogs"
@@ -127,6 +144,7 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         releases_data_dir=releases_data_dir,
         manifests_dir=manifests_dir,
         changelogs_dir=changelogs_dir,
+        asset_cache_dir=asset_cache_dir,
     )
 
     assert manifest["dataset_version"] == "0.1.0"
@@ -138,10 +156,16 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         "OP.GG Pokémon Champions",
         "MunchStats",
         "PokéBase",
+        "Bulbagarden Archives",
     }
+    assert manifest["images"] == {"count": 2, "directory": "images/"}
 
     for table_name in build.TABLES:
         assert (releases_data_dir / "0.1.0" / f"{table_name}.csv").exists()
+
+    images_dir = releases_data_dir / "0.1.0" / "images"
+    assert (images_dir / "0001.png").read_bytes() == b"fake-png-1"
+    assert (images_dir / "0002.png").read_bytes() == b"fake-png-2"
 
     manifest_path = manifests_dir / "manifest-0.1.0.json"
     assert manifest_path.exists()
@@ -159,7 +183,7 @@ def test_build_quality_checks_reflect_report(tmp_path):
     report = _passing_validation_report()
     report_path = tmp_path / "validation_report.json"
     report_path.write_text(json.dumps(report))
-    normalized_dir, staging_dir = _populate_normalized_and_staging(tmp_path)
+    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(tmp_path)
 
     manifest = build.build(
         "0.2.0",
@@ -169,6 +193,7 @@ def test_build_quality_checks_reflect_report(tmp_path):
         releases_data_dir=tmp_path / "releases" / "data",
         manifests_dir=tmp_path / "releases" / "manifests",
         changelogs_dir=tmp_path / "releases" / "changelogs",
+        asset_cache_dir=asset_cache_dir,
     )
 
     checks_by_name = {c["check_name"]: c for c in manifest["quality_checks"]}

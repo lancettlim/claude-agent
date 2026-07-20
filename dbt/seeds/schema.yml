@@ -68,6 +68,65 @@ seeds:
       - name: pokeapi_form_name
         description: The matching form_name in stg_pokeapi/pokemon.
 
+  - name: bulbagarden_title_to_pokeapi_form
+    description: >
+      Controlled name/form mapping (docs/dataset-spec.md's Bulbagarden
+      Archives mapping rule) from every `bulbagarden_title` in
+      stg_bulbagarden to PokéAPI's `form_name` slug. Bulbagarden's own
+      title convention ("Menu CP <4-digit dex number>[-<Form descriptor>]")
+      is not the same token set as OP.GG's or PokéAPI's own form-suffix
+      naming (e.g. Bulbagarden's "Alola"/"Paldea Aqua" vs. PokéAPI's
+      "-alola"/"-paldea-aqua-breed"), so this is a dedicated seed rather
+      than a reuse of opgg_key_to_pokeapi_form.
+
+      Built by fetching the live 359-title category inventory plus
+      PokéAPI's full /pokemon list and /pokemon-species data, then: 1) a
+      direct match on `<base species slug>-<slugified form descriptor>`
+      for the majority of titles; 2) explicit overrides for species whose
+      PokéAPI default variety isn't the bare species slug (e.g. Pyroar's
+      default is `pyroar-male`, not `pyroar`; Paldean Tauros forms need a
+      `-breed` suffix PokéAPI adds that Bulbagarden's title doesn't
+      signal); 3) cosmetic-only species (Vivillon's 20 wing patterns,
+      Florges's 5 colors, Furfrou's 9 trims, Alcremie's 8 cream flavors) —
+      confirmed via live /pokemon-species queries to have exactly one
+      PokéAPI variety despite many visually distinct Bulbagarden sprites —
+      map every one of that species' titles onto the same single
+      `pokeapi_form_name`; int_bulbagarden_mapped.sql dedupes these down to
+      one asset row per pokemon_key, the same treatment
+      int_opgg_champions_mapped.sql already gives OP.GG's cosmetic
+      male/female duplicates.
+
+      One title was left out rather than guessed, matching
+      opgg_key_to_pokeapi_form's precedent for the identical case: "File:Menu
+      CP 0678-Mega.png" (Mega Meowstic) is ambiguous between PokéAPI's
+      `meowstic-male-mega`/`meowstic-female-mega` and Bulbagarden's title
+      doesn't disambiguate, so no override was added. 358/359 titles
+      resolved (99.7%); every mapped row was confirmed against live
+      PokéAPI data, no fuzzy/heuristic matches were kept.
+    columns:
+      - name: bulbagarden_title
+        description: stg_bulbagarden.bulbagarden_title value.
+      - name: pokeapi_form_name
+        description: The matching form_name in stg_pokeapi/pokemon.
+
+  - name: pokeapi_move_types
+    description: >
+      Static move-name-to-type reference table, sourced once from PokéAPI's
+      GitHub `data/v2/csv/moves.csv` + `types.csv` (already cataloged in
+      docs/data-sources.md's PokéAPI entry but not otherwise ingested by
+      this pipeline). Used only by pipelines/render/ to color a team card's
+      move rows by type — not part of the pokemon/tournament_* entity
+      graph, so it isn't referenced by any normalized model, dataset-spec.md
+      entity, or release gate; the renderer reads it directly via
+      csv.DictReader. All 937 PokéAPI moves are included, joined by
+      display name (e.g. "double-slap" -> "Double Slap") for exact-match
+      lookup against tournament roster move strings.
+    columns:
+      - name: move_name
+        description: Move display name, Title Case (e.g. "Ice Punch").
+      - name: move_type
+        description: Move's type, lowercase (e.g. "ice").
+
   - name: pokebase_slug_to_pokeapi_form
     description: >
       Controlled name/form mapping from every distinct `form_name` (slug)

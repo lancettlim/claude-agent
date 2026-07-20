@@ -25,6 +25,12 @@
       "source_url": "https://pokebase.app/pokemon-champions/pokemon",
       "extracted_at_utc": "1970-01-01T00:00:00Z",
       "record_count": 0
+    },
+    {
+      "source_name": "Bulbagarden Archives",
+      "source_url": "https://archives.bulbagarden.net/w/api.php",
+      "extracted_at_utc": "1970-01-01T00:00:00Z",
+      "record_count": 0
     }
   ],
   "tables": [
@@ -75,8 +81,18 @@
       "file_name": "tournament_team_member.csv",
       "primary_key": "team_member_id",
       "row_count": 0
+    },
+    {
+      "table_name": "pokemon_asset",
+      "file_name": "pokemon_asset.csv",
+      "primary_key": "pokemon_asset_key",
+      "row_count": 0
     }
   ],
+  "images": {
+    "count": 0,
+    "directory": "images/"
+  },
   "quality_checks": [
     {
       "check_name": "opgg_legal_pool_coverage",
@@ -95,6 +111,12 @@
       "status": "pending",
       "metric_value": null,
       "threshold": ">=0.95"
+    },
+    {
+      "check_name": "bulbagarden_sprite_coverage",
+      "status": "pending",
+      "metric_value": null,
+      "threshold": ">=0.85"
     },
     {
       "check_name": "required_field_null_rate",

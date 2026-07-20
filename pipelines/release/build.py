@@ -28,6 +28,8 @@ STAGING_DIR = REPO_ROOT / "data" / "staging"
 RELEASES_DATA_DIR = REPO_ROOT / "releases" / "data"
 MANIFESTS_DIR = REPO_ROOT / "releases" / "manifests"
 CHANGELOGS_DIR = REPO_ROOT / "releases" / "changelogs"
+DEFAULT_ASSET_CACHE_DIR = REPO_ROOT / "data" / "assets" / "bulbagarden"
+IMAGES_SUBDIR = "images"
 
 # table_name -> primary_key, reusing the table list report.py already
 # maintains rather than duplicating it.
@@ -42,6 +44,7 @@ SOURCES: dict[str, tuple[str, str]] = {
     "OP.GG Pokémon Champions": ("https://op.gg/pokemon-champions/pokedex", "opgg_champions.csv"),
     "MunchStats": ("https://github.com/PizzaTimeJoshua/munchstats", "munchstats.csv"),
     "PokéBase": ("https://pokebase.app/pokemon-champions/pokemon", "pokebase.csv"),
+    "Bulbagarden Archives": ("https://archives.bulbagarden.net/w/api.php", "bulbagarden.csv"),
 }
 
 CHANGELOG_TEMPLATE = (REPO_ROOT / "releases" / "changelogs" / "CHANGELOG.template.md").read_text()
@@ -100,6 +103,29 @@ def _copy_tables(normalized_dir: Path, dest_dir: Path) -> list[dict[str, Any]]:
             }
         )
     return tables
+
+
+def _copy_referenced_images(
+    dest_dir: Path, *, asset_cache_dir: Path = DEFAULT_ASSET_CACHE_DIR
+) -> dict[str, Any]:
+    """Copy every file pokemon_asset.csv's local_cache_path column
+    references from the local extractor cache into dest_dir/images/, so the
+    release package is self-contained. dest_dir is the release's own
+    per-version directory (releases_data_dir/<dataset_version>), and
+    pokemon_asset.csv must already be present there (i.e. this runs after
+    _copy_tables). Returns the manifest's "images" block."""
+    pokemon_asset_rows = _read_csv_rows(dest_dir / "pokemon_asset.csv")
+    images_dir = dest_dir / IMAGES_SUBDIR
+    images_dir.mkdir(parents=True, exist_ok=True)
+    copied = 0
+    for row in pokemon_asset_rows:
+        local_cache_path = row["local_cache_path"]
+        src = asset_cache_dir / local_cache_path
+        dest = images_dir / local_cache_path
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest)
+        copied += 1
+    return {"count": copied, "directory": f"{IMAGES_SUBDIR}/"}
 
 
 def _build_quality_checks(validation_report: dict[str, Any]) -> list[dict[str, Any]]:
@@ -176,6 +202,10 @@ def _write_changelog(
             "{MUNCHSTATS_EXTRACTED_AT_UTC}", str(source_by_name["MunchStats"]["extracted_at_utc"])
         )
         .replace("{POKEBASE_EXTRACTED_AT_UTC}", str(source_by_name["PokéBase"]["extracted_at_utc"]))
+        .replace(
+            "{BULBAGARDEN_EXTRACTED_AT_UTC}",
+            str(source_by_name["Bulbagarden Archives"]["extracted_at_utc"]),
+        )
     )
     limitations_block = (
         "\n".join(f"- {item}" for item in known_limitations) if known_limitations else "- None"
@@ -197,10 +227,12 @@ def build(
     releases_data_dir: Path = RELEASES_DATA_DIR,
     manifests_dir: Path = MANIFESTS_DIR,
     changelogs_dir: Path = CHANGELOGS_DIR,
+    asset_cache_dir: Path = DEFAULT_ASSET_CACHE_DIR,
 ) -> dict[str, Any]:
     """Build a versioned release package: copies data/normalized/*.csv to
-    releases/data/<dataset_version>/, and writes
-    releases/manifests/manifest-<dataset_version>.json and
+    releases/data/<dataset_version>/, copies the sprite images
+    pokemon_asset.csv references into releases/data/<dataset_version>/images/,
+    and writes releases/manifests/manifest-<dataset_version>.json and
     releases/changelogs/CHANGELOG-<dataset_version>.md.
 
     Raises ReleaseBlockedError if reports/validation/validation_report.json
@@ -210,7 +242,9 @@ def build(
 
     published_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     sources = _build_sources(staging_dir)
-    tables = _copy_tables(normalized_dir, releases_data_dir / dataset_version)
+    release_dir = releases_data_dir / dataset_version
+    tables = _copy_tables(normalized_dir, release_dir)
+    images = _copy_referenced_images(release_dir, asset_cache_dir=asset_cache_dir)
     quality_checks = _build_quality_checks(validation_report)
 
     manifest = {
@@ -218,6 +252,7 @@ def build(
         "published_at_utc": published_at_utc,
         "sources": sources,
         "tables": tables,
+        "images": images,
         "quality_checks": quality_checks,
         "known_limitations": known_limitations or [],
     }
