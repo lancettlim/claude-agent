@@ -114,6 +114,48 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   registered the `pokebase` source, and updated `.gitignore`'s comment to
   match — both silently missed when PokéBase was added in an earlier pass.)
 
+## Phase 4 — Visual assets and card rendering
+
+- [x] Implement extraction contract for Bulbagarden Archives
+  (`pipelines/extract/bulbagarden.py`: MediaWiki API pagination + batched
+  imageinfo resolution + binary image download to a local gitignored cache,
+  no HTML parser dependency needed — see its docstring)
+- [x] Fetch the real Bulbagarden Champions-menu-sprites category inventory
+  (359 titles) and build the `bulbagarden_title_to_pokeapi_form` mapping
+  seed against live PokéAPI data (`dbt/seeds/bulbagarden_title_to_pokeapi_form.csv`
+  + `dbt/seeds/schema.yml`); 358/359 titles resolved (one, Mega Meowstic,
+  deliberately left unmapped rather than guessed, matching
+  `opgg_key_to_pokeapi_form`'s precedent for the identical ambiguity)
+- [x] Normalize into the new `pokemon_asset` entity
+  (`dbt/models/staging/stg_bulbagarden.sql`,
+  `dbt/models/intermediate/int_bulbagarden_mapped.sql` — including the
+  cosmetic-duplicate dedup Vivillon/Florges/Furfrou/Alcremie/Pyroar need —
+  `dbt/models/normalized/pokemon_asset.sql`); 317 final rows; all four
+  release gates (duplicate-key, null-rate, referential-integrity, >=85%
+  coverage) pass against real extracted data
+- [x] Add PokéAPI-sprites-GitHub type/item icon fetch-on-demand helper
+  (`pipelines/render/assets.py`) and a static move-name-to-type reference
+  seed (`dbt/seeds/pokeapi_move_types.csv`, all 937 PokéAPI moves) for
+  card rendering — neither is a dataset entity or release gate, both are
+  rendering-support assets only
+- [x] Build the team card renderer (`pipelines/render/`: `data_source.py`
+  loads a `CardModel` from either real ingested `tournament_team`/
+  `tournament_team_member` data by `team_id` or an ad-hoc JSON build spec;
+  `template.py` renders Jinja2 HTML/CSS with base64-inlined sprite/icon
+  images; `team_card.py` screenshots it to PNG via Playwright's headless
+  Chromium) and a `render-card` CLI subcommand
+  (`--team-id <id>` or `--spec <path.json>`, `--output <path.png>`)
+- [ ] Wire real Bulbagarden sprite art into the renderer end-to-end for a
+  team_id pulled from real MunchStats data (validated so far with the
+  ad-hoc JSON spec path using placeholder art; see Verification section of
+  the implementation plan for the exact manual check)
+- [ ] Extend `pipelines/release/build.py` to copy `pokemon_asset`-
+  referenced images into `releases/data/<version>/images/` and add the
+  Bulbagarden source + `pokemon_asset` table + images block to the
+  manifest/changelog templates, plus a redistribution-posture disclaimer
+  (Bulbagarden-sourced artwork is ultimately Nintendo/Game Freak-owned;
+  see `docs/dataset-spec.md`'s "Image asset source" section)
+
 ## M6 — Dashboard analytics release
 
 - [ ] Stand up a first-party analytics dashboard (KPI overview cards;

@@ -43,6 +43,19 @@ from v1 ingestion and release requirements:
 - **Limitless VGC** — defer until historical event coverage expansion
 - **Victory Road** — defer until detailed moveset/EV enrichment is prioritized
 
+## Image asset source (Phase 4 addition)
+
+A fifth source, **Bulbagarden Archives**, was added after v1's initial four-
+source scope to supply Pokémon sprite images: PokéAPI's own sprite bundle
+(referenced in `data-sources.md`'s PokéAPI entry) is stale for the newest
+Pokémon relevant to the Champions format, and Bulbagarden Archives'
+"Champions menu sprites" wiki category has the missing art. This is purely
+additive — it feeds the new `pokemon_asset` entity below and doesn't change
+any of the four core sources' scope, mapping rules, or refresh cadence.
+Type/item icons used only by card rendering (not a dataset entity) come
+from PokéAPI's community sprites GitHub repo instead — see
+`pipelines/render/assets.py`.
+
 ## Target v1 schema and data contract
 
 ### Entity dictionary
@@ -116,6 +129,18 @@ from v1 ingestion and release requirements:
   - **Optional fields**: `item_name`, `ability`, `tera_type`, `moves`
     (pipe-delimited) — nullable since MunchStats doesn't report a full
     build for every roster slot
+- `pokemon_asset`
+  - **Purpose**: sprite/menu-icon image manifest for Pokémon/form
+    references, sourced from Bulbagarden Archives
+  - **Primary key**: `pokemon_asset_key` (equal to `pokemon_key`; v1 scope
+    is one menu sprite per form)
+  - **Join keys**: `pokemon_key`, `pokemon_id`
+  - **Required fields**: `pokemon_asset_key`, `pokemon_key`, `image_kind`,
+    `local_cache_path`, `sha1`, `width`, `height`, `source_name`,
+    `source_url`, `source_record_id`, `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `pokemon_id` (nullable only if a future source
+    can't supply it directly; Bulbagarden rows always resolve it via the
+    mapping seed)
 
 ### Locked required fields
 
@@ -165,6 +190,13 @@ Each v1 release must publish a versioned package with:
 - `tournament_event.csv`
 - `tournament_team.csv`
 - `tournament_team_member.csv`
+- `pokemon_asset.csv`
+- `images/` — the sprite files referenced by `pokemon_asset.csv`'s
+  `local_cache_path` values, copied from the local asset cache at release
+  time so the release package is self-contained (see
+  `pipelines/release/build.py`). These are Nintendo/Game Freak-owned
+  artwork mirrored via a fan wiki; `releases/data/README.md` carries a
+  redistribution-posture disclaimer alongside this directory.
 - `manifest.json`
 - `CHANGELOG.md`
 
@@ -263,6 +295,30 @@ Every release entry must summarize:
     from a snapshot isn't distinguishable from "not yet observed" versus
     "confirmed illegal"
 
+### Bulbagarden Archives
+
+- **Records to capture**
+  - Champions-menu sprite image manifest (Category:Champions_menu_sprites):
+    one row per image, with its local cache path and resolved CDN metadata
+- **Refresh cadence**
+  - Infrequent / on-demand — sprite art doesn't change once posted, unlike
+    OP.GG's daily change detection
+- **Mapping rules**
+  - Parse each title's Pokédex number and form descriptor, then resolve to
+    `pokemon_key` via the `bulbagarden_title_to_pokeapi_form` mapping seed
+    (see `dbt/seeds/schema.yml` for the exact reconciliation rules)
+  - Several species have many visually distinct Bulbagarden titles but only
+    one PokéAPI form/variety (Vivillon's wing patterns, Florges's colors,
+    Furfrou's trims, Alcremie's cream flavors, Pyroar's cosmetic female
+    sprite); these are deliberately deduped onto a single `pokemon_asset`
+    row per `pokemon_key`, matching how `pokemon_stat_champions` already
+    dedupes OP.GG's analogous cosmetic duplicates
+- **Known risks**
+  - Category membership or file-naming convention could change without
+    notice
+  - Sustained/scheduled automated access rate-limiting or ToS posture not
+    independently verified beyond a one-off extract
+
 ### Confidence requirements
 
 - OP.GG legal-pool mapping coverage must reach at least 95% before release.
@@ -270,6 +326,12 @@ Every release entry must summarize:
   release.
 - PokéBase legal-pool mapping coverage must reach at least 95% before
   release.
+- Bulbagarden sprite mapping coverage must reach at least 85% before
+  release (lower than OP.GG/PokéBase's 95% because `pokemon_asset`'s
+  primary key is `pokemon_key`, not `bulbagarden_title` — the cosmetic-
+  duplicate dedup above legitimately lowers this row-count ratio without
+  indicating a real mapping gap; real measured coverage at seed-build time
+  was 317/359 titles, 88.3%).
 - Any unmapped or low-confidence rows must be documented in the manifest and
   excluded from release tables unless explicitly approved.
 
@@ -285,6 +347,7 @@ checklist and current status of each phase.
   - `>=95%` of OP.GG legal pool mapped to canonical `pokemon_id`
   - `>=90%` of targeted tournament records mapped to normalized team tables
   - `>=95%` of PokéBase legal-pool rows mapped to canonical `pokemon_id`
+  - `>=85%` of Bulbagarden sprite titles mapped to `pokemon_asset` rows
 - **Null-rate gate**
   - Required-field null rate must be `<=1%` for every core table
 - **Duplicate-key gate**
@@ -295,6 +358,7 @@ checklist and current status of each phase.
   - `tournament_team` rows must resolve to `tournament_event`
   - `tournament_team_member` rows must resolve to both `tournament_team` and
     `pokemon`
+  - `pokemon_asset` rows must resolve to `pokemon`
 
 The v1 definition-of-done checklist that tracks these gates, plus export and
 example-query validation, lives in `todo.md`.

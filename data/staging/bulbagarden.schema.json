@@ -1,0 +1,30 @@
+{
+  "source_name": "Bulbagarden Archives",
+  "source_url": "https://archives.bulbagarden.net/w/api.php",
+  "refresh_cadence": "infrequent / on-demand — sprite art doesn't change once posted, unlike OP.GG's daily change detection",
+  "records_captured": [
+    "Champions-menu sprite image manifest (Category:Champions_menu_sprites): one row per image with its local cache path and resolved CDN metadata"
+  ],
+  "fields": [
+    {"name": "bulbagarden_title", "type": "string", "required": true, "description": "Raw MediaWiki file title, e.g. \"File:Menu CP 0003-Mega.png\""},
+    {"name": "pokedex_number_raw", "type": "string", "required": true, "description": "4-digit Pokédex number parsed from the title, prior to normalization"},
+    {"name": "form_suffix_raw", "type": "string", "required": false, "description": "Form descriptor parsed from the title (e.g. \"Mega\", \"Paldea Aqua\"), prior to normalization; empty for base forms"},
+    {"name": "image_kind", "type": "string", "required": true, "description": "Constant: menu_sprite"},
+    {"name": "local_cache_path", "type": "string", "required": true, "description": "Path of the downloaded image file, relative to the extractor's cache_dir (default data/assets/bulbagarden/)"},
+    {"name": "sha1", "type": "string", "required": true, "description": "SHA-1 checksum reported by the MediaWiki API, used for incremental-refresh skip-if-unchanged checks"},
+    {"name": "width", "type": "integer", "required": true, "description": "Image width in pixels"},
+    {"name": "height", "type": "integer", "required": true, "description": "Image height in pixels"},
+    {"name": "mime_type", "type": "string", "required": true, "description": "Image MIME type reported by the MediaWiki API"},
+    {"name": "file_size_bytes", "type": "integer", "required": true, "description": "Image file size in bytes reported by the MediaWiki API"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: Bulbagarden Archives"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Resolved CDN download URL for this image"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MediaWiki file title"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "Category membership or file-naming convention could change without notice",
+    "form_suffix_raw doesn't necessarily map 1:1 onto PokéAPI's form_name convention (needs a controlled mapping seed, same risk class as OP.GG's custom form labels) — see dbt/seeds/bulbagarden_title_to_pokeapi_form.csv",
+    "Sustained/scheduled automated access rate-limiting or ToS posture not independently verified beyond a one-off extract"
+  ]
+}

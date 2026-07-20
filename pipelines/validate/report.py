@@ -52,6 +52,7 @@ DUPLICATE_KEY_TABLES: dict[str, tuple[str, str]] = {
     "tournament_event": ("event_id", "assert_duplicate_key_tournament_event"),
     "tournament_team": ("team_id", "assert_duplicate_key_tournament_team"),
     "tournament_team_member": ("team_member_id", "assert_duplicate_key_tournament_team_member"),
+    "pokemon_asset": ("pokemon_asset_key", "assert_duplicate_key_pokemon_asset"),
 }
 
 # table_name -> singular test file stem
@@ -64,6 +65,7 @@ NULL_RATE_TABLES: dict[str, str] = {
     "tournament_event": "assert_null_rate_tournament_event",
     "tournament_team": "assert_null_rate_tournament_team",
     "tournament_team_member": "assert_null_rate_tournament_team_member",
+    "pokemon_asset": "assert_null_rate_pokemon_asset",
 }
 
 # check_name (matches validation_report.template.json exactly) -> singular test file stem
@@ -75,6 +77,7 @@ REFERENTIAL_INTEGRITY_CHECKS: dict[str, str] = {
     "tournament_team_resolves_to_tournament_event": "assert_tournament_team_resolves_to_tournament_event",
     "tournament_team_member_resolves_to_tournament_team": "assert_tournament_team_member_resolves_to_tournament_team",
     "tournament_team_member_resolves_to_pokemon": "assert_tournament_team_member_resolves_to_pokemon",
+    "pokemon_asset_resolves_to_pokemon": "assert_pokemon_asset_resolves_to_pokemon",
 }
 
 # check_name -> (threshold, description, singular test file stem)
@@ -93,6 +96,11 @@ COVERAGE_CHECKS: dict[str, tuple[str, str, str]] = {
         ">=0.95",
         "Share of PokéBase legal-pool rows mapped to a canonical pokemon_id",
         "assert_pokebase_legal_pool_coverage",
+    ),
+    "bulbagarden_sprite_coverage": (
+        ">=0.85",
+        "Share of Bulbagarden sprite titles mapped to pokemon_asset rows",
+        "assert_bulbagarden_sprite_coverage",
     ),
 }
 

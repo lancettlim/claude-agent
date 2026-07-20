@@ -78,7 +78,37 @@ MunchStats bridges static Pokédex data with active competitive tournament metad
 2. Use Python: `pd.read_json(url)` or [convert.town JSON-to-CSV](https://convert.town/json-to-csv)
 3. Flatten nested team arrays into flat rows (one row per team member)
 
-## 5. Limitless VGC
+## 5. Bulbagarden Archives
+**Best for:** Pokémon sprite/menu-icon artwork for the newest Champions-format Pokémon
+
+PokéAPI's own sprite bundle (see source 1's "Master Database" link) is stale for
+the newest Pokémon relevant to the Champions format. Bulbagarden Archives' wiki
+maintains a "Champions menu sprites" category with up-to-date artwork, and — unlike
+sources 2-3 above — exposes it through a real MediaWiki JSON API rather than
+needing HTML scraping.
+
+**Key coverage:**
+- Menu-sprite artwork, one image per Pokémon/form (359 images as of this writing)
+- Image metadata: resolved CDN URL, dimensions, MIME type, SHA-1 checksum
+
+**How to extract:**
+1. `GET https://archives.bulbagarden.net/w/api.php?action=query&list=categorymembers&cmtitle=Category:Champions_menu_sprites&format=json`
+   lists the category's files, paginated via the response's `continue.cmcontinue`
+   token — no HTML parsing needed, unlike OP.GG/PokéBase (see
+   `pipelines/extract/bulbagarden.py`'s docstring for the exact technique)
+2. Batch-resolve each file title to its real CDN download URL + size/mime/sha1 via
+   `action=query&titles=<pipe-joined titles>&prop=imageinfo&iiprop=url|size|mime|sha1`
+3. Download the resolved URLs' bytes to a local cache and join to canonical PokéAPI
+   records via the `bulbagarden_title_to_pokeapi_form` controlled mapping seed (see
+   `dbt/seeds/schema.yml` for the reconciliation rules)
+
+Type and item icons used only by team-card rendering (not part of the dataset
+itself) come from a different source: PokéAPI's community sprites GitHub repo
+([github.com/PokeAPI/sprites](https://github.com/PokeAPI/sprites)), fetched
+directly by `pipelines/render/assets.py` as plain, deterministically-named raw
+GitHub file URLs (no listing/discovery call needed).
+
+## 6. Limitless VGC
 **Best for:** Historical tournament brackets, player win rates, and macro competitive statistics
 
 Limitless archives grassroots and official VGC event brackets, providing a comprehensive history of tournament placements, player performance metrics, and macro-level competitive trends across regions.
@@ -95,7 +125,7 @@ Limitless archives grassroots and official VGC event brackets, providing a compr
 3. Convert to CSV format and import into your analysis pipeline
 4. Alternatively, contact Limitless for bulk data exports if available
 
-## 6. Victory Road
+## 7. Victory Road
 **Best for:** Certified champion team building, detailed EV spreads, and verified movesets
 
 Victory Road archives complete team slates from certified tournament champions, including full team compositions, EV distributions, item assignments, and move choices. This is the most detailed source for understanding how top players actually built their championship teams.

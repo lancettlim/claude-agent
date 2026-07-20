@@ -1,0 +1,21 @@
+{
+  "table_name": "pokemon_asset",
+  "purpose": "sprite/menu-icon image manifest for Pokémon/form references, sourced from Bulbagarden Archives",
+  "primary_key": "pokemon_asset_key",
+  "join_keys": ["pokemon_key", "pokemon_id"],
+  "fields": [
+    {"name": "pokemon_asset_key", "type": "string", "required": true, "description": "Primary key; equal to pokemon_key (v1 scope is one menu sprite per form)"},
+    {"name": "pokemon_key", "type": "string", "required": true, "description": "Foreign key to pokemon.pokemon_key"},
+    {"name": "pokemon_id", "type": "integer", "required": false, "description": "Foreign key to pokemon.pokemon_id"},
+    {"name": "image_kind", "type": "string", "required": true, "description": "Constant: menu_sprite"},
+    {"name": "local_cache_path", "type": "string", "required": true, "description": "Path of the downloaded image file, relative to the extractor's cache_dir (data/assets/bulbagarden/ by default) — not a release-time guarantee that the file still exists locally; releases/data/<version>/images/ is the durable copy"},
+    {"name": "sha1", "type": "string", "required": true, "description": "SHA-1 checksum of the image file"},
+    {"name": "width", "type": "integer", "required": true, "description": "Image width in pixels"},
+    {"name": "height", "type": "integer", "required": true, "description": "Image height in pixels"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: Bulbagarden Archives"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Resolved CDN download URL for this image"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream MediaWiki file title"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

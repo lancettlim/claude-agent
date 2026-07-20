@@ -17,3 +17,5 @@ models:
     description: "Team-level tournament metadata. See data/normalized/tournament_team.schema.json."
   - name: tournament_team_member
     description: "One row per Pokémon on a normalized tournament team. See data/normalized/tournament_team_member.schema.json."
+  - name: pokemon_asset
+    description: "Sprite/menu-icon image manifest for Pokémon/form references, sourced from Bulbagarden Archives. See data/normalized/pokemon_asset.schema.json."
