@@ -145,27 +145,97 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   images; `team_card.py` screenshots it to PNG via Playwright's headless
   Chromium) and a `render-card` CLI subcommand
   (`--team-id <id>` or `--spec <path.json>`, `--output <path.png>`)
-- [ ] Wire real Bulbagarden sprite art into the renderer end-to-end for a
-  team_id pulled from real MunchStats data (validated so far with the
-  ad-hoc JSON spec path using placeholder art; see Verification section of
-  the implementation plan for the exact manual check)
-- [ ] Extend `pipelines/release/build.py` to copy `pokemon_asset`-
+- [x] Wire real Bulbagarden sprite art into the renderer end-to-end for a
+  team_id pulled from real MunchStats data (`pipelines/render/data_source.py`'s
+  `load_from_team_id` joins `tournament_team_member` to `pokemon_asset` via
+  `pokemon_key` and resolves each slot's sprite from the local Bulbagarden
+  cache; the ad-hoc JSON spec path remains for teams outside MunchStats's
+  coverage)
+- [x] Extend `pipelines/release/build.py` to copy `pokemon_asset`-
   referenced images into `releases/data/<version>/images/` and add the
   Bulbagarden source + `pokemon_asset` table + images block to the
-  manifest/changelog templates, plus a redistribution-posture disclaimer
-  (Bulbagarden-sourced artwork is ultimately Nintendo/Game Freak-owned;
-  see `docs/dataset-spec.md`'s "Image asset source" section)
+  manifest/changelog templates
+  (`_copy_referenced_images` copies every `local_cache_path` into
+  `releases/data/<version>/images/` and the manifest's `images` block
+  records the count; a redistribution-posture disclaimer for
+  Nintendo/Game-Freak-owned artwork is still outstanding — see the new
+  item below)
+- [x] Add a redistribution-posture disclaimer for Bulbagarden-sourced
+  artwork to the release manifest/changelog templates and
+  `docs/dataset-spec.md`'s "Image asset source" section (split out from
+  the item above, which only covered copying the image files themselves)
+  (`docs/dataset-spec.md`'s new "Redistribution posture" subsection is the
+  source of truth; `pipelines/release/build.py`'s `IMAGE_ATTRIBUTION`
+  constant applies it automatically to `manifest.images.attribution` and
+  the changelog's "Image attribution" section whenever a release bundles
+  at least one image)
+- [x] Polish the card template's missing-sprite placeholder and banner
+  headline, found while rendering a real `team_id` for the item above:
+  the placeholder was a flat gray circle indistinguishable from a loading/
+  broken-image state (`pipelines/render/templates/team_card.html.jinja`'s
+  `.placeholder` now renders a Poké Ball silhouette instead), and the
+  banner showed the raw `team_id` in uppercase (`data_source.py`'s
+  `load_from_team_id` now headlines with `Placement #{placement}` when
+  available, falling back to `team_id`, with `player_id`/`team_id` moved
+  to the subtitle)
+
+## Known gap — legal-pool snapshot vs. tournament history
+
+Discovered while wiring the card renderer against real data (rendering a
+real `team_id` showed 5 of 6 slots with no sprite): see
+`docs/dataset-spec.md`'s new "Known limitations (living)" section for the
+full writeup. OP.GG's current legal-pool snapshot (312 Pokémon) covers
+roughly half of the 500 distinct Pokémon MunchStats' tournament history
+actually references — not an extraction bug, just OP.GG/Bulbagarden both
+reflecting only the *current* format. This silently narrows every Phase 3
+mart (all inner-join to `pokemon_stat_champions.is_legal = true`) and
+Phase 4 card sprite coverage well beyond what their docs currently imply.
+
+- [ ] Decide how Phase 3 marts should treat roster slots outside the
+  current legal-pool snapshot: keep excluding them (and update each
+  mart's `schema.yml` description to state the real exclusion rate, not
+  just "restricted to the current legal pool"), or loosen the join so
+  historical-but-no-longer-legal Pokémon still count toward usage/win-rate
+  stats
+- [ ] Decide whether `pokemon_asset` should gain a lower-confidence
+  fallback path (e.g. PokéAPI's own sprite bundle, already noted as stale
+  for the newest Pokémon in `docs/dataset-spec.md`'s "Image asset source"
+  section but presumably fine for older/rotated-out ones) for Pokémon
+  Bulbagarden's current category doesn't cover, or accept that card
+  renders for historical teams will often be partial
+- [ ] Add a coverage/validation check comparing the legal-pool snapshot
+  against `tournament_team_member`'s distinct Pokémon so this gap is
+  visible in `reports/validation/` rather than only discoverable by
+  rendering a card and noticing blank sprites
 
 ## M6 — Dashboard analytics release
 
-- [ ] Stand up a first-party analytics dashboard (KPI overview cards;
-  trend views by regulation window and tournament period; drill-down by
-  Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
+- [x] Decide and document the dashboard's tech stack and hosting approach:
+  Streamlit reading `data/marts/*.csv`/`data/normalized/pokemon.csv`
+  directly, no new database or backend service (`dashboard/app.py`'s
+  module docstring). Public hosting is still undecided — see the new item
+  below.
+- [x] Stand up a first-party analytics dashboard (KPI overview cards;
+  trend views by regulation window and tournament tier; drill-down by
+  Pokémon, item/ability, and move) on top of `data/marts/*.csv`, per
   `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
-  requirement — no dashboard app/UI exists yet, only the flat
-  exports/marts from Phase 3
-- [ ] Decide and document the dashboard's tech stack and hosting approach
-  (not specified anywhere in the repo today) before implementation starts
+  requirement (`dashboard/app.py`, run via `make dashboard`). "Team core"
+  drill-down (per-team roster composition rather than per-Pokémon) isn't
+  covered yet — no mart currently aggregates at that grain; team core is
+  a new item below. The regulation trend view is currently a single-
+  snapshot view rather than a real trend, since only one `snapshot_date`
+  has been extracted so far (matches the existing known limitation noted
+  for `stat_change_leaderboard`/`legality_summary_by_regulation`).
+- [ ] Add a `pokemon_team_core_usage`-style mart (most common multi-
+  Pokémon team cores, not just single-Pokémon usage) and wire it into
+  `dashboard/app.py`, closing the "team core" drill-down gap noted above
+- [ ] Pick and document a public hosting target for the dashboard (e.g.
+  Streamlit Community Cloud) once there's a released dataset version
+  worth hosting it against; local-only via `make dashboard` for now
+- [ ] Add automated test coverage for `dashboard/app.py` (verified
+  manually via `streamlit.testing.v1.AppTest` against real local data so
+  far, but that needs `data/marts/*.csv`/`data/normalized/*.csv` present,
+  which CI doesn't have — see CI's scope note in `CLAUDE.md`)
 
 ## Release readiness (v1 definition of done)
 

@@ -49,6 +49,22 @@ SOURCES: dict[str, tuple[str, str]] = {
 
 CHANGELOG_TEMPLATE = (REPO_ROOT / "releases" / "changelogs" / "CHANGELOG.template.md").read_text()
 
+# Redistribution-posture disclaimer for Bulbagarden-sourced sprite images
+# (docs/dataset-spec.md's "Image asset source" > "Redistribution posture"
+# is the source of truth for this text). Applied automatically to every
+# release that bundles images, rather than relying on an operator to
+# remember to pass it as a --known-limitation.
+IMAGE_ATTRIBUTION = (
+    "Sprite images under images/ are downloaded from Bulbagarden Archives "
+    "(https://archives.bulbagarden.net), a fan wiki that itself hosts official "
+    "Pokémon artwork; the underlying artwork is copyrighted by Nintendo/"
+    "Creatures Inc./GAME FREAK inc., not by this project or by Bulbagarden. "
+    "This dataset redistributes the images as-is for non-commercial reference "
+    "use alongside the rest of the release; downstream consumers are "
+    "responsible for confirming their own use complies with Bulbagarden's "
+    "reuse terms and with Nintendo/Game Freak's IP rights."
+)
+
 
 class ReleaseBlockedError(RuntimeError):
     """Raised when the validation report is missing or reports failing gates."""
@@ -125,7 +141,11 @@ def _copy_referenced_images(
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
         copied += 1
-    return {"count": copied, "directory": f"{IMAGES_SUBDIR}/"}
+    return {
+        "count": copied,
+        "directory": f"{IMAGES_SUBDIR}/",
+        "attribution": IMAGE_ATTRIBUTION if copied else None,
+    }
 
 
 def _build_quality_checks(validation_report: dict[str, Any]) -> list[dict[str, Any]]:
@@ -187,6 +207,7 @@ def _write_changelog(
     dataset_version: str,
     published_at_utc: str,
     sources: list[dict[str, Any]],
+    images: dict[str, Any],
     known_limitations: list[str],
 ) -> None:
     source_by_name = {s["source_name"]: s for s in sources}
@@ -205,6 +226,10 @@ def _write_changelog(
         .replace(
             "{BULBAGARDEN_EXTRACTED_AT_UTC}",
             str(source_by_name["Bulbagarden Archives"]["extracted_at_utc"]),
+        )
+        .replace(
+            "{IMAGE_ATTRIBUTION}",
+            images.get("attribution") or "N/A — no images bundled in this release.",
         )
     )
     limitations_block = (
@@ -268,6 +293,7 @@ def build(
         dataset_version=dataset_version,
         published_at_utc=published_at_utc,
         sources=sources,
+        images=images,
         known_limitations=known_limitations or [],
     )
 

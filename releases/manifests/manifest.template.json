@@ -91,7 +91,8 @@
   ],
   "images": {
     "count": 0,
-    "directory": "images/"
+    "directory": "images/",
+    "attribution": null
   },
   "quality_checks": [
     {

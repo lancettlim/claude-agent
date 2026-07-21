@@ -18,6 +18,10 @@ Published: {PUBLISHED_AT_UTC}
 
 - {table_name}: {previous_row_count} -> {new_row_count}
 
+## Image attribution
+
+{IMAGE_ATTRIBUTION}
+
 ## Known limitations
 
 ### New

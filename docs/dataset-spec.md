@@ -56,6 +56,21 @@ Type/item icons used only by card rendering (not a dataset entity) come
 from PokéAPI's community sprites GitHub repo instead — see
 `pipelines/render/assets.py`.
 
+### Redistribution posture
+
+Sprite images bundled under `releases/data/<version>/images/` are
+downloaded from Bulbagarden Archives, a fan wiki that itself hosts official
+Pokémon artwork; the underlying artwork is copyrighted by Nintendo/
+Creatures Inc./GAME FREAK inc., not by this project or by Bulbagarden. This
+dataset redistributes the images as-is for non-commercial reference use
+alongside the rest of the release; downstream consumers are responsible
+for confirming their own use complies with Bulbagarden's reuse terms and
+with Nintendo/Game Freak's IP rights. `pipelines/release/build.py` attaches
+this disclaimer automatically to every release's manifest
+(`images.attribution`) and changelog whenever it bundles at least one
+image — see `IMAGE_ATTRIBUTION` in that module, which is the literal text
+of this disclaimer and should stay in sync with it.
+
 ## Target v1 schema and data contract
 
 ### Entity dictionary
@@ -362,6 +377,44 @@ checklist and current status of each phase.
 
 The v1 definition-of-done checklist that tracks these gates, plus export and
 example-query validation, lives in `todo.md`.
+
+## Known limitations (living)
+
+Durable, cross-release limitations that aren't specific to one
+`dataset_version` (per-release limitations still go in that release's
+`known_limitations`/changelog, per "Release package" above):
+
+- **OP.GG's current legal-pool snapshot is materially narrower than
+  MunchStats' historical tournament usage.** As of this writing, OP.GG's
+  Pokédex page (`pokemon_stat_champions`) lists 312 legal Pokémon, but
+  MunchStats' tournament rosters (`tournament_team_member`) reference 500
+  distinct Pokémon across their history — roughly half (~256) of them,
+  including ordinary non-restricted species like Amoonguss, Blissey, and
+  Breloom, have no match in the current legal pool at all. This isn't an
+  extraction bug: `pipelines/extract/opgg.py` captures every entry OP.GG's
+  page actually ships (confirmed against a live snapshot — 317 staging
+  rows, matching its "ships its entire Pokédex dataset" docstring claim);
+  the gap is that OP.GG's page reflects only the *current* format while
+  MunchStats accumulates results across regulation history. Effects:
+  - Every Phase 3 mart in `dbt/models/marts/` inner-joins to
+    `pokemon_stat_champions` on `is_legal = true`, so usage/win-rate/
+    build/move stats silently exclude any roster slot for a Pokémon
+    outside the current snapshot — this is a much larger exclusion than
+    the "restricted to the current legal pool" language in each mart's
+    `schema.yml` description implies at a glance.
+  - `pipelines/render/data_source.py`'s `load_from_team_id` can only
+    resolve a sprite for a team member when `pokemon_asset` has a row for
+    it, and `pokemon_asset` is itself scoped to Bulbagarden's current
+    Champions-menu-sprites category (same current-snapshot scoping as
+    OP.GG) — so real teams frequently render with most slots showing the
+    blank-sprite placeholder rather than art, independent of Bulbagarden's
+    own 317/319 mapping completeness.
+  - None of the four coverage gates above catch this, since each measures
+    a source's internal mapping completeness (e.g. "% of OP.GG legal pool
+    mapped"), not whether the legal pool is complete relative to
+    real-world tournament usage.
+  - See `docs/todo.md`'s Phase 3/Phase 4 sections for the follow-up items
+    this implies.
 
 ## Next implementation task
 

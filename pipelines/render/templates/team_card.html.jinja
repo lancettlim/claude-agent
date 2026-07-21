@@ -116,7 +116,23 @@
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: #9db8de;
+    background:
+      linear-gradient(#e2e8f0 0 0) content-box,
+      linear-gradient(to bottom, #b8c6dc 0%, #b8c6dc 47%, #7d8ea8 47%, #7d8ea8 53%, #b8c6dc 53%, #b8c6dc 100%);
+    border: 2px solid #7d8ea8;
+    position: relative;
+  }
+  .sprite-cell .placeholder::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    border: 2px solid #7d8ea8;
+    transform: translate(-50%, -50%);
   }
 </style>
 </head>

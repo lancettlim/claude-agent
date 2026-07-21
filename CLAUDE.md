@@ -76,6 +76,8 @@ releases/
   changelogs/               # one changelog entry per dataset version
 reports/
   validation/               # coverage, null-rate, duplicate-key, referential-integrity reports
+dashboard/
+  app.py                    # M6 Streamlit dashboard reading data/marts/*.csv (see "Development workflow")
 ```
 
 `data/staging/*.csv`, `data/normalized/*.csv`, and `data/marts/*.csv` are
@@ -128,7 +130,14 @@ make check      # lint + unit tests + dbt build/test + validation report
 
 Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
 (`cd dbt && dbt build`), `make validate` (runs dbt build, then writes
-`reports/validation/validation_report.json`).
+`reports/validation/validation_report.json`), `make dashboard` (runs the M6
+Streamlit dashboard against `data/marts/*.csv` — run `make dbt-build` first).
+
+CI (`.github/workflows/ci.yml`) runs `make lint` and `make test` on every
+push/PR — both are hermetic (mocked network, no external data needed).
+`make dbt-build`/`make validate`/`make dashboard` all depend on
+`data/staging/*.csv` from live extractor runs, so they're intentionally not
+part of automated CI; run them locally before publishing a release.
 
 - `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG,
   MunchStats, PokéBase, Bulbagarden) that writes provenance-tagged rows into
@@ -177,6 +186,13 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   `releases/changelogs/CHANGELOG-<version>.md`) from `data/normalized/` and
   the validation report; refuses to publish if any release gate is failing.
 - `tests/` — pytest unit tests, mirroring the `pipelines/` package.
+- `dashboard/app.py` — the M6 dashboard analytics release (`docs/todo.md`):
+  a Streamlit app reading `data/marts/*.csv` and `data/normalized/pokemon.csv`
+  directly (no new database/backend service), covering `docs/prd.md`'s
+  "Dashboard analytics module" — KPI overview cards, trend views by
+  regulation window and tournament tier, and drill-down by Pokémon/item/
+  ability/move. Public hosting is still an open decision (see the M6 items
+  in `docs/todo.md`); for now it's local-only via `make dashboard`.
 
 Playwright is a project dependency (`make setup` installs Chromium). Neither
 the OP.GG nor PokéBase extractor ended up needing it — both pages' data

@@ -47,8 +47,18 @@ def _populate_normalized(tmp_path):
     _write_csv(
         normalized_dir / "pokemon.csv",
         [
-            {"pokemon_key": "incineroar", "pokemon_id": "727", "pokemon_name": "Incineroar", "form_name": "incineroar"},
-            {"pokemon_key": "venusaur", "pokemon_id": "3", "pokemon_name": "Venusaur", "form_name": "venusaur"},
+            {
+                "pokemon_key": "incineroar",
+                "pokemon_id": "727",
+                "pokemon_name": "Incineroar",
+                "form_name": "incineroar",
+            },
+            {
+                "pokemon_key": "venusaur",
+                "pokemon_id": "3",
+                "pokemon_name": "Venusaur",
+                "form_name": "venusaur",
+            },
         ],
     )
     _write_csv(
@@ -68,8 +78,8 @@ def test_load_from_team_id_sorts_by_slot_and_resolves_sprite(tmp_path):
         "team-1", normalized_dir=normalized_dir, asset_cache_dir=asset_cache_dir
     )
 
-    assert card.team_name == "team-1"
-    assert card.subtitle == "p1 · 3"
+    assert card.team_name == "Placement #3"
+    assert card.subtitle == "p1 · team-1"
     assert [s.slot_number for s in card.slots] == [1, 2]
 
     venusaur_slot = card.slots[0]

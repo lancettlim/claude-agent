@@ -10,6 +10,7 @@ dependencies = [
     "dbt-duckdb>=1.8,<2.0",
     "playwright>=1.45",
     "jinja2>=3.1",
+    "streamlit>=1.37",
 ]
 
 [dependency-groups]

@@ -29,6 +29,8 @@ future-goal design loops).
 
 - `data/staging/` — raw source snapshots before normalization
 - `data/normalized/` — normalized tables and derived outputs
+- `data/marts/` — flat analytical exports/dashboard tables built from `data/normalized/`
+- `dashboard/` — Streamlit analytics dashboard (M6) reading `data/marts/*.csv`; run via `make dashboard`
 - `releases/manifests/` — versioned dataset manifests
 - `releases/changelogs/` — versioned dataset changelogs
 - `reports/validation/` — validation artifacts for release gates

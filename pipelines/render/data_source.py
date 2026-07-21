@@ -141,9 +141,11 @@ def load_from_team_id(
         )
 
     team = teams.get(team_id, {})
-    subtitle_bits = [bit for bit in [team.get("player_id"), team.get("placement")] if bit]
+    placement = team.get("placement")
+    team_name = f"Placement #{placement}" if placement else team_id
+    subtitle_bits = [bit for bit in [team.get("player_id"), team_id] if bit]
     return CardModel(
-        team_name=team_id,
+        team_name=team_name,
         subtitle=" · ".join(subtitle_bits) if subtitle_bits else None,
         slots=slots,
     )
@@ -169,9 +171,7 @@ def load_from_spec(
     """
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
 
-    pokemon_by_form = {
-        row["form_name"]: row for row in _read_csv(normalized_dir / "pokemon.csv")
-    }
+    pokemon_by_form = {row["form_name"]: row for row in _read_csv(normalized_dir / "pokemon.csv")}
     assets_by_key = {
         row["pokemon_key"]: row for row in _read_csv(normalized_dir / "pokemon_asset.csv")
     }

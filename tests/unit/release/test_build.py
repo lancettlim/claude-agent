@@ -91,7 +91,12 @@ def _populate_normalized_and_staging(tmp_path):
     )
     _write_csv(
         staging_dir / "bulbagarden.csv",
-        [{"extracted_at_utc": "2026-01-01T04:00:00Z", "bulbagarden_title": "File:Menu CP 0001.png"}],
+        [
+            {
+                "extracted_at_utc": "2026-01-01T04:00:00Z",
+                "bulbagarden_title": "File:Menu CP 0001.png",
+            }
+        ],
     )
     return normalized_dir, staging_dir, asset_cache_dir
 
@@ -158,7 +163,9 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         "PokéBase",
         "Bulbagarden Archives",
     }
-    assert manifest["images"] == {"count": 2, "directory": "images/"}
+    assert manifest["images"]["count"] == 2
+    assert manifest["images"]["directory"] == "images/"
+    assert manifest["images"]["attribution"] == build.IMAGE_ATTRIBUTION
 
     for table_name in build.TABLES:
         assert (releases_data_dir / "0.1.0" / f"{table_name}.csv").exists()
@@ -177,6 +184,35 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     assert "dataset_version 0.1.0" in changelog_text
     assert "example limitation" in changelog_text
     assert "{VERSION}" not in changelog_text
+    assert "Bulbagarden Archives" in changelog_text
+    assert "{IMAGE_ATTRIBUTION}" not in changelog_text
+
+
+def test_build_changelog_notes_no_images_when_none_bundled(tmp_path):
+    report_path = tmp_path / "validation_report.json"
+    report_path.write_text(json.dumps(_passing_validation_report()))
+    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(tmp_path)
+    # pokemon_asset.csv with a header but zero rows, so
+    # _copy_referenced_images has nothing to copy.
+    with (normalized_dir / "pokemon_asset.csv").open("w", newline="", encoding="utf-8") as fh:
+        csv.DictWriter(fh, fieldnames=["pokemon_asset_key", "local_cache_path"]).writeheader()
+    changelogs_dir = tmp_path / "releases" / "changelogs"
+
+    manifest = build.build(
+        "0.3.0",
+        validation_report_path=report_path,
+        normalized_dir=normalized_dir,
+        staging_dir=staging_dir,
+        releases_data_dir=tmp_path / "releases" / "data",
+        manifests_dir=tmp_path / "releases" / "manifests",
+        changelogs_dir=changelogs_dir,
+        asset_cache_dir=asset_cache_dir,
+    )
+
+    assert manifest["images"]["count"] == 0
+    assert manifest["images"]["attribution"] is None
+    changelog_text = (changelogs_dir / "CHANGELOG-0.3.0.md").read_text()
+    assert "N/A — no images bundled in this release." in changelog_text
 
 
 def test_build_quality_checks_reflect_report(tmp_path):

@@ -1,0 +1,37 @@
+# Runs the hermetic parts of `make check` (lint + unit tests) on every push
+# and PR. `make dbt-build`/`make validate` are intentionally out of scope
+# here: they require data/staging/*.csv, which only exists after running the
+# extractors against live external APIs (OP.GG, MunchStats, PokéBase,
+# Bulbagarden, PokéAPI) — not something to do unauthenticated on every PR.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Unit tests
+        run: uv run pytest
