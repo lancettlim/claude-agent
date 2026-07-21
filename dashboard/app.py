@@ -15,6 +15,16 @@ in docs/todo.md for the follow-up on picking a public hosting target
 (e.g. Streamlit Community Cloud) once there's a released dataset version
 to host against.
 
+Regulation scope: every Pokémon-level view (usage, win rate, item/ability/
+move drill-down, stat leaderboard) is filtered to FOCUS_REGULATION's legal
+pool (data/normalized/legality_snapshot.csv, not pokemon_stat_champions'
+regulation-agnostic overall flag — see docs/dataset-spec.md's "Known
+limitations (living)" section for why those two pools differ). This only
+scopes the dashboard's default view; data/normalized/*.csv and
+data/marts/*.csv themselves stay unfiltered so older/future-regulation
+Pokémon remain available once a later regulation becomes current — just
+bump FOCUS_REGULATION.
+
 Run via `make dashboard` (`uv run streamlit run dashboard/app.py`).
 """
 
@@ -28,6 +38,11 @@ import streamlit as st
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MARTS_DIR = REPO_ROOT / "data" / "marts"
 NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
+
+# The latest Champions regulation to scope Pokémon-level views to. Bump this
+# when a newer regulation supersedes it — the underlying data isn't filtered
+# anywhere else, so older regulations stay available for historical use.
+FOCUS_REGULATION = "m-b"
 
 
 @st.cache_data
@@ -49,6 +64,20 @@ def load_pokemon_names() -> pd.DataFrame:
     return pokemon[["pokemon_key", "pokemon_name", "form_name"]].drop_duplicates("pokemon_key")
 
 
+@st.cache_data
+def load_legal_pool_keys(regulation_code: str) -> set[str]:
+    """pokemon_key set legal under regulation_code as of the latest
+    snapshot_date in legality_snapshot.csv (regulation-aware, unlike
+    pokemon_stat_champions.is_legal — see docs/dataset-spec.md)."""
+    snapshot = pd.read_csv(NORMALIZED_DIR / "legality_snapshot.csv")
+    snapshot = snapshot[snapshot["regulation_code"] == regulation_code]
+    if snapshot.empty:
+        return set()
+    latest_date = snapshot["snapshot_date"].max()
+    current = snapshot[(snapshot["snapshot_date"] == latest_date) & (snapshot["is_legal"])]
+    return set(current["pokemon_key"])
+
+
 def with_display_name(df: pd.DataFrame, names: pd.DataFrame) -> pd.DataFrame:
     merged = df.merge(names, on="pokemon_key", how="left")
     merged["display_name"] = merged["form_name"].fillna(merged["pokemon_key"])
@@ -58,12 +87,14 @@ def with_display_name(df: pd.DataFrame, names: pd.DataFrame) -> pd.DataFrame:
 st.set_page_config(page_title="Pokémon Champions Analytics", layout="wide")
 st.title("Pokémon Champions Analytics")
 st.caption(
-    "Built from data/marts/*.csv — run `make dbt-build` first if these tables look stale or missing."
+    f"Built from data/marts/*.csv, scoped to regulation **{FOCUS_REGULATION}** (the latest "
+    "format) — run `make dbt-build` first if these tables look stale or missing."
 )
 
 try:
     marts = load_marts()
     names = load_pokemon_names()
+    legal_pool = load_legal_pool_keys(FOCUS_REGULATION)
 except FileNotFoundError as exc:
     st.error(
         f"Missing mart file: {exc}. Run `make dbt-build` (after `python -m pipelines.cli extract "
@@ -72,18 +103,30 @@ except FileNotFoundError as exc:
     )
     st.stop()
 
+if not legal_pool:
+    st.warning(
+        f"No legal Pokémon found for regulation {FOCUS_REGULATION!r} in "
+        "data/normalized/legality_snapshot.csv — showing an empty dashboard. Check FOCUS_REGULATION "
+        "in dashboard/app.py against the regulations legality_summary_by_regulation.csv reports."
+    )
+
 usage = with_display_name(marts["pokemon_usage_summary"], names)
+usage = usage[usage["pokemon_key"].isin(legal_pool)]
 win_rate = with_display_name(marts["pokemon_win_rate_summary"], names)
+win_rate = win_rate[win_rate["pokemon_key"].isin(legal_pool)]
 stat_leaderboard = with_display_name(marts["stat_change_leaderboard"], names)
+stat_leaderboard = stat_leaderboard[stat_leaderboard["pokemon_key"].isin(legal_pool)]
 legality = marts["legality_summary_by_regulation"]
 build_usage = with_display_name(marts["pokemon_build_usage"], names)
+build_usage = build_usage[build_usage["pokemon_key"].isin(legal_pool)]
 move_usage = with_display_name(marts["pokemon_move_usage"], names)
+move_usage = move_usage[move_usage["pokemon_key"].isin(legal_pool)]
 
 overall_usage = usage[usage["event_tier"].isna()]
 
 # --- KPI overview cards -----------------------------------------------------
 kpi_cols = st.columns(4)
-kpi_cols[0].metric("Legal Pokémon tracked", int(legality["legal_pokemon_count"].sum()))
+kpi_cols[0].metric(f"Legal Pokémon ({FOCUS_REGULATION})", len(legal_pool))
 kpi_cols[1].metric("Teams with usage data", int(overall_usage["usage_count"].sum()))
 top_winner = win_rate.sort_values("win_rate", ascending=False).iloc[0] if len(win_rate) else None
 kpi_cols[2].metric(
@@ -114,6 +157,10 @@ trend_cols = st.columns(2)
 
 with trend_cols[0]:
     st.subheader("Legal pool size by regulation")
+    st.caption(
+        f"Shown for context across all regulations; **{FOCUS_REGULATION}** is the current format "
+        "the rest of this dashboard is scoped to."
+    )
     if legality["snapshot_date"].nunique() <= 1:
         st.caption(
             "Only one snapshot_date has been extracted so far, so this is a single-point-in-time "
@@ -163,10 +210,12 @@ st.divider()
 
 # --- Drill-down by Pokémon: win rate, item/ability, moves --------------------
 st.header("Pokémon drill-down")
-pokemon_options = sorted(overall_usage["display_name"].dropna().unique())
-selected_pokemon = st.selectbox("Pokémon", pokemon_options)
-selected_key = overall_usage.loc[
-    overall_usage["display_name"] == selected_pokemon, "pokemon_key"
+legal_pool_names = with_display_name(
+    pd.DataFrame({"pokemon_key": sorted(legal_pool)}), names
+).sort_values("display_name")
+selected_pokemon = st.selectbox("Pokémon", legal_pool_names["display_name"])
+selected_key = legal_pool_names.loc[
+    legal_pool_names["display_name"] == selected_pokemon, "pokemon_key"
 ].iloc[0]
 
 drill_cols = st.columns(3)
@@ -177,6 +226,8 @@ with drill_cols[0]:
     if len(row):
         st.metric("Usage count", int(row["usage_count"].iloc[0]))
         st.metric("Usage rank", int(row["usage_rank"].iloc[0]))
+    else:
+        st.caption("No recorded tournament usage for this Pokémon yet.")
 
 with drill_cols[1]:
     st.subheader("Win rate")

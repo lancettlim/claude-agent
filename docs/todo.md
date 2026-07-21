@@ -226,6 +226,18 @@ Phase 4 card sprite coverage well beyond what their docs currently imply.
   snapshot view rather than a real trend, since only one `snapshot_date`
   has been extracted so far (matches the existing known limitation noted
   for `stat_change_leaderboard`/`legality_summary_by_regulation`).
+- [x] Scope the dashboard's Pokémon-level views (usage, win rate, item/
+  ability/move drill-down, stat leaderboard) to the current regulation's
+  legal pool rather than every Pokémon ever seen in the underlying data
+  (`dashboard/app.py`'s `FOCUS_REGULATION` constant, currently `"m-b"`,
+  filtered via `legality_snapshot.csv` — the regulation-aware source,
+  not `pokemon_stat_champions.is_legal`'s regulation-agnostic flag; see
+  `docs/dataset-spec.md`'s "Known limitations (living)" section for why
+  those differ). `data/normalized/*.csv`/`data/marts/*.csv` themselves
+  stay unfiltered so older-regulation Pokémon remain available once a
+  later regulation supersedes `m-b` — just bump the constant. The
+  "Legal pool size by regulation" trend panel still shows every
+  regulation for comparison, since narrowing it would defeat its purpose.
 - [ ] Add a `pokemon_team_core_usage`-style mart (most common multi-
   Pokémon team cores, not just single-Pokémon usage) and wire it into
   `dashboard/app.py`, closing the "team core" drill-down gap noted above
