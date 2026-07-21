@@ -5,6 +5,7 @@ Subcommands:
     validate           Reshape dbt's test results into a validation report
     release            Publish a versioned release package (gated on validate)
     render-card        Render a team card PNG, from a team_id or an ad-hoc build spec
+    build-dashboard    Build the static analytics dashboard site from data/marts/*.csv
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from pipelines.dashboard import build as dashboard_build
 from pipelines.extract import bulbagarden, munchstats, opgg, pokeapi, pokebase
 from pipelines.release import build as release_build
 from pipelines.render import team_card
@@ -70,6 +72,21 @@ def _run_render_card(team_id: str | None, spec_path: Path | None, output_path: P
     return 0
 
 
+def _run_build_dashboard(
+    marts_dir: Path | None, normalized_dir: Path | None, output_dir: Path | None
+) -> int:
+    kwargs = {}
+    if marts_dir is not None:
+        kwargs["marts_dir"] = marts_dir
+    if normalized_dir is not None:
+        kwargs["normalized_dir"] = normalized_dir
+    if output_dir is not None:
+        kwargs["output_dir"] = output_dir
+    payload = dashboard_build.build(**kwargs)
+    print(f"Dashboard built with {len(payload['marts'])} mart tables")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pokemon-champions-cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -99,6 +116,15 @@ def main(argv: list[str] | None = None) -> int:
     render_source.add_argument("--spec", dest="spec_path", type=Path)
     render_parser.add_argument("--output", required=True, dest="output_path", type=Path)
 
+    dashboard_parser = subparsers.add_parser(
+        "build-dashboard", help="Build the static analytics dashboard site from data/marts/*.csv"
+    )
+    dashboard_parser.add_argument("--marts-dir", dest="marts_dir", type=Path, default=None)
+    dashboard_parser.add_argument(
+        "--normalized-dir", dest="normalized_dir", type=Path, default=None
+    )
+    dashboard_parser.add_argument("--output-dir", dest="output_dir", type=Path, default=None)
+
     args = parser.parse_args(argv)
 
     if args.command == "extract":
@@ -109,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_release(args.dataset_version, args.known_limitations)
     if args.command == "render-card":
         return _run_render_card(args.team_id, args.spec_path, args.output_path)
+    if args.command == "build-dashboard":
+        return _run_build_dashboard(args.marts_dir, args.normalized_dir, args.output_dir)
     parser.error(f"Unknown command: {args.command}")
     return 2
 

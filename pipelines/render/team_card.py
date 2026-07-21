@@ -40,9 +40,7 @@ def render(
     with sync_playwright() as p:
         browser = p.chromium.launch(**launch_kwargs)
         try:
-            page = browser.new_page(
-                viewport={"width": viewport_width, "height": viewport_height}
-            )
+            page = browser.new_page(viewport={"width": viewport_width, "height": viewport_height})
             page.set_content(html, wait_until="load")
             page.locator(".card-wrap").screenshot(path=str(output_path))
         finally:

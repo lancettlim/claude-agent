@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pokémon Champions — Analytics Dashboard</title>
+<style>
+  :root {
+    --navy: #16264d;
+    --blue: #2b5cad;
+    --light-blue: #eaf1fb;
+    --border: #16264d;
+    --muted: #5b6b8c;
+    --bg: #f4f6fb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--navy);
+  }
+  header {
+    background: #fff;
+    border-bottom: 2px solid var(--border);
+    padding: 24px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 1.6rem; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .kpi-card {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .kpi-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .kpi-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+  .kpi-card .sub { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+  section {
+    background: #fff;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  section h2 { margin-top: 0; font-size: 1.1rem; }
+  .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .controls label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+  select {
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  canvas { max-height: 360px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--light-blue); }
+  th { color: var(--muted); font-weight: 600; }
+  .empty-state {
+    background: var(--light-blue);
+    border-radius: 8px;
+    padding: 14px;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Pokémon Champions — Analytics Dashboard</h1>
+  <p>Generated {{ payload.kpis.latest_snapshot_date or "—" }} · built {{ payload.generated_at_utc }}</p>
+</header>
+<main>
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="label">Distinct Pokémon Used</div>
+      <div class="value">{{ payload.kpis.distinct_pokemon_used }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Most Used</div>
+      <div class="value">
+        {% if payload.kpis.top_used_pokemon %}{{ payload.kpis.top_used_pokemon.pokemon_name }}{% else %}—{% endif %}
+      </div>
+      <div class="sub">
+        {% if payload.kpis.top_used_pokemon %}{{ payload.kpis.top_used_pokemon.usage_count }} roster appearances{% endif %}
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Top Win Rate</div>
+      <div class="value">
+        {% if payload.kpis.top_win_rate_pokemon %}{{ payload.kpis.top_win_rate_pokemon.pokemon_name }}{% else %}—{% endif %}
+      </div>
+      <div class="sub">
+        {% if payload.kpis.top_win_rate_pokemon %}{{ "%.1f"|format(payload.kpis.top_win_rate_pokemon.win_rate * 100) }}% ({{ payload.kpis.top_win_rate_pokemon.record_count }} recorded matches){% endif %}
+      </div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Legal Pool</div>
+      <div class="value">
+        {% for r in payload.kpis.legal_pool_by_regulation %}{{ r.regulation_code }}: {{ r.legal_pokemon_count }}{% if not loop.last %} · {% endif %}{% endfor %}
+        {% if not payload.kpis.legal_pool_by_regulation %}—{% endif %}
+      </div>
+      <div class="sub">as of {{ payload.kpis.latest_snapshot_date or "—" }}</div>
+    </div>
+  </div>
+
+  <section>
+    <h2>Usage by tournament tier</h2>
+    <div class="controls">
+      <label>Tier
+        <select id="usage-tier-filter"></select>
+      </label>
+    </div>
+    <canvas id="usage-chart"></canvas>
+  </section>
+
+  <section>
+    <h2>Win rate leaders</h2>
+    <table id="win-rate-table">
+      <thead><tr><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Build drill-down (item &amp; ability)</h2>
+    <div class="controls">
+      <label>Pokémon
+        <select id="build-pokemon-filter"></select>
+      </label>
+    </div>
+    <table id="build-table">
+      <thead><tr><th>Item</th><th>Ability</th><th>Usage count</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Move drill-down</h2>
+    <div class="controls">
+      <label>Pokémon
+        <select id="move-pokemon-filter"></select>
+      </label>
+    </div>
+    <canvas id="move-chart"></canvas>
+  </section>
+
+  <section>
+    <h2>Stat change leaderboard</h2>
+    {% if payload.flags.stat_changes_degenerate %}
+    <p class="empty-state">No stat rebalance data yet — every Pokémon shows a 0 delta in the current snapshot. This section will populate once a Champions rebalance occurs and a new extraction is run.</p>
+    {% else %}
+    <table id="stat-change-table">
+      <thead><tr><th>Pokémon</th><th>Direction</th><th>Total delta</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Legal pool trend by regulation</h2>
+    {% if payload.flags.trend_degenerate %}
+    <p class="empty-state">Trend views populate as more snapshots are collected — today's data has only one extraction run ({{ payload.kpis.latest_snapshot_date or "—" }}), so there's nothing to trend against yet.</p>
+    {% else %}
+    <canvas id="legality-chart"></canvas>
+    {% endif %}
+  </section>
+</main>
+<footer>Pokémon Champions Competitive Data Platform · static dashboard built by pipelines/dashboard/</footer>
+
+<script>window.DASHBOARD_DATA = {{ data_json | safe }};</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="app.js"></script>
+</body>
+</html>

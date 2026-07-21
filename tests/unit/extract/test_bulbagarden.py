@@ -87,9 +87,7 @@ IMAGEINFO = {
 
 def _make_session(**kwargs):
     return _FakeSession(
-        categorymembers_pages=kwargs.get(
-            "categorymembers_pages", [MEMBERS_PAGE_1, MEMBERS_PAGE_2]
-        ),
+        categorymembers_pages=kwargs.get("categorymembers_pages", [MEMBERS_PAGE_1, MEMBERS_PAGE_2]),
         imageinfo_by_title=kwargs.get("imageinfo_by_title", IMAGEINFO),
     )
 
@@ -99,9 +97,7 @@ def test_extract_paginates_category_members_and_writes_manifest_rows(tmp_path):
     output_path = tmp_path / "bulbagarden.csv"
     cache_dir = tmp_path / "cache"
 
-    bulbagarden.extract(
-        output_path, dataset_version="0.1.0", session=session, cache_dir=cache_dir
-    )
+    bulbagarden.extract(output_path, dataset_version="0.1.0", session=session, cache_dir=cache_dir)
 
     with output_path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
