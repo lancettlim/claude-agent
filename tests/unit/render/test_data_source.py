@@ -47,8 +47,18 @@ def _populate_normalized(tmp_path):
     _write_csv(
         normalized_dir / "pokemon.csv",
         [
-            {"pokemon_key": "incineroar", "pokemon_id": "727", "pokemon_name": "Incineroar", "form_name": "incineroar"},
-            {"pokemon_key": "venusaur", "pokemon_id": "3", "pokemon_name": "Venusaur", "form_name": "venusaur"},
+            {
+                "pokemon_key": "incineroar",
+                "pokemon_id": "727",
+                "pokemon_name": "Incineroar",
+                "form_name": "incineroar",
+            },
+            {
+                "pokemon_key": "venusaur",
+                "pokemon_id": "3",
+                "pokemon_name": "Venusaur",
+                "form_name": "venusaur",
+            },
         ],
     )
     _write_csv(

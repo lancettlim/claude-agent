@@ -145,27 +145,47 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   images; `team_card.py` screenshots it to PNG via Playwright's headless
   Chromium) and a `render-card` CLI subcommand
   (`--team-id <id>` or `--spec <path.json>`, `--output <path.png>`)
-- [ ] Wire real Bulbagarden sprite art into the renderer end-to-end for a
-  team_id pulled from real MunchStats data (validated so far with the
-  ad-hoc JSON spec path using placeholder art; see Verification section of
-  the implementation plan for the exact manual check)
-- [ ] Extend `pipelines/release/build.py` to copy `pokemon_asset`-
+- [x] Wire real Bulbagarden sprite art into the renderer end-to-end for a
+  team_id pulled from real MunchStats data (ran all five extractors +
+  `make dbt-build` for real, then `render-card --team-id
+  011yDp6gkk3AeXY6wFCm` — confirmed real sprite art, not placeholder, for
+  all 6 roster slots: Sneasler, Kingambit, Aerodactyl, Basculegion,
+  Sylveon, Alolan Ninetales)
+- [x] Extend `pipelines/release/build.py` to copy `pokemon_asset`-
   referenced images into `releases/data/<version>/images/` and add the
   Bulbagarden source + `pokemon_asset` table + images block to the
   manifest/changelog templates, plus a redistribution-posture disclaimer
   (Bulbagarden-sourced artwork is ultimately Nintendo/Game Freak-owned;
-  see `docs/dataset-spec.md`'s "Image asset source" section)
+  see `docs/dataset-spec.md`'s "Image asset source" section — the copy
+  step, manifest/changelog templates, and `releases/data/README.md`
+  disclaimer were already in place; fixed a real gap where a missing
+  cached image would crash the release with `FileNotFoundError` instead of
+  skipping it gracefully — coverage gate is only >=85%, not 100% —  and
+  cut `dataset_version 0.2.0`, the first release with real Bulbagarden
+  data: 317 images copied, 0 missing, `pokemon_asset` at 317 rows)
 
 ## M6 — Dashboard analytics release
 
-- [ ] Stand up a first-party analytics dashboard (KPI overview cards;
+- [x] Stand up a first-party analytics dashboard (KPI overview cards;
   trend views by regulation window and tournament period; drill-down by
   Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
   `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
-  requirement — no dashboard app/UI exists yet, only the flat
-  exports/marts from Phase 3
-- [ ] Decide and document the dashboard's tech stack and hosting approach
-  (not specified anywhere in the repo today) before implementation starts
+  requirement (`pipelines/dashboard/`: KPI cards, usage-by-tier/
+  win-rate/build/move drill-downs are functional today against real data;
+  the stat-change leaderboard and legal-pool trend-by-regulation sections
+  are structurally built but show honest "not enough data yet" empty
+  states — driven by `data.py`'s `compute_flags` — since today's snapshot
+  has zero nonzero stat deltas and only one `snapshot_date` so far; they'll
+  light up automatically as more extractor runs accumulate data)
+- [x] Decide and document the dashboard's tech stack and hosting approach
+  (resolved in `docs/prd.md`'s Open questions and `docs/dashboard.md`: a
+  static HTML/CSS/vanilla-JS site, Chart.js via CDN, no backend, deployed
+  via GitHub Pages serving `/docs`)
+- [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
+  `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
+  dataset has enough snapshots/trend data (multiple `snapshot_date`s, a
+  real Champions rebalance) to justify the added hosting complexity beyond
+  today's free static GitHub Pages site — not part of this pass's scope
 
 ## Release readiness (v1 definition of done)
 

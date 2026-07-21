@@ -169,9 +169,7 @@ def load_from_spec(
     """
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
 
-    pokemon_by_form = {
-        row["form_name"]: row for row in _read_csv(normalized_dir / "pokemon.csv")
-    }
+    pokemon_by_form = {row["form_name"]: row for row in _read_csv(normalized_dir / "pokemon.csv")}
     assets_by_key = {
         row["pokemon_key"]: row for row in _read_csv(normalized_dir / "pokemon_asset.csv")
     }

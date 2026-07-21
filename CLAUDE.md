@@ -7,17 +7,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This repository builds the **Pokémon Champions Competitive Data Platform** —
 a unified, versioned dataset combining canonical Pokémon game data,
 Champions-format balance changes, legality snapshots, and tournament usage
-data. Phase 1 (ingestion) and Phase 2 (normalization) are implemented: the
-extractors in `pipelines/extract/` pull real data from all four v1 sources,
-and `dbt/` normalizes it into join-ready tables with real mapping logic (see
-"Development workflow" below). All release gates pass and `dataset_version
-0.1.0` has been published (`releases/data/0.1.0/`, `releases/manifests/
-manifest-0.1.0.json`) — see `docs/todo.md` for current status. Phase 3
-(analytics/dashboard outputs beyond the example queries in `dbt/analyses/`)
-is still outstanding. A Phase 4 addition layers Pokémon sprite images
-(Bulbagarden Archives, a fifth source) and a `pipelines/render/` team-card
-PNG generator on top of the normalized dataset — see "V1 scope at a glance"
-and "Development workflow" below.
+data. Phase 1 (ingestion), Phase 2 (normalization), and Phase 3
+(analytics/dashboard outputs — the marts in `dbt/models/marts/` plus the
+example queries in `dbt/analyses/`) are all implemented: the extractors in
+`pipelines/extract/` pull real data from all five v1 sources (including
+Bulbagarden Archives, a Phase 4 addition — see below), and `dbt/` normalizes
+it into join-ready tables with real mapping logic (see "Development
+workflow" below). All release gates pass and `dataset_version 0.2.0` has
+been published (`releases/data/0.2.0/`, `releases/manifests/
+manifest-0.2.0.json`) — see `docs/todo.md` for current status. Phase 4 layers
+Pokémon sprite images and a `pipelines/render/` team-card PNG generator on
+top of the normalized dataset, and M6 layers a static analytics dashboard
+(`pipelines/dashboard/`, deployed via GitHub Pages — see `docs/dashboard.md`)
+on top of the Phase 3 marts — see "V1 scope at a glance" and "Development
+workflow" below.
 
 ## Document map
 
@@ -76,12 +79,14 @@ releases/
   changelogs/               # one changelog entry per dataset version
 reports/
   validation/               # coverage, null-rate, duplicate-key, referential-integrity reports
+docs/
+  dashboard/                # generated static dashboard site — unlike data/ above, this IS committed
 ```
 
 `data/staging/*.csv`, `data/normalized/*.csv`, and `data/marts/*.csv` are
 all gitignored build output — regenerate staging with `python -m
 pipelines.cli extract <source>` (`pokeapi` | `opgg` | `munchstats` |
-`pokebase`) and normalized/marts with `make dbt-build`. They're
+`pokebase` | `bulbagarden`) and normalized/marts with `make dbt-build`. They're
 inputs/intermediate/derived output, not deliverables
 (`data/staging/*.schema.json` carries the durable, tracked contract for
 each source instead), and staging snapshots grow on every refresh per
@@ -168,6 +173,16 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   base64-inlined images; `team_card.py` screenshots it to PNG via
   Playwright. Invoke via `python -m pipelines.cli render-card --team-id
   <id>|--spec <path.json> --output <path.png>`.
+- `pipelines/dashboard/` — the M6 static analytics dashboard, built on top
+  of the Phase 3 marts (not part of `dbt/` or the release gates):
+  `data.py` reads `data/marts/*.csv` (degrading gracefully to empty lists
+  if they don't exist yet) and computes KPIs plus empty-state flags for
+  views that are currently data-starved (zero stat deltas, a single
+  snapshot date); `build.py` renders a self-contained static site
+  (`templates/index.html.jinja` + `static/app.js`, Chart.js via CDN, no
+  backend) into `docs/dashboard/` — see `docs/dashboard.md` for the
+  hosting/publishing story. Invoke via `python -m pipelines.cli
+  build-dashboard` or `make dashboard`.
 - `pipelines/validate/report.py` — reshapes dbt's test results into
   `reports/validation/validation_report.json`, matching
   `reports/validation/validation_report.template.json`'s shape exactly.

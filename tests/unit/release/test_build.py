@@ -55,7 +55,7 @@ def _passing_validation_report():
     }
 
 
-def _populate_normalized_and_staging(tmp_path):
+def _populate_normalized_and_staging(tmp_path, *, include_missing_asset=False):
     normalized_dir = tmp_path / "normalized"
     staging_dir = tmp_path / "staging"
     asset_cache_dir = tmp_path / "assets" / "bulbagarden"
@@ -67,6 +67,10 @@ def _populate_normalized_and_staging(tmp_path):
                 {primary_key: "k1", "local_cache_path": "0001.png"},
                 {primary_key: "k2", "local_cache_path": "0002.png"},
             ]
+            if include_missing_asset:
+                # References a cache file that was never downloaded/was
+                # pruned (coverage gate is only >=85%, not 100%).
+                rows.append({primary_key: "k3", "local_cache_path": "0003.png"})
         else:
             rows = [{primary_key: "k1"}, {primary_key: "k2"}]
         _write_csv(normalized_dir / f"{table_name}.csv", rows)
@@ -91,7 +95,12 @@ def _populate_normalized_and_staging(tmp_path):
     )
     _write_csv(
         staging_dir / "bulbagarden.csv",
-        [{"extracted_at_utc": "2026-01-01T04:00:00Z", "bulbagarden_title": "File:Menu CP 0001.png"}],
+        [
+            {
+                "extracted_at_utc": "2026-01-01T04:00:00Z",
+                "bulbagarden_title": "File:Menu CP 0001.png",
+            }
+        ],
     )
     return normalized_dir, staging_dir, asset_cache_dir
 
@@ -158,7 +167,7 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         "PokéBase",
         "Bulbagarden Archives",
     }
-    assert manifest["images"] == {"count": 2, "directory": "images/"}
+    assert manifest["images"] == {"count": 2, "missing": 0, "directory": "images/"}
 
     for table_name in build.TABLES:
         assert (releases_data_dir / "0.1.0" / f"{table_name}.csv").exists()
@@ -177,6 +186,32 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     assert "dataset_version 0.1.0" in changelog_text
     assert "example limitation" in changelog_text
     assert "{VERSION}" not in changelog_text
+
+
+def test_build_skips_missing_cached_images(tmp_path):
+    report_path = tmp_path / "validation_report.json"
+    report_path.write_text(json.dumps(_passing_validation_report()))
+    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(
+        tmp_path, include_missing_asset=True
+    )
+    releases_data_dir = tmp_path / "releases" / "data"
+
+    manifest = build.build(
+        "0.1.0",
+        validation_report_path=report_path,
+        normalized_dir=normalized_dir,
+        staging_dir=staging_dir,
+        releases_data_dir=releases_data_dir,
+        manifests_dir=tmp_path / "releases" / "manifests",
+        changelogs_dir=tmp_path / "releases" / "changelogs",
+        asset_cache_dir=asset_cache_dir,
+    )
+
+    assert manifest["images"] == {"count": 2, "missing": 1, "directory": "images/"}
+    images_dir = releases_data_dir / "0.1.0" / "images"
+    assert (images_dir / "0001.png").exists()
+    assert (images_dir / "0002.png").exists()
+    assert not (images_dir / "0003.png").exists()
 
 
 def test_build_quality_checks_reflect_report(tmp_path):

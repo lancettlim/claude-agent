@@ -91,6 +91,7 @@
   ],
   "images": {
     "count": 0,
+    "missing": 0,
     "directory": "images/"
   },
   "quality_checks": [

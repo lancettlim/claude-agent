@@ -52,9 +52,7 @@ class _FakePlaywrightContext:
 
 def test_render_screenshots_rendered_html_to_output_path(tmp_path, monkeypatch):
     fake_chromium = _FakeChromium()
-    monkeypatch.setattr(
-        team_card, "sync_playwright", lambda: _FakePlaywrightContext(fake_chromium)
-    )
+    monkeypatch.setattr(team_card, "sync_playwright", lambda: _FakePlaywrightContext(fake_chromium))
     monkeypatch.setattr(
         team_card.template, "render_html", lambda card, **kwargs: "<html>fake</html>"
     )

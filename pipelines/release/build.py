@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import json
 import shutil
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -118,14 +119,22 @@ def _copy_referenced_images(
     images_dir = dest_dir / IMAGES_SUBDIR
     images_dir.mkdir(parents=True, exist_ok=True)
     copied = 0
+    missing = 0
     for row in pokemon_asset_rows:
         local_cache_path = row["local_cache_path"]
         src = asset_cache_dir / local_cache_path
+        if not src.exists():
+            missing += 1
+            print(
+                f"warning: pokemon_asset image not found in cache, skipping: {src}",
+                file=sys.stderr,
+            )
+            continue
         dest = images_dir / local_cache_path
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
         copied += 1
-    return {"count": copied, "directory": f"{IMAGES_SUBDIR}/"}
+    return {"count": copied, "missing": missing, "directory": f"{IMAGES_SUBDIR}/"}
 
 
 def _build_quality_checks(validation_report: dict[str, Any]) -> list[dict[str, Any]]:
