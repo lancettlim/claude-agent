@@ -16,14 +16,21 @@ in docs/todo.md for the follow-up on picking a public hosting target
 to host against.
 
 Regulation scope: every Pokémon-level view (usage, win rate, item/ability/
-move drill-down, stat leaderboard) is filtered to FOCUS_REGULATION's legal
+move drill-down, stat leaderboard) is filtered to FOCUS_REGULATIONS' legal
 pool (data/normalized/legality_snapshot.csv, not pokemon_stat_champions'
 regulation-agnostic overall flag — see docs/dataset-spec.md's "Known
 limitations (living)" section for why those two pools differ). This only
 scopes the dashboard's default view; data/normalized/*.csv and
 data/marts/*.csv themselves stay unfiltered so older/future-regulation
-Pokémon remain available once a later regulation becomes current — just
-bump FOCUS_REGULATION.
+Pokémon remain available once a later regulation becomes current.
+
+FOCUS_REGULATIONS is a list, not a single code, because Champions
+regulations are cumulative here: m-b is an *extension* of m-a (it adds 39
+newly-legal Pokémon on top of m-a's 268, not a replacement of them — the
+two pools barely overlap), so the real current legal pool is their union
+(306 Pokémon), not m-b alone. Bump the list (e.g. add "m-c") if a future
+regulation is likewise additive; replace it entirely instead if a future
+regulation ever turns out to *reset* the pool rather than extend it.
 
 Run via `make dashboard` (`uv run streamlit run dashboard/app.py`).
 """
@@ -39,10 +46,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 MARTS_DIR = REPO_ROOT / "data" / "marts"
 NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 
-# The latest Champions regulation to scope Pokémon-level views to. Bump this
-# when a newer regulation supersedes it — the underlying data isn't filtered
-# anywhere else, so older regulations stay available for historical use.
-FOCUS_REGULATION = "m-b"
+# The Champions regulations whose union makes up the current legal pool
+# (cumulative: m-b extends m-a rather than replacing it — see module
+# docstring). The underlying data isn't filtered anywhere else, so older
+# regulations stay available for historical use even as this list grows.
+FOCUS_REGULATIONS = ["m-a", "m-b"]
 
 
 @st.cache_data
@@ -65,16 +73,18 @@ def load_pokemon_names() -> pd.DataFrame:
 
 
 @st.cache_data
-def load_legal_pool_keys(regulation_code: str) -> set[str]:
-    """pokemon_key set legal under regulation_code as of the latest
-    snapshot_date in legality_snapshot.csv (regulation-aware, unlike
-    pokemon_stat_champions.is_legal — see docs/dataset-spec.md)."""
+def load_legal_pool_keys(regulation_codes: list[str]) -> set[str]:
+    """Union of pokemon_key sets legal under any of regulation_codes, each
+    as of its own latest snapshot_date in legality_snapshot.csv
+    (regulation-aware, unlike pokemon_stat_champions.is_legal — see
+    docs/dataset-spec.md). Union, not intersection, because regulations
+    here are cumulative (see FOCUS_REGULATIONS)."""
     snapshot = pd.read_csv(NORMALIZED_DIR / "legality_snapshot.csv")
-    snapshot = snapshot[snapshot["regulation_code"] == regulation_code]
+    snapshot = snapshot[snapshot["regulation_code"].isin(regulation_codes)]
     if snapshot.empty:
         return set()
-    latest_date = snapshot["snapshot_date"].max()
-    current = snapshot[(snapshot["snapshot_date"] == latest_date) & (snapshot["is_legal"])]
+    latest_by_regulation = snapshot.groupby("regulation_code")["snapshot_date"].transform("max")
+    current = snapshot[(snapshot["snapshot_date"] == latest_by_regulation) & (snapshot["is_legal"])]
     return set(current["pokemon_key"])
 
 
@@ -86,15 +96,17 @@ def with_display_name(df: pd.DataFrame, names: pd.DataFrame) -> pd.DataFrame:
 
 st.set_page_config(page_title="Pokémon Champions Analytics", layout="wide")
 st.title("Pokémon Champions Analytics")
+FOCUS_LABEL = "+".join(FOCUS_REGULATIONS)
 st.caption(
-    f"Built from data/marts/*.csv, scoped to regulation **{FOCUS_REGULATION}** (the latest "
-    "format) — run `make dbt-build` first if these tables look stale or missing."
+    f"Built from data/marts/*.csv, scoped to the current legal pool (regulations "
+    f"**{FOCUS_LABEL}** — {FOCUS_REGULATIONS[-1]} extends {', '.join(FOCUS_REGULATIONS[:-1])} "
+    "rather than replacing it) — run `make dbt-build` first if these tables look stale or missing."
 )
 
 try:
     marts = load_marts()
     names = load_pokemon_names()
-    legal_pool = load_legal_pool_keys(FOCUS_REGULATION)
+    legal_pool = load_legal_pool_keys(FOCUS_REGULATIONS)
 except FileNotFoundError as exc:
     st.error(
         f"Missing mart file: {exc}. Run `make dbt-build` (after `python -m pipelines.cli extract "
@@ -105,9 +117,10 @@ except FileNotFoundError as exc:
 
 if not legal_pool:
     st.warning(
-        f"No legal Pokémon found for regulation {FOCUS_REGULATION!r} in "
-        "data/normalized/legality_snapshot.csv — showing an empty dashboard. Check FOCUS_REGULATION "
-        "in dashboard/app.py against the regulations legality_summary_by_regulation.csv reports."
+        f"No legal Pokémon found for regulations {FOCUS_REGULATIONS!r} in "
+        "data/normalized/legality_snapshot.csv — showing an empty dashboard. Check "
+        "FOCUS_REGULATIONS in dashboard/app.py against the regulations "
+        "legality_summary_by_regulation.csv reports."
     )
 
 usage = with_display_name(marts["pokemon_usage_summary"], names)
@@ -126,7 +139,7 @@ overall_usage = usage[usage["event_tier"].isna()]
 
 # --- KPI overview cards -----------------------------------------------------
 kpi_cols = st.columns(4)
-kpi_cols[0].metric(f"Legal Pokémon ({FOCUS_REGULATION})", len(legal_pool))
+kpi_cols[0].metric(f"Legal Pokémon ({FOCUS_LABEL})", len(legal_pool))
 kpi_cols[1].metric("Teams with usage data", int(overall_usage["usage_count"].sum()))
 top_winner = win_rate.sort_values("win_rate", ascending=False).iloc[0] if len(win_rate) else None
 kpi_cols[2].metric(
@@ -158,8 +171,8 @@ trend_cols = st.columns(2)
 with trend_cols[0]:
     st.subheader("Legal pool size by regulation")
     st.caption(
-        f"Shown for context across all regulations; **{FOCUS_REGULATION}** is the current format "
-        "the rest of this dashboard is scoped to."
+        f"Shown for context across all regulations; **{FOCUS_LABEL}** (cumulative) is the current "
+        "pool the rest of this dashboard is scoped to."
     )
     if legality["snapshot_date"].nunique() <= 1:
         st.caption(

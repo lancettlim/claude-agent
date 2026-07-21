@@ -229,13 +229,20 @@ Phase 4 card sprite coverage well beyond what their docs currently imply.
 - [x] Scope the dashboard's Pokémon-level views (usage, win rate, item/
   ability/move drill-down, stat leaderboard) to the current regulation's
   legal pool rather than every Pokémon ever seen in the underlying data
-  (`dashboard/app.py`'s `FOCUS_REGULATION` constant, currently `"m-b"`,
-  filtered via `legality_snapshot.csv` — the regulation-aware source,
-  not `pokemon_stat_champions.is_legal`'s regulation-agnostic flag; see
-  `docs/dataset-spec.md`'s "Known limitations (living)" section for why
-  those differ). `data/normalized/*.csv`/`data/marts/*.csv` themselves
-  stay unfiltered so older-regulation Pokémon remain available once a
-  later regulation supersedes `m-b` — just bump the constant. The
+  (`dashboard/app.py`'s `FOCUS_REGULATIONS` constant, currently
+  `["m-a", "m-b"]`, filtered via `legality_snapshot.csv` — the
+  regulation-aware source, not `pokemon_stat_champions.is_legal`'s
+  regulation-agnostic flag; see `docs/dataset-spec.md`'s "Known
+  limitations (living)" section for why those differ). Champions
+  regulations here are cumulative — m-b adds 39 newly-legal Pokémon on
+  top of m-a's 268 rather than replacing them (only 1 Pokémon overlaps
+  between the two pools) — so `FOCUS_REGULATIONS` is a list unioned
+  together (306 Pokémon total), not a single code; an initial version of
+  this item scoped to `"m-b"` alone (39 Pokémon) before that was caught
+  and corrected. `data/normalized/*.csv`/`data/marts/*.csv` themselves
+  stay unfiltered so older-regulation Pokémon remain available; bump the
+  list (or replace it, if a future regulation resets rather than
+  extends the pool) when a new regulation lands. The
   "Legal pool size by regulation" trend panel still shows every
   regulation for comparison, since narrowing it would defeat its purpose.
 - [ ] Add a `pokemon_team_core_usage`-style mart (most common multi-
