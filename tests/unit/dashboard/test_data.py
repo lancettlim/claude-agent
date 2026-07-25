@@ -53,37 +53,6 @@ def test_load_pokemon_names(tmp_path):
     assert data.load_pokemon_names(tmp_path) == {"pikachu": "Pikachu"}
 
 
-def test_compute_flags_stat_changes_degenerate_when_all_zero():
-    marts = {
-        "stat_change_leaderboard": [
-            {"pokemon_key": "a", "stat_total_delta": 0, "direction": "gainer"},
-            {"pokemon_key": "b", "stat_total_delta": 0, "direction": "gainer"},
-        ],
-        "legality_summary_by_regulation": [
-            {"regulation_code": "m-a", "snapshot_date": "2026-01-01", "legal_pokemon_count": 10}
-        ],
-    }
-    flags = data.compute_flags(marts)
-    assert flags["stat_changes_degenerate"] is True
-    assert flags["trend_degenerate"] is True
-
-
-def test_compute_flags_not_degenerate_with_mixed_deltas_and_multiple_dates():
-    marts = {
-        "stat_change_leaderboard": [
-            {"pokemon_key": "a", "stat_total_delta": 5, "direction": "gainer"},
-            {"pokemon_key": "b", "stat_total_delta": -3, "direction": "loser"},
-        ],
-        "legality_summary_by_regulation": [
-            {"regulation_code": "m-a", "snapshot_date": "2026-01-01", "legal_pokemon_count": 10},
-            {"regulation_code": "m-a", "snapshot_date": "2026-02-01", "legal_pokemon_count": 12},
-        ],
-    }
-    flags = data.compute_flags(marts)
-    assert flags["stat_changes_degenerate"] is False
-    assert flags["trend_degenerate"] is False
-
-
 def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
     marts_dir = tmp_path / "marts"
     normalized_dir = tmp_path / "normalized"
@@ -110,6 +79,4 @@ def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
     ]
     assert payload["kpis"]["distinct_pokemon_used"] == 1
     assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "Pikachu"
-    assert payload["flags"]["stat_changes_degenerate"] is True
-    assert payload["flags"]["trend_degenerate"] is True
     assert "generated_at_utc" in payload

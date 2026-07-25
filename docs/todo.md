@@ -171,16 +171,26 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
   `docs/prd.md`'s M6 milestone and "Dashboard analytics module"
   requirement (`pipelines/dashboard/`: KPI cards, usage-by-tier/
-  win-rate/build/move drill-downs are functional today against real data;
-  the stat-change leaderboard and legal-pool trend-by-regulation sections
-  are structurally built but show honest "not enough data yet" empty
-  states — driven by `data.py`'s `compute_flags` — since today's snapshot
-  has zero nonzero stat deltas and only one `snapshot_date` so far; they'll
-  light up automatically as more extractor runs accumulate data)
+  win-rate/build/move drill-downs are functional today against real data)
 - [x] Decide and document the dashboard's tech stack and hosting approach
   (resolved in `docs/prd.md`'s Open questions and `docs/dashboard.md`: a
   static HTML/CSS/vanilla-JS site, Chart.js via CDN, no backend, deployed
   via GitHub Pages serving `/docs`)
+- [x] Remove the stat-change leaderboard and legal-pool trend-by-regulation
+  sections: both were structurally built but permanently showed a
+  "not enough data yet" empty state (zero nonzero stat deltas, only one
+  `snapshot_date`), so they were cut from `index.html.jinja`/`app.js`
+  rather than ship two always-empty sections — see `docs/dashboard.md`'s
+  "Removed sections" note; re-add once a rebalance + multiple snapshots
+  make the underlying data real
+- [ ] Backlog: dashboard capability/UX refinement pass (live at
+  https://lancettlim.github.io/claude-agent/dashboard/) — next candidates:
+  regulation-code filter on the KPI row and usage/win-rate views, a
+  tournament-event/date filter once multiple snapshots exist, sortable
+  table columns (currently fixed-sort), a loading/empty state for the
+  build and move drill-downs before a Pokémon is picked instead of
+  defaulting to the first alphabetically, and mobile-responsive layout
+  for the KPI grid and tables
 - [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
   `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
   dataset has enough snapshots/trend data (multiple `snapshot_date`s, a
