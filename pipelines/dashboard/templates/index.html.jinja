@@ -154,26 +154,6 @@
     <canvas id="move-chart"></canvas>
   </section>
 
-  <section>
-    <h2>Stat change leaderboard</h2>
-    {% if payload.flags.stat_changes_degenerate %}
-    <p class="empty-state">No stat rebalance data yet — every Pokémon shows a 0 delta in the current snapshot. This section will populate once a Champions rebalance occurs and a new extraction is run.</p>
-    {% else %}
-    <table id="stat-change-table">
-      <thead><tr><th>Pokémon</th><th>Direction</th><th>Total delta</th></tr></thead>
-      <tbody></tbody>
-    </table>
-    {% endif %}
-  </section>
-
-  <section>
-    <h2>Legal pool trend by regulation</h2>
-    {% if payload.flags.trend_degenerate %}
-    <p class="empty-state">Trend views populate as more snapshots are collected — today's data has only one extraction run ({{ payload.kpis.latest_snapshot_date or "—" }}), so there's nothing to trend against yet.</p>
-    {% else %}
-    <canvas id="legality-chart"></canvas>
-    {% endif %}
-  </section>
 </main>
 <footer>Pokémon Champions Competitive Data Platform · static dashboard built by pipelines/dashboard/</footer>
 

@@ -25,7 +25,6 @@ DEFAULT_NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pokemon_usage_summary": (("usage_count", "usage_rank"), ()),
     "legality_summary_by_regulation": (("legal_pokemon_count",), ()),
-    "stat_change_leaderboard": (("stat_total_delta", "rank_within_direction"), ()),
     "pokemon_win_rate_summary": (
         ("total_wins", "total_losses", "record_count"),
         ("win_rate",),
@@ -93,7 +92,6 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     usage_rows = [r for r in marts["pokemon_usage_summary"] if not r.get("event_tier")]
     legality_rows = marts["legality_summary_by_regulation"]
     win_rate_rows = marts["pokemon_win_rate_summary"]
-    stat_rows = marts["stat_change_leaderboard"]
 
     latest_snapshot_date = max((r["snapshot_date"] for r in legality_rows), default=None)
     legal_pool_by_regulation = [
@@ -117,21 +115,6 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         "distinct_pokemon_used": len(usage_rows),
         "top_used_pokemon": top_used,
         "top_win_rate_pokemon": top_win_rate,
-        "stat_changes_tracked": sum(1 for r in stat_rows if r["stat_total_delta"] != 0),
-    }
-
-
-def compute_flags(marts: dict[str, list[dict[str, Any]]]) -> dict[str, bool]:
-    stat_rows = marts["stat_change_leaderboard"]
-    legality_rows = marts["legality_summary_by_regulation"]
-
-    stat_changes_degenerate = not any(r["stat_total_delta"] != 0 for r in stat_rows)
-    distinct_dates = {r["snapshot_date"] for r in legality_rows}
-    trend_degenerate = len(distinct_dates) <= 1
-
-    return {
-        "stat_changes_degenerate": stat_changes_degenerate,
-        "trend_degenerate": trend_degenerate,
     }
 
 
@@ -144,6 +127,5 @@ def build_payload(
     return {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "kpis": compute_kpis(marts),
-        "flags": compute_flags(marts),
         "marts": marts,
     }

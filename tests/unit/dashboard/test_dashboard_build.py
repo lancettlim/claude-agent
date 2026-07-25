@@ -20,7 +20,7 @@ def _embedded_payload(html: str) -> dict:
     return json.loads(raw)
 
 
-def _populate_marts(marts_dir, normalized_dir, *, degenerate=True):
+def _populate_marts(marts_dir, normalized_dir):
     _write_csv(
         normalized_dir / "pokemon.csv",
         [
@@ -70,49 +70,10 @@ def _populate_marts(marts_dir, normalized_dir, *, degenerate=True):
             }
         ],
     )
-    if degenerate:
-        _write_csv(
-            marts_dir / "stat_change_leaderboard.csv",
-            [
-                {
-                    "pokemon_key": "pikachu",
-                    "stat_total_delta": "0",
-                    "direction": "gainer",
-                    "rank_within_direction": "1",
-                }
-            ],
-        )
-        _write_csv(
-            marts_dir / "legality_summary_by_regulation.csv",
-            [{"regulation_code": "m-a", "snapshot_date": "2026-01-01", "legal_pokemon_count": "2"}],
-        )
-    else:
-        _write_csv(
-            marts_dir / "stat_change_leaderboard.csv",
-            [
-                {
-                    "pokemon_key": "pikachu",
-                    "stat_total_delta": "5",
-                    "direction": "gainer",
-                    "rank_within_direction": "1",
-                }
-            ],
-        )
-        _write_csv(
-            marts_dir / "legality_summary_by_regulation.csv",
-            [
-                {
-                    "regulation_code": "m-a",
-                    "snapshot_date": "2026-01-01",
-                    "legal_pokemon_count": "2",
-                },
-                {
-                    "regulation_code": "m-a",
-                    "snapshot_date": "2026-02-01",
-                    "legal_pokemon_count": "3",
-                },
-            ],
-        )
+    _write_csv(
+        marts_dir / "legality_summary_by_regulation.csv",
+        [{"regulation_code": "m-a", "snapshot_date": "2026-01-01", "legal_pokemon_count": "2"}],
+    )
 
 
 def test_build_writes_index_html_and_app_js(tmp_path):
@@ -133,34 +94,19 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     assert "Pikachu" in html
 
 
-def test_build_shows_empty_state_banners_when_degenerate(tmp_path):
+def test_build_omits_removed_stat_change_and_trend_sections(tmp_path):
     marts_dir = tmp_path / "marts"
     normalized_dir = tmp_path / "normalized"
     output_dir = tmp_path / "out"
-    _populate_marts(marts_dir, normalized_dir, degenerate=True)
+    _populate_marts(marts_dir, normalized_dir)
 
     build.build(marts_dir=marts_dir, normalized_dir=normalized_dir, output_dir=output_dir)
     html = (output_dir / "index.html").read_text(encoding="utf-8")
 
-    assert "No stat rebalance data yet" in html
-    assert "Trend views populate as more snapshots are collected" in html
+    assert "Stat change leaderboard" not in html
+    assert "Legal pool trend by regulation" not in html
     assert 'id="stat-change-table"' not in html
     assert 'id="legality-chart"' not in html
-
-
-def test_build_omits_empty_state_banners_when_data_present(tmp_path):
-    marts_dir = tmp_path / "marts"
-    normalized_dir = tmp_path / "normalized"
-    output_dir = tmp_path / "out"
-    _populate_marts(marts_dir, normalized_dir, degenerate=False)
-
-    build.build(marts_dir=marts_dir, normalized_dir=normalized_dir, output_dir=output_dir)
-    html = (output_dir / "index.html").read_text(encoding="utf-8")
-
-    assert "No stat rebalance data yet" not in html
-    assert "Trend views populate as more snapshots are collected" not in html
-    assert 'id="stat-change-table"' in html
-    assert 'id="legality-chart"' in html
 
 
 def test_safe_json_escapes_script_close_tag():

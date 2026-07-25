@@ -93,20 +93,22 @@ from a branch", branch `main` (or whichever branch is the default), folder
 ## Data-reality caveats
 
 As of this writing:
-- **Stat changes**: every `stat_total_delta` in `stat_change_leaderboard`
-  is `0` — no Champions rebalance has happened yet in the current
-  extraction snapshot. The dashboard's stat-change leaderboard section
-  shows an honest empty-state message instead of a chart of all-zero bars.
-- **Trend over time**: there is only one `snapshot_date` so far, so there's
-  nothing to plot a trend against yet. The legal-pool-by-regulation trend
-  section shows an empty-state message for the same reason.
 - **Regulation filtering**: `regulation_code` values (`m-a`, `m-b`) are
-  populated (via PokéBase), so the current KPI card and
-  `legality_summary_by_regulation` data are real and non-degenerate — only
-  the *time-series* trend view is blocked on having more than one snapshot.
+  populated (via PokéBase), so the current KPI card's
+  `legality_summary_by_regulation` data is real and non-degenerate.
 
-`data.py`'s `compute_flags` (`stat_changes_degenerate`,
-`trend_degenerate`) drives which sections show real data versus an
-empty-state banner, so these sections will light up automatically — no
-code changes needed — once more extractor runs accumulate additional
-snapshots and a real rebalance occurs.
+## Removed sections (as of this pass)
+
+The stat-change leaderboard and legal-pool-trend-by-regulation sections
+were removed from the page (see `docs/todo.md`'s dashboard refinement
+plan): both were structurally built but permanently showed an
+empty-state banner, since today's dataset has zero nonzero stat deltas
+(no Champions rebalance has occurred yet) and only one `snapshot_date`
+(nothing to trend against). Rather than ship two sections that always
+render as "not enough data yet," they were cut until the underlying data
+exists. `pipelines/dashboard/data.py` no longer loads
+`stat_change_leaderboard` or computes degenerate-data flags; re-adding
+these views once a rebalance happens and multiple snapshots accumulate is
+a small, self-contained addition (reintroduce the mart load, the two
+template sections, and their `app.js` render functions — see git history
+for the removed code).
