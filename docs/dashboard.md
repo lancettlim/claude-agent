@@ -22,16 +22,23 @@ to justify the added hosting complexity.
 
 ```
 pipelines/dashboard/data.py       reads data/marts/*.csv, joins pokemon
-                                   names, computes KPIs and empty-state flags
-pipelines/dashboard/build.py      renders templates/index.html.jinja with
-                                   the payload baked in as inline JSON, and
+                                   names, computes KPIs
+pipelines/dashboard/sprites.py    copies Bulbagarden species sprites
+                                   (keyed by pokemon_key) into output/images/
+pipelines/dashboard/build.py      calls data.py + sprites.py, resolves
+                                   move-type and item icons, renders
+                                   templates/index.html.jinja with the
+                                   payload baked in as inline JSON, and
                                    copies static/app.js alongside it
-pipelines/dashboard/templates/    the single-page HTML/CSS template
+pipelines/dashboard/templates/    the tabbed HTML/CSS template
 pipelines/dashboard/static/       app.js — vanilla JS reading the baked-in
-                                   data to wire filters, tables, and charts
+                                   data to wire tabs, filters, tables, and
+                                   charts
+pipelines/dashboard/static/icons/ 18 committed move-type icon PNGs
         ↓
 docs/dashboard/index.html         generated output — committed to git
 docs/dashboard/app.js
+docs/dashboard/images/            sprites + type/item icons — committed to git
 ```
 
 Data is baked into `index.html` as `window.DASHBOARD_DATA = {...}` (an
@@ -41,7 +48,16 @@ when `index.html` is opened directly via `file://` (no local server), and
 inlining sidesteps that entirely while working identically once served
 over `https://` by GitHub Pages.
 
-The dashboard degrades gracefully in two ways:
+Pokémon sprites, move-type icons, and item icons are copied/resolved into
+`docs/dashboard/images/` as separate committed files rather than inlined as
+base64 — the payload JSON is already large (hundreds of usage/build/move/
+team-core rows), and base64 would add ~33% overhead across ~250 sprites,
+bloating the one committed HTML file and making its diffs unreadable.
+Separate PNGs keep diffs scoped to changed images and are browser-cacheable
+across page loads, mirroring the `releases/data/<version>/images/` pattern
+used by release packages.
+
+The dashboard degrades gracefully in several ways:
 - If `data/marts/*.csv` files don't exist yet (before `make dbt-build` has
   run), each mart loads as an empty list rather than erroring — the page
   still builds, just with empty sections.
@@ -49,6 +65,62 @@ The dashboard degrades gracefully in two ways:
   `app.js` checks `typeof Chart` before drawing and simply skips chart
   rendering — tables and KPI cards still populate normally, and no console
   errors are thrown.
+- If a Pokémon referenced by a mart has no Bulbagarden sprite yet (or
+  `data/assets/bulbagarden/` isn't populated at all), `sprites.py` skips it
+  with a warning rather than raising — the dashboard falls back to
+  text-only Pokémon names wherever a sprite is missing.
+- Item icons (see "Icon sources" below) are resolved best-effort over the
+  network; an unresolved or unreachable item icon degrades to a text-only
+  item name, never a build failure.
+
+## Tabs
+
+The page is a single scrolling KPI row plus five tabs (client-side,
+vanilla JS — no routing library, no page reload):
+
+- **Overview** — the four KPI cards (unchanged from before this pass)
+- **Usage** — usage-by-tournament-tier chart + win-rate leaders table
+- **Builds** — item & ability drill-down, with item icons per row
+- **Moves** — move drill-down chart, with move-type icons per row
+- **Team Cores** — which Pokémon most often share a team with the selected
+  Pokémon (see "Team-core drill-down" below)
+
+Chart.js canvases inside a hidden tab panel initialize at zero size, so
+each tab's chart-drawing setup runs lazily on that tab's first activation
+rather than eagerly on page load (see `app.js`'s `tabInitializers`).
+
+## Icon sources
+
+Three distinct assets, three distinct strategies:
+
+- **Species sprites** (~250 Pokémon): copied from the gitignored
+  `data/assets/bulbagarden/` cache (populated by
+  `python -m pipelines.cli extract bulbagarden`) via `pipelines/dashboard/
+  sprites.py`, keyed by `pokemon_key` so `app.js` can look them up the same
+  way it looks up every other Pokémon-keyed field. Purely a local file
+  copy — no network access at dashboard-build time.
+- **Move-type icons** (18, fixed): bundled as committed static assets under
+  `pipelines/dashboard/static/icons/types/`, bootstrapped once via
+  `pipelines/render/assets.py`'s `ensure_type_icon()` and copied verbatim
+  into `docs/dashboard/images/icons/types/` on every build. No network
+  dependency — types never change.
+- **Item icons** (open-ended, data-dependent): resolved via
+  `pipelines/render/assets.py`'s `ensure_item_icon()` (PokéAPI community
+  sprites) for every distinct `item_name` in `pokemon_build_usage`. This is
+  the one part of a dashboard build that needs network access. Pass
+  `--no-fetch-icons` to `build-dashboard` (or `fetch_icons=False` to
+  `pipelines.dashboard.build.build`) for an offline build — item names
+  render text-only in that case.
+
+## Team-core drill-down
+
+`dbt/models/marts/pokemon_team_core_usage.sql` closes a gap named in
+`docs/prd.md`'s original scope ("Drill-down by Pokémon, team core, move,
+and item usage") but never built until this pass: it self-joins
+`tournament_team_member` on `team_id` to count how often each pair of
+Pokémon appears on the same tournament team, restricted to the current
+legal pool, mirrored into both anchor directions so either Pokémon in a
+pair can be the drill-down's selected anchor.
 
 ## Building and viewing locally
 
@@ -56,6 +128,8 @@ The dashboard degrades gracefully in two ways:
 make dashboard                     # runs dbt-build, then builds the site
 # or, if data/marts/*.csv is already current:
 python -m pipelines.cli build-dashboard
+# offline (skips fetching item icons over the network):
+python -m pipelines.cli build-dashboard --no-fetch-icons
 ```
 
 View it either by opening the file directly:
@@ -74,11 +148,11 @@ python -m http.server --directory docs/dashboard
 
 Unlike other pipeline output in this repo (`data/normalized/`,
 `data/marts/`, `data/staging/` are all gitignored regenerated build
-output), **`docs/dashboard/index.html` and `docs/dashboard/app.js` are
-committed to git.** There is no CI/Actions workflow that rebuilds the
-dashboard — GitHub Pages serves exactly what's checked in, so after
-running `make dashboard`, `git add`/commit the regenerated files for the
-live site to update.
+output), **`docs/dashboard/index.html`, `docs/dashboard/app.js`, and
+`docs/dashboard/images/` are committed to git.** There is no CI/Actions
+workflow that rebuilds the dashboard — GitHub Pages serves exactly what's
+checked in, so after running `make dashboard`, `git add`/commit the
+regenerated files (including `images/`) for the live site to update.
 
 `docs/.nojekyll` is committed alongside them so GitHub Pages serves the
 `/docs` folder as plain static files, without Jekyll trying to process the
@@ -112,3 +186,9 @@ these views once a rebalance happens and multiple snapshots accumulate is
 a small, self-contained addition (reintroduce the mart load, the two
 template sections, and their `app.js` render functions — see git history
 for the removed code).
+
+By contrast, the "Tabs", "Icon sources", and "Team-core drill-down"
+sections above are additive against this same original scope: they cover
+a PRD-named drill-down (team core) and refinement-pass backlog items
+(mobile layout, richer imagery) that had real, non-degenerate data
+available, unlike the two removed sections.

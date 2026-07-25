@@ -73,9 +73,12 @@ def _run_render_card(team_id: str | None, spec_path: Path | None, output_path: P
 
 
 def _run_build_dashboard(
-    marts_dir: Path | None, normalized_dir: Path | None, output_dir: Path | None
+    marts_dir: Path | None,
+    normalized_dir: Path | None,
+    output_dir: Path | None,
+    fetch_icons: bool,
 ) -> int:
-    kwargs = {}
+    kwargs = {"fetch_icons": fetch_icons}
     if marts_dir is not None:
         kwargs["marts_dir"] = marts_dir
     if normalized_dir is not None:
@@ -124,6 +127,14 @@ def main(argv: list[str] | None = None) -> int:
         "--normalized-dir", dest="normalized_dir", type=Path, default=None
     )
     dashboard_parser.add_argument("--output-dir", dest="output_dir", type=Path, default=None)
+    dashboard_parser.add_argument(
+        "--no-fetch-icons",
+        dest="fetch_icons",
+        action="store_false",
+        default=True,
+        help="Skip fetching item icons over the network (species sprites and "
+        "move-type icons are always local, offline copies)",
+    )
 
     args = parser.parse_args(argv)
 
@@ -136,7 +147,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render-card":
         return _run_render_card(args.team_id, args.spec_path, args.output_path)
     if args.command == "build-dashboard":
-        return _run_build_dashboard(args.marts_dir, args.normalized_dir, args.output_dir)
+        return _run_build_dashboard(
+            args.marts_dir, args.normalized_dir, args.output_dir, args.fetch_icons
+        )
     parser.error(f"Unknown command: {args.command}")
     return 2
 

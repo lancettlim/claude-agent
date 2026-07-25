@@ -5,8 +5,12 @@ Uses plain csv.DictReader (no pandas/dbt runtime), matching the rest of
 this codebase's convention of not requiring a build runtime just to read
 already-materialized output (see pipelines/render/data_source.py). Missing
 mart files degrade to an empty list rather than raising, so the dashboard
-still builds (with empty-state sections) before `make dbt-build` has ever
-been run.
+still builds before `make dbt-build` has ever been run. (An earlier version
+of this module also computed empty-state flags for two now-removed
+sections — stat-change leaderboard and legal-pool trend — that were cut
+because the underlying data is permanently degenerate; see
+docs/dashboard.md's "Removed sections" note. No empty-state computation
+remains here.)
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "pokemon_build_usage": (("usage_count", "usage_rank"), ()),
     "pokemon_move_usage": (("usage_count", "usage_rank"), ()),
+    "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ()),
 }
 
 
@@ -79,12 +84,22 @@ def _join_pokemon_names(
 ) -> dict[str, list[dict[str, Any]]]:
     joined = {}
     for mart_name, rows in marts.items():
-        joined[mart_name] = [
-            {**row, "pokemon_name": pokemon_names.get(row["pokemon_key"], row["pokemon_key"])}
-            if "pokemon_key" in row
-            else row
-            for row in rows
-        ]
+        joined_rows = []
+        for row in rows:
+            if "pokemon_key" in row:
+                row = {
+                    **row,
+                    "pokemon_name": pokemon_names.get(row["pokemon_key"], row["pokemon_key"]),
+                }
+            if "partner_pokemon_key" in row:
+                row = {
+                    **row,
+                    "partner_pokemon_name": pokemon_names.get(
+                        row["partner_pokemon_key"], row["partner_pokemon_key"]
+                    ),
+                }
+            joined_rows.append(row)
+        joined[mart_name] = joined_rows
     return joined
 
 

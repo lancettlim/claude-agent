@@ -183,14 +183,24 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   rather than ship two always-empty sections — see `docs/dashboard.md`'s
   "Removed sections" note; re-add once a rebalance + multiple snapshots
   make the underlying data real
-- [ ] Backlog: dashboard capability/UX refinement pass (live at
-  https://lancettlim.github.io/claude-agent/dashboard/) — next candidates:
-  regulation-code filter on the KPI row and usage/win-rate views, a
-  tournament-event/date filter once multiple snapshots exist, sortable
-  table columns (currently fixed-sort), a loading/empty state for the
-  build and move drill-downs before a Pokémon is picked instead of
-  defaulting to the first alphabetically, and mobile-responsive layout
-  for the KPI grid and tables
+- [x] Dashboard full redesign (live at
+  https://lancettlim.github.io/claude-agent/dashboard/): tabbed navigation
+  (Overview/Usage/Builds/Moves/Team Cores) replacing the single scrolling
+  page; Pokémon sprites, move-type icons, and item icons throughout (KPI
+  cards, tables, chart axes, chart tooltips — see `docs/dashboard.md`'s
+  "Icon sources"); mobile-responsive layout for the KPI grid, tab nav, and
+  tables (breakpoints at 720px/480px, horizontal table scroll); and a new
+  `pokemon_team_core_usage` mart + Team Cores drill-down tab, closing the
+  "team core" gap named in `docs/prd.md`'s original scope ("Drill-down by
+  Pokémon, team core, move, and item usage") but never built until now.
+  The stat-change leaderboard and legal-pool-trend sections stay removed
+  (still genuinely data-starved, see above) and were not part of this pass.
+- [ ] Backlog: further dashboard capability items not covered by the above
+  redesign: regulation-code filter on the KPI row and usage/win-rate views,
+  a tournament-event/date filter once multiple snapshots exist, sortable
+  table columns (currently fixed-sort), and a loading/empty state for the
+  build/move/team-core drill-downs before a Pokémon is picked instead of
+  defaulting to the first alphabetically
 - [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
   `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
   dataset has enough snapshots/trend data (multiple `snapshot_date`s, a

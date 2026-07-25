@@ -176,13 +176,14 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
 - `pipelines/dashboard/` — the M6 static analytics dashboard, built on top
   of the Phase 3 marts (not part of `dbt/` or the release gates):
   `data.py` reads `data/marts/*.csv` (degrading gracefully to empty lists
-  if they don't exist yet) and computes KPIs plus empty-state flags for
-  views that are currently data-starved (zero stat deltas, a single
-  snapshot date); `build.py` renders a self-contained static site
-  (`templates/index.html.jinja` + `static/app.js`, Chart.js via CDN, no
-  backend) into `docs/dashboard/` — see `docs/dashboard.md` for the
-  hosting/publishing story. Invoke via `python -m pipelines.cli
-  build-dashboard` or `make dashboard`.
+  if they don't exist yet) and computes KPIs; `sprites.py` copies
+  Bulbagarden species sprites into the published site's `images/`, keyed by
+  `pokemon_key`; `build.py` calls both, resolves move-type and item icons
+  (see `docs/dashboard.md`'s "Icon sources"), and renders a tabbed,
+  self-contained static site (`templates/index.html.jinja` +
+  `static/app.js`, Chart.js via CDN, no backend) into `docs/dashboard/` —
+  see `docs/dashboard.md` for the hosting/publishing story. Invoke via
+  `python -m pipelines.cli build-dashboard` or `make dashboard`.
 - `pipelines/validate/report.py` — reshapes dbt's test results into
   `reports/validation/validation_report.json`, matching
   `reports/validation/validation_report.template.json`'s shape exactly.

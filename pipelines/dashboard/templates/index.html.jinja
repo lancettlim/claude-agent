@@ -29,6 +29,7 @@
   header h1 { margin: 0; font-size: 1.6rem; }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
   main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -40,10 +41,44 @@
     border: 2px solid var(--border);
     border-radius: 10px;
     padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
+  .kpi-card .kpi-sprite { width: 40px; height: 40px; object-fit: contain; flex: 0 0 auto; }
+  .kpi-card .kpi-body { min-width: 0; }
   .kpi-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .kpi-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
   .kpi-card .sub { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+
+  /* --- Tabs --- */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .tab-btn {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--muted);
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 10px 16px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { color: var(--navy); }
+  .tab-btn[aria-selected="true"] {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+  .tab-panel[hidden] { display: none; }
+
   section {
     background: #fff;
     border: 2px solid var(--border);
@@ -58,12 +93,21 @@
     padding: 6px 8px;
     border-radius: 6px;
     border: 1px solid var(--border);
-    font-size: 0.9rem;
+    font-size: 16px; /* prevents iOS Safari auto-zoom-on-focus */
   }
-  canvas { max-height: 360px; }
+
+  .chart-wrap { position: relative; height: 320px; }
+  canvas { max-width: 100%; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--light-blue); }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--light-blue); white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; }
+
+  /* Sprite/icon cells populated by app.js's pokemonCell()/iconCell() helpers */
+  .cell-with-icon { display: flex; align-items: center; gap: 8px; }
+  .cell-icon { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
+
   .empty-state {
     background: var(--light-blue);
     border-radius: 8px;
@@ -72,6 +116,45 @@
     font-size: 0.9rem;
   }
   footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
+
+  /* Chart.js external tooltip (see app.js's externalTooltip helper) */
+  .chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--navy);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transform: translate(-50%, -110%);
+    transition: opacity 0.1s ease;
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .chart-tooltip img { width: 24px; height: 24px; object-fit: contain; }
+
+  @media (max-width: 720px) {
+    main { padding: 16px; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .kpi-card { padding: 12px; }
+    .kpi-card .value { font-size: 1.2rem; }
+    .chart-wrap { height: 280px; }
+  }
+
+  @media (max-width: 480px) {
+    header h1 { font-size: 1.3rem; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .kpi-card { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .controls select { width: 100%; }
+    section { padding: 14px; }
+  }
+
+  @media (max-width: 360px) {
+    .kpi-row { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -82,76 +165,119 @@
 <main>
   <div class="kpi-row">
     <div class="kpi-card">
-      <div class="label">Distinct Pokémon Used</div>
-      <div class="value">{{ payload.kpis.distinct_pokemon_used }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="label">Most Used</div>
-      <div class="value">
-        {% if payload.kpis.top_used_pokemon %}{{ payload.kpis.top_used_pokemon.pokemon_name }}{% else %}—{% endif %}
-      </div>
-      <div class="sub">
-        {% if payload.kpis.top_used_pokemon %}{{ payload.kpis.top_used_pokemon.usage_count }} roster appearances{% endif %}
+      <div class="kpi-body">
+        <div class="label">Distinct Pokémon Used</div>
+        <div class="value">{{ payload.kpis.distinct_pokemon_used }}</div>
       </div>
     </div>
     <div class="kpi-card">
-      <div class="label">Top Win Rate</div>
-      <div class="value">
-        {% if payload.kpis.top_win_rate_pokemon %}{{ payload.kpis.top_win_rate_pokemon.pokemon_name }}{% else %}—{% endif %}
-      </div>
-      <div class="sub">
-        {% if payload.kpis.top_win_rate_pokemon %}{{ "%.1f"|format(payload.kpis.top_win_rate_pokemon.win_rate * 100) }}% ({{ payload.kpis.top_win_rate_pokemon.record_count }} recorded matches){% endif %}
+      {% set top_used = payload.kpis.top_used_pokemon %}
+      {% if top_used and payload.sprites.get(top_used.pokemon_key) %}
+        <img class="kpi-sprite" src="{{ payload.sprites[top_used.pokemon_key] }}" alt="">
+      {% endif %}
+      <div class="kpi-body">
+        <div class="label">Most Used</div>
+        <div class="value">{% if top_used %}{{ top_used.pokemon_name }}{% else %}—{% endif %}</div>
+        <div class="sub">{% if top_used %}{{ top_used.usage_count }} roster appearances{% endif %}</div>
       </div>
     </div>
     <div class="kpi-card">
-      <div class="label">Legal Pool</div>
-      <div class="value">
-        {% for r in payload.kpis.legal_pool_by_regulation %}{{ r.regulation_code }}: {{ r.legal_pokemon_count }}{% if not loop.last %} · {% endif %}{% endfor %}
-        {% if not payload.kpis.legal_pool_by_regulation %}—{% endif %}
+      {% set top_win = payload.kpis.top_win_rate_pokemon %}
+      {% if top_win and payload.sprites.get(top_win.pokemon_key) %}
+        <img class="kpi-sprite" src="{{ payload.sprites[top_win.pokemon_key] }}" alt="">
+      {% endif %}
+      <div class="kpi-body">
+        <div class="label">Top Win Rate</div>
+        <div class="value">{% if top_win %}{{ top_win.pokemon_name }}{% else %}—{% endif %}</div>
+        <div class="sub">{% if top_win %}{{ "%.1f"|format(top_win.win_rate * 100) }}% ({{ top_win.record_count }} recorded matches){% endif %}</div>
       </div>
-      <div class="sub">as of {{ payload.kpis.latest_snapshot_date or "—" }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-body">
+        <div class="label">Legal Pool</div>
+        <div class="value">
+          {% for r in payload.kpis.legal_pool_by_regulation %}{{ r.regulation_code }}: {{ r.legal_pokemon_count }}{% if not loop.last %} · {% endif %}{% endfor %}
+          {% if not payload.kpis.legal_pool_by_regulation %}—{% endif %}
+        </div>
+        <div class="sub">as of {{ payload.kpis.latest_snapshot_date or "—" }}</div>
+      </div>
     </div>
   </div>
 
-  <section>
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button class="tab-btn" role="tab" data-tab="usage" aria-selected="false">Usage</button>
+    <button class="tab-btn" role="tab" data-tab="builds" aria-selected="false">Builds</button>
+    <button class="tab-btn" role="tab" data-tab="moves" aria-selected="false">Moves</button>
+    <button class="tab-btn" role="tab" data-tab="team-cores" aria-selected="false">Team Cores</button>
+  </nav>
+
+  <section class="tab-panel" data-panel="overview">
+    <h2>Overview</h2>
+    <p class="empty-state">
+      The KPI cards above summarize the current legal-pool snapshot. Use the
+      tabs to drill into usage, builds, moves, and team-core pairings.
+    </p>
+  </section>
+
+  <section class="tab-panel" data-panel="usage" hidden>
     <h2>Usage by tournament tier</h2>
     <div class="controls">
       <label>Tier
         <select id="usage-tier-filter"></select>
       </label>
     </div>
-    <canvas id="usage-chart"></canvas>
-  </section>
+    <div class="chart-wrap"><canvas id="usage-chart"></canvas></div>
 
-  <section>
     <h2>Win rate leaders</h2>
-    <table id="win-rate-table">
-      <thead><tr><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-scroll">
+      <table id="win-rate-table">
+        <thead><tr><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
-  <section>
+  <section class="tab-panel" data-panel="builds" hidden>
     <h2>Build drill-down (item &amp; ability)</h2>
     <div class="controls">
       <label>Pokémon
         <select id="build-pokemon-filter"></select>
       </label>
     </div>
-    <table id="build-table">
-      <thead><tr><th>Item</th><th>Ability</th><th>Usage count</th></tr></thead>
-      <tbody></tbody>
-    </table>
+    <div class="table-scroll">
+      <table id="build-table">
+        <thead><tr><th>Item</th><th>Ability</th><th>Usage count</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
-  <section>
+  <section class="tab-panel" data-panel="moves" hidden>
     <h2>Move drill-down</h2>
     <div class="controls">
       <label>Pokémon
         <select id="move-pokemon-filter"></select>
       </label>
     </div>
-    <canvas id="move-chart"></canvas>
+    <div class="chart-wrap"><canvas id="move-chart"></canvas></div>
+  </section>
+
+  <section class="tab-panel" data-panel="team-cores" hidden>
+    <h2>Team-core drill-down</h2>
+    <p class="sub">Which Pokémon most often share a team with the selected Pokémon.</p>
+    <div class="controls">
+      <label>Pokémon
+        <select id="team-core-pokemon-filter"></select>
+      </label>
+    </div>
+    <div class="chart-wrap"><canvas id="team-core-chart"></canvas></div>
+    <div class="table-scroll">
+      <table id="team-core-table">
+        <thead><tr><th>Partner Pokémon</th><th>Co-occurrence count</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
   </section>
 
 </main>

@@ -80,3 +80,61 @@ def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
     assert payload["kpis"]["distinct_pokemon_used"] == 1
     assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "Pikachu"
     assert "generated_at_utc" in payload
+
+
+def test_load_mart_coerces_team_core_usage_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_team_core_usage.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "partner_pokemon_key": "raichu",
+                "co_occurrence_count": "3",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_team_core_usage")
+    assert rows == [
+        {
+            "pokemon_key": "pikachu",
+            "partner_pokemon_key": "raichu",
+            "co_occurrence_count": 3,
+            "usage_rank": 1,
+        }
+    ]
+
+
+def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    _write_csv(
+        normalized_dir / "pokemon.csv",
+        [
+            {"pokemon_key": "pikachu", "pokemon_name": "Pikachu"},
+            {"pokemon_key": "raichu", "pokemon_name": "Raichu"},
+        ],
+    )
+    _write_csv(
+        marts_dir / "pokemon_team_core_usage.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "partner_pokemon_key": "raichu",
+                "co_occurrence_count": "3",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    payload = data.build_payload(marts_dir, normalized_dir)
+
+    assert payload["marts"]["pokemon_team_core_usage"] == [
+        {
+            "pokemon_key": "pikachu",
+            "partner_pokemon_key": "raichu",
+            "co_occurrence_count": 3,
+            "usage_rank": 1,
+            "pokemon_name": "Pikachu",
+            "partner_pokemon_name": "Raichu",
+        }
+    ]
