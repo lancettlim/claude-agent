@@ -162,7 +162,8 @@ generated HTML or the repo's other `docs/*.md` narrative files.
 git**: in the repo's GitHub Settings → Pages, set the source to "Deploy
 from a branch", branch `main` (or whichever branch is the default), folder
 `/docs`. Once enabled, the dashboard is reachable at
-`https://<owner>.github.io/<repo>/dashboard/`.
+`https://<owner>.github.io/<repo>/dashboard/` — for this repo, that's
+https://lancettlim.github.io/claude-agent/dashboard/.
 
 ## Data-reality caveats
 
