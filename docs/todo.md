@@ -198,11 +198,12 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 - [x] Write a UX design system for the dashboard
   (`docs/design-system.md`: design tokens, component catalog, Pokémon-
   representation and naming conventions, ordering conventions) and apply
-  it: camelCase Pokémon display names derived from `pokemon_key`/
+  it: PascalCase Pokémon display names derived from `pokemon_key`/
   `form_name` instead of the species-only `pokemon_name` column (fixes a
   real bug where alternate forms of one species, e.g. Landorus-Incarnate
   vs. Landorus-Therian, displayed identically —
-  `pipelines/dashboard/data.py`'s `to_camel_case()`); usage-percentage
+  `pipelines/dashboard/data.py`'s `to_pascal_case()`, revised from an
+  initial camelCase pass); usage-percentage
   (`pokemon_usage_summary.usage_share`) surfaced on the "Most Used" KPI
   card and a new Usage leaders table; explicit descending order-by-usage/
   order-by-win-rate on every Pokémon leaderboard/picker (see

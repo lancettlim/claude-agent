@@ -101,7 +101,7 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     embedded = _embedded_payload(html)
     assert embedded["kpis"]["distinct_pokemon_used"] == payload["kpis"]["distinct_pokemon_used"]
-    assert "pikachu" in html
+    assert "Pikachu" in html
 
 
 def test_build_omits_removed_stat_change_and_trend_sections(tmp_path):
