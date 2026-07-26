@@ -62,9 +62,9 @@
 
   function renderRows(tbody, rows, rowHtmlFn) {
     tbody.innerHTML = "";
-    rows.forEach(function (row) {
+    rows.forEach(function (row, index) {
       var tr = document.createElement("tr");
-      tr.innerHTML = rowHtmlFn(row);
+      tr.innerHTML = rowHtmlFn(row, index);
       tbody.appendChild(tr);
     });
   }
@@ -103,6 +103,31 @@
       '<div class="cell-with-icon">' + spriteImg(pokemonKey) + "<span>" +
       escapeHtml(pokemonName) + "</span></div>"
     );
+  }
+
+  function formatPercent(value) {
+    return value === null || value === undefined ? "—" : (value * 100).toFixed(1) + "%";
+  }
+
+  // Speed-tier bucketing (docs/design-system.md's "Speed-tier badge"
+  // component) — thresholds are documented there and must stay in sync
+  // with this function, the single source of truth for the bucketing
+  // logic itself.
+  var SPEED_TIERS = [
+    { max: Infinity, min: 120, label: "Blazing", cls: "badge-speed-blazing" },
+    { max: 119, min: 90, label: "Fast", cls: "badge-speed-fast" },
+    { max: 89, min: 60, label: "Average", cls: "badge-speed-average" },
+    { max: 59, min: -Infinity, label: "Slow", cls: "badge-speed-slow" },
+  ];
+  function speedTier(speed) {
+    for (var i = 0; i < SPEED_TIERS.length; i++) {
+      if (speed >= SPEED_TIERS[i].min) return SPEED_TIERS[i];
+    }
+    return SPEED_TIERS[SPEED_TIERS.length - 1];
+  }
+  function speedTierBadge(speed) {
+    var tier = speedTier(speed);
+    return '<span class="badge ' + tier.cls + '">' + tier.label + "</span>";
   }
 
   function itemCell(itemName) {
@@ -300,6 +325,27 @@
       drawUsageChart();
     }
 
+    var usageLeadersBody = document.querySelector("#usage-leaders-table tbody");
+    if (usageLeadersBody) {
+      var leaders = usageRows
+        .filter(function (r) {
+          return !r.event_tier;
+        })
+        .slice()
+        .sort(function (a, b) {
+          return a.usage_rank - b.usage_rank;
+        })
+        .slice(0, 20);
+      renderRows(usageLeadersBody, leaders, function (r) {
+        return (
+          '<td><span class="badge badge-rank">#' + r.usage_rank + "</span></td>" +
+          "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+          "<td>" + r.usage_count + "</td>" +
+          "<td>" + formatPercent(r.usage_share) + "</td>"
+        );
+      });
+    }
+
     var winRows = marts.pokemon_win_rate_summary || [];
     var tbody = document.querySelector("#win-rate-table tbody");
     if (tbody) {
@@ -309,12 +355,13 @@
           return b.win_rate - a.win_rate;
         })
         .slice(0, 20);
-      renderRows(tbody, top, function (r) {
+      renderRows(tbody, top, function (r, i) {
         return (
+          '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
           "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
           "<td>" + r.total_wins + "</td>" +
           "<td>" + r.total_losses + "</td>" +
-          "<td>" + (r.win_rate * 100).toFixed(1) + "%</td>" +
+          "<td>" + formatPercent(r.win_rate) + "</td>" +
           "<td>" + r.record_count + "</td>"
         );
       });
@@ -453,11 +500,258 @@
     });
   }
 
+  function setupSpeedTiers() {
+    var rows = (marts.pokemon_champions_profile || [])
+      .slice()
+      .sort(function (a, b) {
+        return b.speed - a.speed;
+      });
+
+    var top = rows.slice(0, 20);
+    drawBarChart("speed-chart", {
+      labels: top.map(function (r) {
+        return r.pokemon_name;
+      }),
+      values: top.map(function (r) {
+        return r.speed;
+      }),
+      label: "Speed",
+      spriteSources: top.map(function (r) {
+        return sprites[r.pokemon_key];
+      }),
+      tooltipInfoFn: function (i) {
+        var r = top[i];
+        return { iconSrc: sprites[r.pokemon_key], text: r.pokemon_name + ": " + r.speed + " speed" };
+      },
+    });
+
+    var tbody = document.querySelector("#speed-tiers-table tbody");
+    if (tbody) {
+      renderRows(tbody, rows, function (r, i) {
+        return (
+          '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
+          "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+          "<td>" + r.speed + "</td>" +
+          "<td>" + speedTierBadge(r.speed) + "</td>" +
+          "<td>" + formatPercent(r.usage_share) + "</td>" +
+          "<td>" + formatPercent(r.win_rate) + "</td>"
+        );
+      });
+    }
+  }
+
+  // Fully client-side (no backend): lets a visitor assemble a roster of up
+  // to 6 from the current legal pool (pokemon_champions_profile), ordered
+  // by usage/win-rate/speed per docs/design-system.md's ordering
+  // convention, and see their picks' speed order — reusing the same
+  // speed-tier bucketing as the Speed Tiers tab. Persisted to
+  // localStorage only; never sent anywhere.
+  function setupTeamBuilder() {
+    var rows = marts.pokemon_champions_profile || [];
+    var byKey = {};
+    rows.forEach(function (r) {
+      byKey[r.pokemon_key] = r;
+    });
+
+    var STORAGE_KEY = "pokemonChampionsTeamBuilder";
+    var MAX_TEAM_SIZE = 6;
+    var team = [];
+    try {
+      var saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
+      team = saved.filter(function (key) {
+        return byKey[key];
+      }).slice(0, MAX_TEAM_SIZE);
+    } catch (e) {
+      team = [];
+    }
+
+    var searchInput = document.getElementById("team-builder-search");
+    var sortSelect = document.getElementById("team-builder-sort");
+    var availableList = document.getElementById("team-builder-available");
+    var slotsEl = document.getElementById("team-builder-slots");
+    var countEl = document.getElementById("team-builder-count");
+    var speedOrderEl = document.getElementById("team-builder-speed-order");
+    var summaryEl = document.getElementById("team-builder-summary");
+    var clearBtn = document.getElementById("team-builder-clear");
+
+    function persist() {
+      try {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(team));
+      } catch (e) {
+        // localStorage unavailable (private browsing, etc.) — the team
+        // just won't survive a reload; not fatal.
+      }
+    }
+
+    function addToTeam(key) {
+      if (team.length >= MAX_TEAM_SIZE || team.indexOf(key) !== -1) return;
+      team.push(key);
+      persist();
+      renderAll();
+    }
+
+    function removeFromTeam(key) {
+      team = team.filter(function (k) {
+        return k !== key;
+      });
+      persist();
+      renderAll();
+    }
+
+    function renderAvailable() {
+      if (!availableList) return;
+      var query = ((searchInput && searchInput.value) || "").trim().toLowerCase();
+      var sortBy = sortSelect ? sortSelect.value : "usage";
+      var candidates = rows.filter(function (r) {
+        return team.indexOf(r.pokemon_key) === -1 && r.pokemon_name.toLowerCase().indexOf(query) !== -1;
+      });
+      candidates.sort(function (a, b) {
+        if (sortBy === "win_rate") return (b.win_rate || 0) - (a.win_rate || 0);
+        if (sortBy === "speed") return (b.speed || 0) - (a.speed || 0);
+        return (b.usage_count || 0) - (a.usage_count || 0);
+      });
+      var full = team.length >= MAX_TEAM_SIZE;
+      availableList.innerHTML = "";
+      candidates.slice(0, 50).forEach(function (r) {
+        var li = document.createElement("li");
+        li.className = "roster-item";
+        li.innerHTML =
+          spriteImg(r.pokemon_key, 32) +
+          '<div class="roster-info"><div class="roster-name">' + escapeHtml(r.pokemon_name) + "</div>" +
+          '<div class="roster-sub">' + formatPercent(r.usage_share) + " usage · " +
+          formatPercent(r.win_rate) + " win rate · " + (r.speed != null ? r.speed : "—") + " speed</div></div>" +
+          '<button class="btn btn-sm" type="button"' + (full ? " disabled" : "") + ">Add</button>";
+        li.querySelector("button").addEventListener("click", function () {
+          addToTeam(r.pokemon_key);
+        });
+        availableList.appendChild(li);
+      });
+      if (!candidates.length) {
+        var empty = document.createElement("li");
+        empty.className = "roster-item";
+        empty.textContent = "No Pokémon match your search.";
+        availableList.appendChild(empty);
+      }
+    }
+
+    // A named helper (rather than inline logic in renderSlots' for loop)
+    // so each slot's remove handler closes over its own `key` — a `var`
+    // declared inside a for-loop body is function-scoped, not
+    // block-scoped, so handlers built directly in the loop would all end
+    // up capturing the loop's final value instead of their own slot's.
+    function buildSlotElement(key) {
+      var slot = document.createElement("div");
+      if (key && byKey[key]) {
+        var r = byKey[key];
+        slot.className = "team-slot";
+        slot.innerHTML =
+          (sprites[key] ? '<img src="' + sprites[key] + '" alt="">' : "") +
+          '<div class="slot-name">' + escapeHtml(r.pokemon_name) + "</div>" +
+          '<button class="btn-remove" type="button" aria-label="Remove ' + escapeHtml(r.pokemon_name) + '">Remove</button>';
+        slot.querySelector("button").addEventListener("click", function () {
+          removeFromTeam(key);
+        });
+      } else {
+        slot.className = "team-slot empty";
+        slot.textContent = "Empty slot";
+      }
+      return slot;
+    }
+
+    function renderSlots() {
+      if (!slotsEl) return;
+      slotsEl.innerHTML = "";
+      for (var i = 0; i < MAX_TEAM_SIZE; i++) {
+        slotsEl.appendChild(buildSlotElement(team[i]));
+      }
+      if (countEl) countEl.textContent = String(team.length);
+      if (clearBtn) clearBtn.disabled = team.length === 0;
+    }
+
+    function renderSpeedOrder() {
+      if (!speedOrderEl) return;
+      var members = team
+        .map(function (key) {
+          return byKey[key];
+        })
+        .filter(Boolean)
+        .sort(function (a, b) {
+          return (b.speed || 0) - (a.speed || 0);
+        });
+      speedOrderEl.innerHTML = "";
+      if (!members.length) {
+        var li = document.createElement("li");
+        li.textContent = "Add Pokémon to your team to see their speed order.";
+        speedOrderEl.appendChild(li);
+        return;
+      }
+      members.forEach(function (r) {
+        var row = document.createElement("li");
+        row.innerHTML =
+          spriteImg(r.pokemon_key, 24) +
+          "<span>" + escapeHtml(r.pokemon_name) + "</span>" +
+          speedTierBadge(r.speed) +
+          '<span class="speed-value">' + r.speed + "</span>";
+        speedOrderEl.appendChild(row);
+      });
+    }
+
+    function renderSummary() {
+      if (!summaryEl) return;
+      var members = team
+        .map(function (key) {
+          return byKey[key];
+        })
+        .filter(Boolean);
+      function avg(field) {
+        var values = members
+          .map(function (r) {
+            return r[field];
+          })
+          .filter(function (v) {
+            return v !== null && v !== undefined;
+          });
+        if (!values.length) return null;
+        return (
+          values.reduce(function (sum, v) {
+            return sum + v;
+          }, 0) / values.length
+        );
+      }
+      var avgSpeed = avg("speed");
+      summaryEl.innerHTML =
+        '<div class="stat"><strong>' + (avgSpeed !== null ? Math.round(avgSpeed) : "—") + "</strong>Avg. speed</div>" +
+        '<div class="stat"><strong>' + formatPercent(avg("usage_share")) + "</strong>Avg. usage share</div>" +
+        '<div class="stat"><strong>' + formatPercent(avg("win_rate")) + "</strong>Avg. win rate</div>";
+    }
+
+    function renderAll() {
+      renderAvailable();
+      renderSlots();
+      renderSpeedOrder();
+      renderSummary();
+    }
+
+    if (searchInput) searchInput.addEventListener("input", renderAvailable);
+    if (sortSelect) sortSelect.addEventListener("change", renderAvailable);
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function () {
+        team = [];
+        persist();
+        renderAll();
+      });
+    }
+
+    renderAll();
+  }
+
   var tabInitializers = {
     usage: setupUsage,
     builds: setupBuild,
     moves: setupMoves,
     "team-cores": setupTeamCores,
+    "speed-tiers": setupSpeedTiers,
+    "team-builder": setupTeamBuilder,
   };
   var initialized = {};
   setupTabs(function (tabId) {
