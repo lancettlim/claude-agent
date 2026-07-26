@@ -5,13 +5,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pokémon Champions — Analytics Dashboard</title>
 <style>
+  /* ---------------------------------------------------------------
+   * Design tokens — see docs/design-system.md for the full token
+   * reference, component catalog, and Pokémon-representation/naming
+   * conventions this dashboard follows. Every color, spacing, and
+   * radius value used below traces back to one of these variables so
+   * the two stay in sync.
+   * --------------------------------------------------------------- */
   :root {
+    /* Color */
     --navy: #16264d;
     --blue: #2b5cad;
     --light-blue: #eaf1fb;
     --border: #16264d;
     --muted: #5b6b8c;
     --bg: #f4f6fb;
+    --surface: #fff;
+    --positive: #1f8a4c;
+    --positive-bg: #e8f7ee;
+    --warning: #a8710a;
+    --warning-bg: #fbf1e0;
+    --danger: #b23434;
+    --danger-bg: #fbe9e9;
+
+    /* Speed-tier badge scale (docs/design-system.md's "Speed-tier badge"
+       component) — bucketed off pokemon_champions_profile.speed. */
+    --speed-blazing: #b23434;
+    --speed-blazing-bg: #fbe9e9;
+    --speed-fast: #a8710a;
+    --speed-fast-bg: #fbf1e0;
+    --speed-average: #2b5cad;
+    --speed-average-bg: #eaf1fb;
+    --speed-slow: #5b6b8c;
+    --speed-slow-bg: #eef0f5;
+
+    /* Spacing scale (4px base unit) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* Radius scale */
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-pill: 999px;
+
+    /* Type scale */
+    --font-xs: 0.8rem;
+    --font-sm: 0.85rem;
+    --font-base: 0.9rem;
+    --font-md: 0.95rem;
+    --font-lg: 1.1rem;
+    --font-xl: 1.5rem;
+    --font-2xl: 1.6rem;
   }
   * { box-sizing: border-box; }
   body {
@@ -115,6 +164,137 @@
     color: var(--muted);
     font-size: 0.9rem;
   }
+
+  /* --- Badge (rank pills, speed tiers — see docs/design-system.md) --- */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill);
+    font-size: var(--font-xs);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .badge-rank { background: var(--light-blue); color: var(--blue); }
+  .badge-speed-blazing { background: var(--speed-blazing-bg); color: var(--speed-blazing); }
+  .badge-speed-fast { background: var(--speed-fast-bg); color: var(--speed-fast); }
+  .badge-speed-average { background: var(--speed-average-bg); color: var(--speed-average); }
+  .badge-speed-slow { background: var(--speed-slow-bg); color: var(--speed-slow); }
+
+  /* --- Buttons --- */
+  .btn {
+    font: inherit;
+    font-size: var(--font-sm);
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--navy);
+    cursor: pointer;
+  }
+  .btn:hover { background: var(--light-blue); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--blue); color: #fff; border-color: var(--blue); }
+  .btn-primary:hover { background: var(--navy); }
+  .btn-primary:disabled { background: var(--muted); border-color: var(--muted); }
+  .btn-remove {
+    background: none;
+    border: none;
+    color: var(--danger);
+    font-size: var(--font-md);
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px 6px;
+  }
+  .btn-remove:hover { text-decoration: underline; }
+  .btn-sm { padding: 4px 10px; font-size: var(--font-xs); }
+
+  input[type="text"] {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: 16px; /* prevents iOS Safari auto-zoom-on-focus */
+    width: 100%;
+  }
+
+  /* --- Team Builder --- */
+  .team-builder-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+    gap: var(--space-6);
+    align-items: start;
+  }
+  .roster-picker { display: flex; flex-direction: column; gap: var(--space-3); }
+  .roster-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 420px;
+    overflow-y: auto;
+    border: 1px solid var(--light-blue);
+    border-radius: var(--radius-sm);
+  }
+  .roster-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--light-blue);
+  }
+  .roster-item:last-child { border-bottom: none; }
+  .roster-item .roster-info { flex: 1 1 auto; min-width: 0; }
+  .roster-item .roster-name { font-weight: 600; }
+  .roster-item .roster-sub { font-size: var(--font-xs); color: var(--muted); }
+
+  .team-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-3);
+  }
+  .team-slot {
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+    text-align: center;
+    min-height: 96px;
+    justify-content: center;
+  }
+  .team-slot.empty { border-style: dashed; color: var(--muted); font-size: var(--font-xs); }
+  .team-slot img { width: 40px; height: 40px; object-fit: contain; }
+  .team-slot .slot-name { font-weight: 600; font-size: var(--font-sm); }
+
+  .speed-order-list { list-style: none; margin: 0; padding: 0; }
+  .speed-order-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) 0;
+  }
+  .speed-order-list .speed-value { margin-left: auto; font-weight: 600; }
+
+  .stat-summary-row {
+    display: flex;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    margin-top: var(--space-4);
+  }
+  .stat-summary-row .stat {
+    background: var(--light-blue);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-sm);
+  }
+  .stat-summary-row .stat strong { display: block; font-size: var(--font-lg); color: var(--navy); }
+
+  @media (max-width: 720px) {
+    .team-builder-grid { grid-template-columns: 1fr; }
+    .team-slots { grid-template-columns: repeat(2, 1fr); }
+  }
+
   footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
 
   /* Chart.js external tooltip (see app.js's externalTooltip helper) */
@@ -178,7 +358,7 @@
       <div class="kpi-body">
         <div class="label">Most Used</div>
         <div class="value">{% if top_used %}{{ top_used.pokemon_name }}{% else %}—{% endif %}</div>
-        <div class="sub">{% if top_used %}{{ top_used.usage_count }} roster appearances{% endif %}</div>
+        <div class="sub">{% if top_used %}{{ top_used.usage_count }} roster appearances{% if top_used.usage_share is not none %} ({{ "%.1f"|format(top_used.usage_share * 100) }}% of meta){% endif %}{% endif %}</div>
       </div>
     </div>
     <div class="kpi-card">
@@ -210,6 +390,8 @@
     <button class="tab-btn" role="tab" data-tab="builds" aria-selected="false">Builds</button>
     <button class="tab-btn" role="tab" data-tab="moves" aria-selected="false">Moves</button>
     <button class="tab-btn" role="tab" data-tab="team-cores" aria-selected="false">Team Cores</button>
+    <button class="tab-btn" role="tab" data-tab="speed-tiers" aria-selected="false">Speed Tiers</button>
+    <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
   </nav>
 
   <section class="tab-panel" data-panel="overview">
@@ -229,10 +411,19 @@
     </div>
     <div class="chart-wrap"><canvas id="usage-chart"></canvas></div>
 
+    <h2>Usage leaders</h2>
+    <p class="sub">Ranked by roster appearances within the selected tier, most-used first.</p>
+    <div class="table-scroll">
+      <table id="usage-leaders-table">
+        <thead><tr><th>Rank</th><th>Pokémon</th><th>Usage count</th><th>% of meta</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
     <h2>Win rate leaders</h2>
     <div class="table-scroll">
       <table id="win-rate-table">
-        <thead><tr><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -283,6 +474,59 @@
         <thead><tr><th>Partner Pokémon</th><th>Co-occurrence count</th></tr></thead>
         <tbody></tbody>
       </table>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-panel="speed-tiers" hidden>
+    <h2>Speed tiers</h2>
+    <p class="sub">
+      Every currently-legal Pokémon's Champions-format base Speed stat,
+      fastest first, bucketed into the speed-tier bands documented in
+      docs/design-system.md.
+    </p>
+    <div class="chart-wrap"><canvas id="speed-chart"></canvas></div>
+    <div class="table-scroll">
+      <table id="speed-tiers-table">
+        <thead><tr><th>Rank</th><th>Pokémon</th><th>Speed</th><th>Tier</th><th>Usage</th><th>Win rate</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-panel="team-builder" hidden>
+    <h2>Team builder</h2>
+    <p class="sub">
+      Build a roster of up to 6 from the current legal pool. Your team is
+      saved in this browser (not shared or uploaded anywhere).
+    </p>
+    <div class="team-builder-grid">
+      <div class="roster-picker">
+        <h3>Legal pool</h3>
+        <div class="controls">
+          <label>Search
+            <input type="text" id="team-builder-search" placeholder="Filter by name…">
+          </label>
+          <label>Sort by
+            <select id="team-builder-sort">
+              <option value="usage">Usage</option>
+              <option value="win_rate">Win rate</option>
+              <option value="speed">Speed</option>
+            </select>
+          </label>
+        </div>
+        <ul class="roster-list" id="team-builder-available"></ul>
+      </div>
+      <div class="team-roster">
+        <h3>Your team (<span id="team-builder-count">0</span>/6)</h3>
+        <div class="team-slots" id="team-builder-slots"></div>
+        <button class="btn btn-sm" id="team-builder-clear" type="button">Clear team</button>
+
+        <h3>Speed order</h3>
+        <p class="sub">Your team's picks, fastest first — who moves before whom.</p>
+        <ol class="speed-order-list" id="team-builder-speed-order"></ol>
+
+        <div class="stat-summary-row" id="team-builder-summary"></div>
+      </div>
     </div>
   </section>
 

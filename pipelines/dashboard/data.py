@@ -27,7 +27,7 @@ DEFAULT_NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 # mart_name -> (int_fields, float_fields) for numeric coercion; every other
 # column is left as a string.
 MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
-    "pokemon_usage_summary": (("usage_count", "usage_rank"), ()),
+    "pokemon_usage_summary": (("usage_count", "usage_rank"), ("usage_share",)),
     "legality_summary_by_regulation": (("legal_pokemon_count",), ()),
     "pokemon_win_rate_summary": (
         ("total_wins", "total_losses", "record_count"),
@@ -36,7 +36,36 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pokemon_build_usage": (("usage_count", "usage_rank"), ()),
     "pokemon_move_usage": (("usage_count", "usage_rank"), ()),
     "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ()),
+    "pokemon_champions_profile": (
+        (
+            "hp",
+            "attack",
+            "defense",
+            "sp_attack",
+            "sp_defense",
+            "speed",
+            "stat_total",
+            "usage_count",
+            "record_count",
+        ),
+        ("usage_share", "win_rate"),
+    ),
 }
+
+
+def to_camel_case(slug: str) -> str:
+    """Converts a hyphen-delimited PokéAPI form slug (e.g.
+    "landorus-therian", "charizard-mega-x") into a camelCase display name
+    ("landorusTherian", "charizardMegaX") per the dashboard design system's
+    Pokémon-naming convention (docs/design-system.md). Applied to
+    pokemon_key/form_name rather than the raw species-only pokemon_name
+    column, since form_name is what's actually unique per row — using the
+    bare species name would collide across forms (e.g. Landorus-Incarnate
+    and Landorus-Therian both reporting as "landorus")."""
+    parts = [part for part in slug.split("-") if part]
+    if not parts:
+        return slug
+    return parts[0].lower() + "".join(part.capitalize() for part in parts[1:])
 
 
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -67,10 +96,13 @@ def load_mart(marts_dir: Path, mart_name: str) -> list[dict[str, Any]]:
 
 
 def load_pokemon_names(normalized_dir: Path = DEFAULT_NORMALIZED_DIR) -> dict[str, str]:
-    """pokemon_key -> pokemon_name, for friendlier labels than raw keys.
-    Returns {} gracefully if data/normalized/pokemon.csv isn't present."""
+    """pokemon_key -> camelCase display name, for friendlier labels than
+    raw keys. Derived from pokemon_key itself (== form_name) via
+    to_camel_case rather than the CSV's own pokemon_name column, which is
+    species-only and collides across a species' multiple forms. Returns {}
+    gracefully if data/normalized/pokemon.csv isn't present."""
     return {
-        row["pokemon_key"]: row["pokemon_name"]
+        row["pokemon_key"]: to_camel_case(row["pokemon_key"])
         for row in _read_csv_rows(normalized_dir / "pokemon.csv")
     }
 

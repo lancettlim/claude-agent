@@ -1,7 +1,10 @@
 # Dashboard
 
 M6's first-party analytics dashboard: a static site built from
-`data/marts/*.csv` and published via GitHub Pages.
+`data/marts/*.csv` and published via GitHub Pages. This document covers
+architecture and build/publish mechanics; see `docs/design-system.md` for
+the dashboard's design tokens, component catalog, and Pokémon-
+representation/naming/ordering conventions.
 
 ## Stack decision
 
@@ -75,15 +78,32 @@ The dashboard degrades gracefully in several ways:
 
 ## Tabs
 
-The page is a single scrolling KPI row plus five tabs (client-side,
+The page is a single scrolling KPI row plus seven tabs (client-side,
 vanilla JS — no routing library, no page reload):
 
-- **Overview** — the four KPI cards (unchanged from before this pass)
-- **Usage** — usage-by-tournament-tier chart + win-rate leaders table
+- **Overview** — the four KPI cards
+- **Usage** — usage-by-tournament-tier chart, a Usage leaders table (rank,
+  usage count, and `usage_share` as a percentage of the meta), and a
+  Win rate leaders table
 - **Builds** — item & ability drill-down, with item icons per row
 - **Moves** — move drill-down chart, with move-type icons per row
 - **Team Cores** — which Pokémon most often share a team with the selected
   Pokémon (see "Team-core drill-down" below)
+- **Speed Tiers** — every currently-legal Pokémon's Champions-format base
+  Speed stat, fastest first, with a bar chart (top 20) and a full table
+  bucketed into Blazing/Fast/Average/Slow badges (see
+  `docs/design-system.md`'s "Speed-tier badge")
+- **Team Builder** — a fully client-side roster builder: search/sort the
+  legal pool, add up to 6 Pokémon, see their speed order and
+  usage/win-rate/speed averages (see `docs/design-system.md`'s "Team
+  Builder"); the team persists to `localStorage` only, never sent
+  anywhere
+
+Usage leaders, Speed Tiers, and Team Builder's picker all pull from
+`data/marts/pokemon_champions_profile.csv` — a new mart (one row per
+currently-legal Pokémon, joining `pokemon_stat_champions` with
+`pokemon_usage_summary` and `pokemon_win_rate_summary`) purpose-built so
+these views don't have to join multiple marts client-side.
 
 Chart.js canvases inside a hidden tab panel initialize at zero size, so
 each tab's chart-drawing setup runs lazily on that tab's first activation

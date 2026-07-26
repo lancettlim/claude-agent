@@ -41,16 +41,33 @@ def test_load_mart_coerces_numeric_fields(tmp_path):
     ]
 
 
+def test_to_camel_case():
+    assert data.to_camel_case("pikachu") == "pikachu"
+    assert data.to_camel_case("landorus-therian") == "landorusTherian"
+    assert data.to_camel_case("charizard-mega-x") == "charizardMegaX"
+    assert data.to_camel_case("porygon-z") == "porygonZ"
+
+
 def test_load_pokemon_names_returns_empty_dict_when_file_missing(tmp_path):
     assert data.load_pokemon_names(tmp_path) == {}
 
 
 def test_load_pokemon_names(tmp_path):
+    # Display names are derived from pokemon_key (== form_name), not the
+    # species-only pokemon_name column — landorus-therian's species-level
+    # pokemon_name would just be "Landorus", which would collide with
+    # Landorus-Incarnate's row if used directly.
     _write_csv(
         tmp_path / "pokemon.csv",
-        [{"pokemon_key": "pikachu", "pokemon_name": "Pikachu"}],
+        [
+            {"pokemon_key": "pikachu", "pokemon_name": "Pikachu"},
+            {"pokemon_key": "landorus-therian", "pokemon_name": "Landorus"},
+        ],
     )
-    assert data.load_pokemon_names(tmp_path) == {"pikachu": "Pikachu"}
+    assert data.load_pokemon_names(tmp_path) == {
+        "pikachu": "pikachu",
+        "landorus-therian": "landorusTherian",
+    }
 
 
 def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
@@ -74,12 +91,69 @@ def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
             "event_tier": "",
             "usage_count": 100,
             "usage_rank": 1,
-            "pokemon_name": "Pikachu",
+            "usage_share": None,
+            "pokemon_name": "pikachu",
         }
     ]
     assert payload["kpis"]["distinct_pokemon_used"] == 1
-    assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "Pikachu"
+    assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "pikachu"
     assert "generated_at_utc" in payload
+
+
+def test_load_mart_coerces_usage_share(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_usage_summary.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "event_tier": "",
+                "usage_count": "3",
+                "usage_share": "0.75",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_usage_summary")
+    assert rows[0]["usage_share"] == 0.75
+
+
+def test_load_mart_coerces_champions_profile_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_champions_profile.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "hp": "35",
+                "attack": "55",
+                "defense": "40",
+                "sp_attack": "50",
+                "sp_defense": "50",
+                "speed": "90",
+                "stat_total": "320",
+                "usage_count": "3",
+                "usage_share": "0.75",
+                "win_rate": "0.6",
+                "record_count": "5",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_champions_profile")
+    assert rows == [
+        {
+            "pokemon_key": "pikachu",
+            "hp": 35,
+            "attack": 55,
+            "defense": 40,
+            "sp_attack": 50,
+            "sp_defense": 50,
+            "speed": 90,
+            "stat_total": 320,
+            "usage_count": 3,
+            "usage_share": 0.75,
+            "win_rate": 0.6,
+            "record_count": 5,
+        }
+    ]
 
 
 def test_load_mart_coerces_team_core_usage_fields(tmp_path):
@@ -134,7 +208,7 @@ def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
             "partner_pokemon_key": "raichu",
             "co_occurrence_count": 3,
             "usage_rank": 1,
-            "pokemon_name": "Pikachu",
-            "partner_pokemon_name": "Raichu",
+            "pokemon_name": "pikachu",
+            "partner_pokemon_name": "raichu",
         }
     ]
