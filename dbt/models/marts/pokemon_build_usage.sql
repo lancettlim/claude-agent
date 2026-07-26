@@ -4,20 +4,37 @@
 -- and item usage"): usage count per Pokémon x item x ability combination,
 -- restricted to the current legal pool and to roster slots that reported
 -- at least one of item/ability.
+--
+-- build_share is usage_count's fraction of that Pokémon's own total build
+-- rows (dashboard "percentages, not raw counts" ask), the same
+-- share-of-own-total pattern pokemon_usage_summary.usage_share and
+-- pokemon_move_usage.move_share use.
+with counted as (
+  select
+    member.pokemon_key,
+    member.item_name,
+    member.ability,
+    count(*) as usage_count
+  from {{ ref('tournament_team_member') }} member
+  inner join {{ ref('pokemon_stat_champions') }} champions
+    on champions.pokemon_key = member.pokemon_key
+    and champions.is_legal = true
+  where member.item_name is not null
+    or member.ability is not null
+  group by member.pokemon_key, member.item_name, member.ability
+)
 select
-  member.pokemon_key,
-  member.item_name,
-  member.ability,
-  count(*) as usage_count,
+  pokemon_key,
+  item_name,
+  ability,
+  usage_count,
+  round(
+    usage_count::double / sum(usage_count) over (partition by pokemon_key),
+    4
+  ) as build_share,
   row_number() over (
-    partition by member.pokemon_key
-    order by count(*) desc
+    partition by pokemon_key
+    order by usage_count desc
   ) as usage_rank
-from {{ ref('tournament_team_member') }} member
-inner join {{ ref('pokemon_stat_champions') }} champions
-  on champions.pokemon_key = member.pokemon_key
-  and champions.is_legal = true
-where member.item_name is not null
-  or member.ability is not null
-group by member.pokemon_key, member.item_name, member.ability
-order by member.pokemon_key, usage_count desc
+from counted
+order by pokemon_key, usage_count desc

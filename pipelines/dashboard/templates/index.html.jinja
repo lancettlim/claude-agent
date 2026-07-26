@@ -28,6 +28,23 @@
     --danger: #b23434;
     --danger-bg: #fbe9e9;
 
+    /* Broadcast/esports theme tokens (docs/design-system.md's "Broadcast
+       color-block header" component) — color-blocking + weight/case is
+       what gives this a broadcast-graphic feel, deliberately without
+       adding a webfont dependency. */
+    --panel-dark: #12131a;
+    --accent-red: #e3323c;
+    --accent-red-bg: #fce7e8;
+    --accent-gold: #f4b942;
+    --accent-gold-bg: #fdf3dd;
+
+    /* Icon-size scale (docs/design-system.md's "Icon size scale") — every
+       sprite/item/type icon must use one of these three tokens, no other
+       pixel value, replacing four previously ad-hoc sizes (40/32/24/22px). */
+    --icon-sm: 32px;
+    --icon-md: 48px;
+    --icon-lg: 72px;
+
     /* Speed-tier badge scale (docs/design-system.md's "Speed-tier badge"
        component) — bucketed off pokemon_champions_profile.speed. */
     --speed-blazing: #b23434;
@@ -70,13 +87,19 @@
     color: var(--navy);
   }
   header {
-    background: #fff;
-    border-bottom: 2px solid var(--border);
+    background: var(--panel-dark);
+    color: #fff;
     padding: 24px;
     text-align: center;
   }
-  header h1 { margin: 0; font-size: 1.6rem; }
-  header p { margin: 4px 0 0; color: var(--muted); font-size: 0.9rem; }
+  header h1 {
+    margin: 0;
+    font-size: 1.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+  }
+  header p { margin: 4px 0 0; color: #b8bdd1; font-size: 0.9rem; }
   main { max-width: 1100px; margin: 0 auto; padding: 24px; }
 
   .kpi-row {
@@ -94,10 +117,10 @@
     align-items: center;
     gap: 12px;
   }
-  .kpi-card .kpi-sprite { width: 40px; height: 40px; object-fit: contain; flex: 0 0 auto; }
+  .kpi-card .kpi-sprite { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; flex: 0 0 auto; image-rendering: pixelated; }
   .kpi-card .kpi-body { min-width: 0; }
   .kpi-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .kpi-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+  .kpi-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; overflow-wrap: break-word; }
   .kpi-card .sub { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
 
   /* --- Tabs --- */
@@ -123,8 +146,8 @@
   }
   .tab-btn:hover { color: var(--navy); }
   .tab-btn[aria-selected="true"] {
-    color: var(--blue);
-    border-bottom-color: var(--blue);
+    color: var(--accent-red);
+    border-bottom-color: var(--accent-red);
   }
   .tab-panel[hidden] { display: none; }
 
@@ -132,10 +155,24 @@
     background: #fff;
     border: 2px solid var(--border);
     border-radius: 10px;
-    padding: 20px;
+    padding: 0 20px 20px;
     margin-bottom: 24px;
+    overflow: hidden;
   }
-  section h2 { margin-top: 0; font-size: 1.1rem; }
+  /* Broadcast color-block section header (docs/design-system.md) — bold,
+     uppercase, letter-spaced, on a dark bar, replacing plain
+     text-on-white section titles. */
+  section h2 {
+    margin: 0 -20px 16px;
+    padding: 14px 20px;
+    background: var(--panel-dark);
+    color: #fff;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+  }
+  section h3 { font-size: var(--font-md); text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); }
   .controls { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
   .controls label { font-size: 0.85rem; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
   select {
@@ -145,17 +182,74 @@
     font-size: 16px; /* prevents iOS Safari auto-zoom-on-focus */
   }
 
-  .chart-wrap { position: relative; height: 320px; }
-  canvas { max-width: 100%; }
-
   .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--light-blue); white-space: nowrap; }
   th { color: var(--muted); font-weight: 600; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { color: var(--navy); }
+  th.sortable .sort-indicator { margin-left: 4px; color: var(--accent-red); }
 
   /* Sprite/icon cells populated by app.js's pokemonCell()/iconCell() helpers */
   .cell-with-icon { display: flex; align-items: center; gap: 8px; }
-  .cell-icon { width: 24px; height: 24px; object-fit: contain; flex: 0 0 auto; }
+  .cell-icon { width: var(--icon-sm); height: var(--icon-sm); object-fit: contain; flex: 0 0 auto; image-rendering: pixelated; }
+
+  /* --- Ranked percentage/value list (replaces Chart.js bar charts —
+     docs/design-system.md's "Percentage row (ranked list)" component) --- */
+  .ranked-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+  .ranked-row { display: flex; align-items: center; gap: var(--space-3); }
+  .ranked-rank { flex: 0 0 auto; width: 2em; color: var(--muted); font-weight: 700; font-size: var(--font-sm); }
+  .ranked-icon { flex: 0 0 auto; width: var(--icon-sm); height: var(--icon-sm); object-fit: contain; image-rendering: pixelated; }
+  .ranked-body { flex: 1 1 auto; min-width: 0; }
+  .ranked-label { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--font-sm); font-weight: 600; }
+  .ranked-value { color: var(--muted); font-weight: 700; white-space: nowrap; }
+  .ranked-bar-track { background: var(--light-blue); border-radius: var(--radius-pill); height: 8px; margin-top: 4px; overflow: hidden; }
+  .ranked-bar-fill { background: var(--blue); height: 100%; border-radius: var(--radius-pill); }
+  .ranked-row.is-leader .ranked-bar-fill { background: var(--accent-red); }
+
+  /* --- Spotlight grid (Overview "Top 12") --- */
+  .spotlight-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--space-3); }
+  .spotlight-card {
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-1);
+  }
+  .spotlight-card img { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; image-rendering: pixelated; }
+  .spotlight-card .spotlight-name { font-weight: 700; font-size: var(--font-sm); }
+  .spotlight-card .spotlight-stats { font-size: var(--font-xs); color: var(--muted); }
+  .spotlight-card .badge-rank { position: relative; align-self: flex-start; }
+
+  /* --- Archetype Explorer card grid --- */
+  .archetype-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+  .archetype-card {
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-4);
+    cursor: pointer;
+    text-align: left;
+    background: var(--surface);
+    font: inherit;
+    color: inherit;
+  }
+  .archetype-card:hover { background: var(--light-blue); }
+  .archetype-card[aria-pressed="true"] { border-color: var(--accent-red); background: var(--accent-red-bg); }
+  .archetype-card h3 { margin: 0 0 var(--space-1); color: var(--navy); }
+  .archetype-card .archetype-stats { font-size: var(--font-xs); color: var(--muted); margin-bottom: var(--space-2); }
+  .archetype-card .archetype-members { display: flex; gap: var(--space-1); }
+  .archetype-card .archetype-members img { width: var(--icon-md); height: var(--icon-md); object-fit: contain; image-rendering: pixelated; }
+
+  /* --- Pro Team Gallery card grid --- */
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
+  .gallery-card { border: 2px solid var(--border); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; }
+  .gallery-card img.gallery-card-image { width: 100%; display: block; }
+  .gallery-card .gallery-card-body { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
+  .gallery-card .gallery-card-player { font-weight: 700; }
+  .gallery-card .gallery-card-meta { font-size: var(--font-xs); color: var(--muted); }
 
   .empty-state {
     background: var(--light-blue);
@@ -264,7 +358,7 @@
     justify-content: center;
   }
   .team-slot.empty { border-style: dashed; color: var(--muted); font-size: var(--font-xs); }
-  .team-slot img { width: 40px; height: 40px; object-fit: contain; }
+  .team-slot img { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; image-rendering: pixelated; }
   .team-slot .slot-name { font-weight: 600; font-size: var(--font-sm); }
 
   .speed-order-list { list-style: none; margin: 0; padding: 0; }
@@ -297,31 +391,11 @@
 
   footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
 
-  /* Chart.js external tooltip (see app.js's externalTooltip helper) */
-  .chart-tooltip {
-    position: absolute;
-    pointer-events: none;
-    background: var(--navy);
-    color: #fff;
-    border-radius: 6px;
-    padding: 6px 10px;
-    font-size: 0.8rem;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    transform: translate(-50%, -110%);
-    transition: opacity 0.1s ease;
-    white-space: nowrap;
-    z-index: 10;
-  }
-  .chart-tooltip img { width: 24px; height: 24px; object-fit: contain; }
-
   @media (max-width: 720px) {
     main { padding: 16px; }
     .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 12px; }
     .kpi-card { padding: 12px; }
     .kpi-card .value { font-size: 1.2rem; }
-    .chart-wrap { height: 280px; }
   }
 
   @media (max-width: 480px) {
@@ -374,12 +448,12 @@
     </div>
     <div class="kpi-card">
       <div class="kpi-body">
-        <div class="label">Legal Pool</div>
+        <div class="label">Legal Pool (cumulative)</div>
         <div class="value">
-          {% for r in payload.kpis.legal_pool_by_regulation %}{{ r.regulation_code }}: {{ r.legal_pokemon_count }}{% if not loop.last %} · {% endif %}{% endfor %}
+          {% for r in payload.kpis.legal_pool_by_regulation %}{{ r.regulation_code }}: {{ r.cumulative_legal_pokemon_count }}{% if not loop.last %} · {% endif %}{% endfor %}
           {% if not payload.kpis.legal_pool_by_regulation %}—{% endif %}
         </div>
-        <div class="sub">as of {{ payload.kpis.latest_snapshot_date or "—" }}</div>
+        <div class="sub">as of {{ payload.kpis.latest_snapshot_date or "—" }} · see Regulations tab</div>
       </div>
     </div>
   </div>
@@ -387,19 +461,21 @@
   <nav class="tabs" role="tablist">
     <button class="tab-btn" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button class="tab-btn" role="tab" data-tab="usage" aria-selected="false">Usage</button>
-    <button class="tab-btn" role="tab" data-tab="builds" aria-selected="false">Builds</button>
-    <button class="tab-btn" role="tab" data-tab="moves" aria-selected="false">Moves</button>
-    <button class="tab-btn" role="tab" data-tab="team-cores" aria-selected="false">Team Cores</button>
+    <button class="tab-btn" role="tab" data-tab="pokemon-profile" aria-selected="false">Pokémon Profile</button>
+    <button class="tab-btn" role="tab" data-tab="archetypes" aria-selected="false">Archetypes</button>
+    <button class="tab-btn" role="tab" data-tab="regulations" aria-selected="false">Regulations</button>
     <button class="tab-btn" role="tab" data-tab="speed-tiers" aria-selected="false">Speed Tiers</button>
     <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
   </nav>
 
   <section class="tab-panel" data-panel="overview">
     <h2>Overview</h2>
-    <p class="empty-state">
-      The KPI cards above summarize the current legal-pool snapshot. Use the
-      tabs to drill into usage, builds, moves, and team-core pairings.
-    </p>
+    <h3>Top 12</h3>
+    <div class="spotlight-grid" id="overview-top-12"></div>
+
+    <h3>Top 30</h3>
+    <ol class="ranked-list" id="overview-top-30"></ol>
+    <button class="btn btn-sm" id="overview-top-30-toggle" type="button">Show all 30</button>
   </section>
 
   <section class="tab-panel" data-panel="usage" hidden>
@@ -409,69 +485,94 @@
         <select id="usage-tier-filter"></select>
       </label>
     </div>
-    <div class="chart-wrap"><canvas id="usage-chart"></canvas></div>
+    <ol class="ranked-list" id="usage-ranked-list"></ol>
 
     <h2>Usage leaders</h2>
-    <p class="sub">Ranked by roster appearances within the selected tier, most-used first.</p>
+    <p class="sub">Ranked by % of meta within the selected tier, most-used first. Click a column header to re-sort.</p>
     <div class="table-scroll">
       <table id="usage-leaders-table">
-        <thead><tr><th>Rank</th><th>Pokémon</th><th>Usage count</th><th>% of meta</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">% of meta</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
 
     <h2>Win rate leaders</h2>
+    <div class="controls">
+      <label>Min. recorded matches
+        <select id="win-rate-min-record-count-filter">
+          <option value="5">5+</option>
+          <option value="10">10+</option>
+          <option value="20">20+</option>
+          <option value="50">50+</option>
+        </select>
+      </label>
+    </div>
     <div class="table-scroll">
       <table id="win-rate-table">
-        <thead><tr><th>Rank</th><th>Pokémon</th><th>Wins</th><th>Losses</th><th>Win rate</th><th>Recorded matches</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </section>
 
-  <section class="tab-panel" data-panel="builds" hidden>
-    <h2>Build drill-down (item &amp; ability)</h2>
+  <section class="tab-panel" data-panel="pokemon-profile" hidden>
+    <h2>Pokémon Profile</h2>
     <div class="controls">
       <label>Pokémon
-        <select id="build-pokemon-filter"></select>
+        <select id="pokemon-profile-filter"></select>
       </label>
     </div>
+
+    <h3>Profile</h3>
+    <div id="pokemon-profile-stats" class="empty-state"></div>
+
+    <h3>Build &amp; Moveset</h3>
+    <p class="sub">Item/ability combinations, then moves, ranked by share of this Pokémon's own recorded builds.</p>
     <div class="table-scroll">
       <table id="build-table">
-        <thead><tr><th>Item</th><th>Ability</th><th>Usage count</th></tr></thead>
+        <thead><tr><th class="sortable" data-sort-key="build_share">Item</th><th>Ability</th><th class="sortable" data-sort-key="build_share">Build share</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <ol class="ranked-list" id="move-ranked-list"></ol>
+
+    <h3>Team Cores</h3>
+    <p class="sub">Which Pokémon most often share a team with this Pokémon.</p>
+    <ol class="ranked-list" id="team-core-ranked-list"></ol>
+  </section>
+
+  <section class="tab-panel" data-panel="archetypes" hidden>
+    <h2>Archetype Explorer</h2>
+    <p class="empty-state">
+      Archetypes are curated groupings maintained by this dashboard's
+      authors, not sourced tournament data — membership reflects
+      competitive-strategy judgment, not an extracted signal. Usage/win-rate
+      figures shown per member are real recorded data.
+    </p>
+    <div class="archetype-grid" id="archetype-grid"></div>
+
+    <h3 id="archetype-members-heading" style="display:none">Members</h3>
+    <div class="table-scroll">
+      <table id="archetype-members-table" style="display:none">
+        <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">% of meta</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
   </section>
 
-  <section class="tab-panel" data-panel="moves" hidden>
-    <h2>Move drill-down</h2>
-    <div class="controls">
-      <label>Pokémon
-        <select id="move-pokemon-filter"></select>
-      </label>
-    </div>
-    <div class="chart-wrap"><canvas id="move-chart"></canvas></div>
+  <section class="tab-panel" data-panel="regulations" hidden>
+    <h2>Regulation Comparison</h2>
+    <p class="empty-state">
+      Cumulative counts assume each regulation's legal pool is a superset of
+      the previous one (Regulation B shown as B ∪ A). PokéBase (the source
+      of this data) never publishes a removal signal, so a cumulative count
+      can only grow — if a Pokémon were actually banned in a later
+      regulation, this count would keep including it anyway. Treat these as
+      an upper bound, not a confirmed current pool.
+    </p>
     <div class="table-scroll">
-      <table id="move-table">
-        <thead><tr><th>Move</th><th>Usage count</th></tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="tab-panel" data-panel="team-cores" hidden>
-    <h2>Team-core drill-down</h2>
-    <p class="sub">Which Pokémon most often share a team with the selected Pokémon.</p>
-    <div class="controls">
-      <label>Pokémon
-        <select id="team-core-pokemon-filter"></select>
-      </label>
-    </div>
-    <div class="chart-wrap"><canvas id="team-core-chart"></canvas></div>
-    <div class="table-scroll">
-      <table id="team-core-table">
-        <thead><tr><th>Partner Pokémon</th><th>Co-occurrence count</th></tr></thead>
+      <table id="regulation-comparison-table">
+        <thead><tr><th>Regulation</th><th>Legal pool (this regulation)</th><th>Cumulative legal pool</th><th>Δ vs. previous</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -484,10 +585,18 @@
       fastest first, bucketed into the speed-tier bands documented in
       docs/design-system.md.
     </p>
-    <div class="chart-wrap"><canvas id="speed-chart"></canvas></div>
+    <ol class="ranked-list" id="speed-ranked-list"></ol>
     <div class="table-scroll">
       <table id="speed-tiers-table">
-        <thead><tr><th>Rank</th><th>Pokémon</th><th>Speed</th><th>Tier</th><th>Usage</th><th>Win rate</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Pokémon</th>
+            <th class="sortable" data-sort-key="speed">Speed</th>
+            <th>Tier</th>
+            <th class="sortable" data-sort-key="usage_share">Usage</th>
+            <th class="sortable" data-sort-key="win_rate">Win rate</th>
+          </tr>
+        </thead>
         <tbody></tbody>
       </table>
     </div>
@@ -528,13 +637,21 @@
         <div class="stat-summary-row" id="team-builder-summary"></div>
       </div>
     </div>
+
+    <h3>Pro Team Gallery</h3>
+    <p class="sub">
+      Real tournament teams for reference/inspiration — not part of your
+      saved roster above. "Load into my builder" copies a gallery team's
+      Pokémon into your team above (skipping any no longer in the legal
+      pool).
+    </p>
+    <div class="gallery-grid" id="pro-team-gallery"></div>
   </section>
 
 </main>
 <footer>Pokémon Champions Competitive Data Platform · static dashboard built by pipelines/dashboard/</footer>
 
 <script>window.DASHBOARD_DATA = {{ data_json | safe }};</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -10,7 +10,14 @@ models:
       partition. Written to data/marts/pokemon_usage_summary.csv.
   - name: legality_summary_by_regulation
     description: >
-      Legal-pool size per regulation and snapshot_date. Written to
+      Legal-pool size per regulation and snapshot_date: legal_pokemon_count
+      (this regulation only) and cumulative_legal_pokemon_count (a naive
+      union of every regulation_code <= this one, within the same
+      snapshot_date). CAVEAT: PokéBase (legality_snapshot's sole source)
+      publishes no removal signal, so cumulative_legal_pokemon_count can
+      only grow across regulations -- it will keep counting a Pokémon that
+      was actually banned in a later regulation, since there's no event to
+      subtract it back out. Written to
       data/marts/legality_summary_by_regulation.csv.
   - name: stat_change_leaderboard
     description: >
@@ -26,26 +33,47 @@ models:
       to data/marts/pokemon_win_rate_summary.csv.
   - name: pokemon_build_usage
     description: >
-      Item/ability drill-down: usage count per Pokémon x item x ability
-      combination, restricted to the current legal pool and to roster
-      slots reporting at least one of item/ability, ranked within each
-      Pokémon. Written to data/marts/pokemon_build_usage.csv.
+      Item/ability drill-down: usage count and build_share (that count's
+      fraction of the Pokémon's own total build rows) per Pokémon x item
+      x ability combination, restricted to the current legal pool and to
+      roster slots reporting at least one of item/ability, ranked within
+      each Pokémon. Written to data/marts/pokemon_build_usage.csv.
   - name: pokemon_move_usage
     description: >
-      Move drill-down: usage count per Pokémon x move, unnesting
+      Move drill-down: usage count and move_share (that count's fraction
+      of the Pokémon's own total move rows) per Pokémon x move, unnesting
       tournament_team_member's pipe-delimited moves list, restricted to
       the current legal pool, ranked within each Pokémon. Written to
       data/marts/pokemon_move_usage.csv.
   - name: pokemon_team_core_usage
     description: >
       Team-core drill-down (docs/prd.md's "Drill-down by Pokémon, team
-      core, move, and item usage"): co-occurrence usage count per
-      Pokémon x partner Pokémon pair appearing on the same tournament
-      team, restricted to the current legal pool, ranked within each
-      anchor Pokémon by co-occurrence count. Symmetric: each unordered
-      pair appears twice (once per anchor direction) so either Pokémon
-      in the pair can be the drill-down's selected anchor. Written to
+      core, move, and item usage"): co-occurrence usage count and
+      partner_share (that count's fraction of the Pokémon's own total
+      co-occurrence count across all partners) per Pokémon x partner
+      Pokémon pair appearing on the same tournament team, restricted to
+      the current legal pool, ranked within each anchor Pokémon by
+      co-occurrence count. Symmetric: each unordered pair appears twice
+      (once per anchor direction) so either Pokémon in the pair can be the
+      drill-down's selected anchor. Written to
       data/marts/pokemon_team_core_usage.csv.
+  - name: pokemon_archetype_usage
+    description: >
+      Archetype Explorer member-level drill-down: joins the curated,
+      NOT-sourced dbt/seeds/archetype_pokemon_map.csv seed to real
+      usage/win-rate data, ranked within each archetype by usage_share.
+      usage_share/win_rate/record_count are nullable -- a curated member
+      may have no recorded tournament appearances yet. Written to
+      data/marts/pokemon_archetype_usage.csv.
+  - name: archetype_summary
+    description: >
+      Archetype Explorer card-grid feed: one row per curated archetype
+      with member_count, combined_usage_share (sum of members'
+      usage_share), avg_win_rate, and top_member_pokemon_key (the #1
+      member by usage_share). Built on top of the curated, NOT-sourced
+      archetype_pokemon_map seed -- see that seed's schema.yml entry for
+      why this is an explicit exception to the provenance-is-mandatory
+      convention. Written to data/marts/archetype_summary.csv.
   - name: pokemon_champions_profile
     description: >
       Denormalized per-Pokémon profile for the Speed Tiers and Team
@@ -73,6 +101,16 @@ models:
 #   - usage as a percentage of the meta: pokemon_usage_summary.usage_share
 #   - speed tiers / team builder: pokemon_champions_profile, one row per
 #     legal Pokémon with Champions-format speed plus usage/win-rate
+#   - cumulative legal pool by regulation:
+#     legality_summary_by_regulation.cumulative_legal_pokemon_count (naive
+#     union across regulation_codes <= the current one) -- CAVEAT: no
+#     removal signal in the source, so this count can only grow, repeated
+#     here for discoverability alongside that model's own schema.yml entry
+#   - competitive archetype/team-composition drill-down:
+#     pokemon_archetype_usage / archetype_summary, built from a CURATED
+#     seed (dbt/seeds/archetype_pokemon_map.csv) joined against real
+#     usage/win-rate data -- must be presented in the dashboard as
+#     editorial judgment, not as an extracted/sourced fact
 #
 # Still a real gap (see docs/todo.md's backlog): type-effectiveness /
 # head-to-head matchup data. No in-scope source publishes Pokémon types or

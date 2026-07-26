@@ -164,6 +164,7 @@ def test_load_mart_coerces_team_core_usage_fields(tmp_path):
                 "pokemon_key": "pikachu",
                 "partner_pokemon_key": "raichu",
                 "co_occurrence_count": "3",
+                "partner_share": "0.75",
                 "usage_rank": "1",
             }
         ],
@@ -174,8 +175,125 @@ def test_load_mart_coerces_team_core_usage_fields(tmp_path):
             "pokemon_key": "pikachu",
             "partner_pokemon_key": "raichu",
             "co_occurrence_count": 3,
+            "partner_share": 0.75,
             "usage_rank": 1,
         }
+    ]
+
+
+def test_load_mart_coerces_legality_cumulative_field(tmp_path):
+    _write_csv(
+        tmp_path / "legality_summary_by_regulation.csv",
+        [
+            {
+                "regulation_code": "m-b",
+                "snapshot_date": "2026-01-01",
+                "legal_pokemon_count": "39",
+                "cumulative_legal_pokemon_count": "307",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "legality_summary_by_regulation")
+    assert rows == [
+        {
+            "regulation_code": "m-b",
+            "snapshot_date": "2026-01-01",
+            "legal_pokemon_count": 39,
+            "cumulative_legal_pokemon_count": 307,
+        }
+    ]
+
+
+def test_load_mart_coerces_archetype_marts(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_archetype_usage.csv",
+        [
+            {
+                "archetype_key": "rain",
+                "archetype_name": "Rain",
+                "pokemon_key": "pelipper",
+                "usage_share": "0.05",
+                "win_rate": "0.5",
+                "record_count": "100",
+                "member_rank": "1",
+            }
+        ],
+    )
+    _write_csv(
+        tmp_path / "archetype_summary.csv",
+        [
+            {
+                "archetype_key": "rain",
+                "archetype_name": "Rain",
+                "member_count": "6",
+                "combined_usage_share": "0.12",
+                "avg_win_rate": "0.48",
+                "top_member_pokemon_key": "pelipper",
+            }
+        ],
+    )
+    assert data.load_mart(tmp_path, "pokemon_archetype_usage") == [
+        {
+            "archetype_key": "rain",
+            "archetype_name": "Rain",
+            "pokemon_key": "pelipper",
+            "usage_share": 0.05,
+            "win_rate": 0.5,
+            "record_count": 100,
+            "member_rank": 1,
+        }
+    ]
+    assert data.load_mart(tmp_path, "archetype_summary") == [
+        {
+            "archetype_key": "rain",
+            "archetype_name": "Rain",
+            "member_count": 6,
+            "combined_usage_share": 0.12,
+            "avg_win_rate": 0.48,
+            "top_member_pokemon_key": "pelipper",
+        }
+    ]
+
+
+def test_compute_kpis_top_12_and_top_30_and_cumulative_legal_pool():
+    usage_rows = [
+        {"pokemon_key": f"mon-{i}", "event_tier": "", "usage_rank": i, "usage_count": 100 - i}
+        for i in range(1, 41)
+    ]
+    marts = {
+        "pokemon_usage_summary": usage_rows,
+        "legality_summary_by_regulation": [
+            {
+                "regulation_code": "m-a",
+                "snapshot_date": "2026-01-01",
+                "legal_pokemon_count": 268,
+                "cumulative_legal_pokemon_count": 268,
+            },
+            {
+                "regulation_code": "m-b",
+                "snapshot_date": "2026-01-01",
+                "legal_pokemon_count": 39,
+                "cumulative_legal_pokemon_count": 307,
+            },
+        ],
+        "pokemon_win_rate_summary": [],
+    }
+    kpis = data.compute_kpis(marts)
+
+    assert [r["pokemon_key"] for r in kpis["top_12_pokemon"]] == [f"mon-{i}" for i in range(1, 13)]
+    assert len(kpis["top_30_pokemon"]) == 30
+    assert kpis["top_30_pokemon"][0]["pokemon_key"] == "mon-1"
+    assert kpis["legal_pool_by_regulation"] == [
+        {
+            "regulation_code": "m-a",
+            "legal_pokemon_count": 268,
+            "cumulative_legal_pokemon_count": 268,
+        },
+        {
+            "regulation_code": "m-b",
+            "legal_pokemon_count": 39,
+            "cumulative_legal_pokemon_count": 307,
+        },
     ]
 
 
@@ -196,6 +314,7 @@ def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
                 "pokemon_key": "pikachu",
                 "partner_pokemon_key": "raichu",
                 "co_occurrence_count": "3",
+                "partner_share": "0.75",
                 "usage_rank": "1",
             }
         ],
@@ -207,6 +326,7 @@ def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
             "pokemon_key": "pikachu",
             "partner_pokemon_key": "raichu",
             "co_occurrence_count": 3,
+            "partner_share": 0.75,
             "usage_rank": 1,
             "pokemon_name": "Pikachu",
             "partner_pokemon_name": "Raichu",

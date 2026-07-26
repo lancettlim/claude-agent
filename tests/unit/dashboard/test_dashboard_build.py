@@ -72,7 +72,14 @@ def _populate_marts(marts_dir, normalized_dir):
     )
     _write_csv(
         marts_dir / "legality_summary_by_regulation.csv",
-        [{"regulation_code": "m-a", "snapshot_date": "2026-01-01", "legal_pokemon_count": "2"}],
+        [
+            {
+                "regulation_code": "m-a",
+                "snapshot_date": "2026-01-01",
+                "legal_pokemon_count": "2",
+                "cumulative_legal_pokemon_count": "2",
+            }
+        ],
     )
 
 
@@ -131,9 +138,9 @@ def test_build_has_tab_markup_for_all_tabs(tmp_path):
     for tab in (
         "overview",
         "usage",
-        "builds",
-        "moves",
-        "team-cores",
+        "pokemon-profile",
+        "archetypes",
+        "regulations",
         "speed-tiers",
         "team-builder",
     ):
@@ -180,6 +187,67 @@ def test_build_skips_item_icons_when_fetch_icons_false(tmp_path):
 
     assert payload["item_icons"] == {}
     assert not (output_dir / "images" / "icons" / "items").exists()
+
+
+def test_build_reference_teams_empty_when_directory_missing(tmp_path):
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    output_dir = tmp_path / "out"
+    _populate_marts(marts_dir, normalized_dir)
+
+    payload = _build(
+        marts_dir,
+        normalized_dir,
+        output_dir,
+        reference_teams_dir=tmp_path / "reference_teams_absent",
+    )
+
+    assert payload["reference_teams"] == []
+
+
+def test_build_copies_reference_team_cards(tmp_path):
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    output_dir = tmp_path / "out"
+    reference_teams_dir = tmp_path / "reference_teams"
+    _populate_marts(marts_dir, normalized_dir)
+
+    cards_dir = reference_teams_dir / "cards"
+    cards_dir.mkdir(parents=True)
+    (cards_dir / "worlds-2026-team.png").write_bytes(b"fake-card-png-bytes")
+    (reference_teams_dir / "reference_teams.json").write_text(
+        json.dumps(
+            [
+                {
+                    "team_id": "worlds-2026",
+                    "player_name": "Ada Lovelace",
+                    "country": "GB",
+                    "event_name": "2026 World Championships",
+                    "placement": 1,
+                    "archetype_key": "rain",
+                    "card_image": "worlds-2026-team.png",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = _build(marts_dir, normalized_dir, output_dir, reference_teams_dir=reference_teams_dir)
+
+    assert payload["reference_teams"] == [
+        {
+            "team_id": "worlds-2026",
+            "player_name": "Ada Lovelace",
+            "country": "GB",
+            "event_name": "2026 World Championships",
+            "placement": 1,
+            "archetype_key": "rain",
+            "card_image": "images/reference_teams/worlds-2026-team.png",
+        }
+    ]
+    assert (
+        output_dir / "images" / "reference_teams" / "worlds-2026-team.png"
+    ).read_bytes() == b"fake-card-png-bytes"
 
 
 def test_safe_json_escapes_script_close_tag():

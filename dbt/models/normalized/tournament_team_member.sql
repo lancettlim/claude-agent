@@ -14,6 +14,7 @@ select
   source.item_name,
   source.ability,
   source.tera_type,
+  source.nature,
   source.moves,
   source.source_name,
   source.source_url,

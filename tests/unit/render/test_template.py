@@ -82,3 +82,19 @@ def test_render_html_handles_missing_optional_fields(tmp_path):
 
     assert "T" in html
     assert "A" in html
+    assert '<div class="player-row">' not in html
+
+
+def test_render_html_includes_player_banner_when_set(tmp_path):
+    card = CardModel(
+        team_name="Worlds 2026",
+        player_name="Wolfe Glick",
+        country="US",
+        slots=[CardSlot(slot_number=1, pokemon_name="A", form_name="a", moves=[], move_types=[])],
+    )
+
+    html = render_html(card, icon_cache_dir=tmp_path, session=_FakeSession())
+
+    assert '<div class="player-row">' in html
+    assert "Wolfe Glick" in html
+    assert ">US<" in html

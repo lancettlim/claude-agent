@@ -225,13 +225,49 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   unfetched endpoint); the battle-log half would need a new source not
   currently in scope or deferred (see `docs/design-system.md`'s
   "Backlog: not yet buildable").
+- [x] Broadcast/esports dashboard redesign + feature expansion: full
+  visual re-theme (`docs/design-system.md`'s broadcast color-block header,
+  `--accent-red`/`--accent-gold` tokens, three-step `--icon-sm/md/lg`
+  scale replacing four ad-hoc pixel sizes); removed Chart.js/CDN entirely
+  in favor of a dependency-free ranked-list component
+  (`renderRankedList()`); merged the Builds/Moves/Team Cores tabs into one
+  **Pokémon Profile** tab with a single relevance-sorted picker; Pokémon
+  `<select>` dropdowns now sorted by `usage_share` descending instead of
+  alphabetically (superseding the prior "dropdowns stay alphabetical"
+  convention); sortable `<th>` columns on every leaderboard table
+  (resolves the "sortable table columns" backlog item below); new
+  **Archetypes** tab (Archetype Explorer) backed by a curated,
+  editorial-not-sourced `dbt/seeds/archetype_pokemon_map.csv` seed plus two
+  new marts (`pokemon_archetype_usage`, `archetype_summary`); new
+  **Regulations** tab (Regulation Comparison) backed by a new
+  `cumulative_legal_pokemon_count` column on `legality_summary_by_
+  regulation` (naive union across regulations, with the PokéBase
+  no-removal-signal caveat shown as visible UI copy — resolves the
+  "regulation-code filter" half of the backlog item below); new
+  `build_share`/`move_share`/`partner_share` percentage columns on
+  `pokemon_build_usage`/`pokemon_move_usage`/`pokemon_team_core_usage` so
+  raw counts could be dropped from every view in favor of percentages (a
+  small `(n=X)` annotation stays next to win rate specifically, so a
+  100%-on-n=1 doesn't read as more authoritative than a well-established
+  Pokémon's real win rate); Overview redesigned into a "Top 12" spotlight
+  grid + "Top 30" ranked list; a minimum-recorded-matches filter on Win
+  rate leaders; `player_name`/`player_country` (real MunchStats fields
+  that were previously discarded during extraction, only hashed into an
+  opaque `player_id`) now flow through to `tournament_team` and into
+  `pipelines/render/`'s `CardModel`; the team-card renderer re-themed to
+  match the dashboard's broadcast palette with a player/country banner
+  row; and a new **Pro Team Gallery** (curated real teams, pre-rendered
+  via `render-card` and committed to `data/reference_teams/`, shown in the
+  Team Builder tab with a "Load into my builder" button) — see
+  `docs/dashboard.md`'s "Pro Team Gallery", "Cumulative legal pool", and
+  "Archetype Explorer" sections.
 - [ ] Backlog: further dashboard capability items not covered by the above
-  redesign: regulation-code filter on the KPI row and usage/win-rate views,
-  a tournament-event/date filter once multiple snapshots exist, sortable
-  table columns (currently fixed-sort — now also applies to the new Usage
-  leaders and Speed Tiers tables), and a loading/empty state for the
-  build/move/team-core drill-downs before a Pokémon is picked instead of
-  defaulting to the first alphabetically
+  redesign: a tournament-event/date filter once multiple snapshots exist
+  (still blocked — only one `snapshot_date` in the data), trend/line
+  charts once that same multi-snapshot data exists, and a loading/empty
+  state for the Pokémon Profile tab before a Pokémon is picked (currently
+  defaults to the highest-usage Pokémon rather than showing an empty
+  state, which may be preferable anyway)
 - [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
   `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
   dataset has enough snapshots/trend data (multiple `snapshot_date`s, a

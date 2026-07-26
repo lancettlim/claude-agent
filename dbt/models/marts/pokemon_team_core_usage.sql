@@ -3,6 +3,12 @@
 -- move, and item usage" — named in scope but never built until now):
 -- co-occurrence usage count per Pokémon x partner Pokémon pair appearing
 -- on the same tournament team, restricted to the current legal pool.
+--
+-- partner_share is co_occurrence_count's fraction of that Pokémon's own
+-- total co-occurrence count across all partners (dashboard "percentages,
+-- not raw counts" ask), the same share-of-own-total pattern
+-- pokemon_usage_summary.usage_share/pokemon_build_usage.build_share/
+-- pokemon_move_usage.move_share use.
 with legal_members as (
   select member.team_member_id, member.team_id, member.pokemon_key
   from {{ ref('tournament_team_member') }} member
@@ -40,6 +46,11 @@ select
   pokemon_key,
   partner_pokemon_key,
   co_occurrence_count,
+  round(
+    co_occurrence_count::double
+      / sum(co_occurrence_count) over (partition by pokemon_key),
+    4
+  ) as partner_share,
   row_number() over (
     partition by pokemon_key
     order by co_occurrence_count desc

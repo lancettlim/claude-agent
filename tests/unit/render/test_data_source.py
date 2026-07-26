@@ -19,7 +19,15 @@ def _populate_normalized(tmp_path):
     normalized_dir = tmp_path / "normalized"
     _write_csv(
         normalized_dir / "tournament_team.csv",
-        [{"team_id": "team-1", "player_id": "p1", "placement": "3"}],
+        [
+            {
+                "team_id": "team-1",
+                "player_id": "p1",
+                "player_name": "Ada Lovelace",
+                "player_country": "GB",
+                "placement": "3",
+            }
+        ],
     )
     _write_csv(
         normalized_dir / "tournament_team_member.csv",
@@ -31,6 +39,7 @@ def _populate_normalized(tmp_path):
                 "item_name": "Sitrus Berry",
                 "ability": "Intimidate",
                 "tera_type": "Ghost",
+                "nature": "Adamant",
                 "moves": "Fake Out|Flare Blitz",
             },
             {
@@ -40,6 +49,7 @@ def _populate_normalized(tmp_path):
                 "item_name": "",
                 "ability": "Chlorophyll",
                 "tera_type": "",
+                "nature": "",
                 "moves": "Giga Drain",
             },
         ],
@@ -79,21 +89,60 @@ def test_load_from_team_id_sorts_by_slot_and_resolves_sprite(tmp_path):
     )
 
     assert card.team_name == "team-1"
-    assert card.subtitle == "p1 · 3"
+    assert card.subtitle == "Placement: 3"
+    assert card.player_name == "Ada Lovelace"
+    assert card.country == "GB"
     assert [s.slot_number for s in card.slots] == [1, 2]
 
     venusaur_slot = card.slots[0]
     assert venusaur_slot.pokemon_name == "Venusaur"
     assert venusaur_slot.moves == ["Giga Drain"]
     assert venusaur_slot.item_name is None
+    assert venusaur_slot.nature is None
     assert venusaur_slot.sprite_path is None  # not in pokemon_asset.csv fixture
 
     incineroar_slot = card.slots[1]
     assert incineroar_slot.pokemon_name == "Incineroar"
     assert incineroar_slot.item_name == "Sitrus Berry"
     assert incineroar_slot.tera_type == "Ghost"
+    assert incineroar_slot.nature == "Adamant"
     assert incineroar_slot.moves == ["Fake Out", "Flare Blitz"]
     assert incineroar_slot.sprite_path == asset_cache_dir / "0727.png"
+
+
+def test_load_from_team_id_degrades_gracefully_without_player_name_columns(tmp_path):
+    # Older normalized snapshots (pre player_name/player_country/nature
+    # columns) shouldn't KeyError -- missing columns degrade to None.
+    normalized_dir = tmp_path / "normalized"
+    _write_csv(
+        normalized_dir / "tournament_team.csv",
+        [{"team_id": "team-1", "player_id": "p1", "placement": "3"}],
+    )
+    _write_csv(
+        normalized_dir / "tournament_team_member.csv",
+        [{"team_id": "team-1", "pokemon_key": "incineroar", "slot_number": "1"}],
+    )
+    _write_csv(
+        normalized_dir / "pokemon.csv",
+        [
+            {
+                "pokemon_key": "incineroar",
+                "pokemon_id": "727",
+                "pokemon_name": "Incineroar",
+                "form_name": "incineroar",
+            }
+        ],
+    )
+    asset_cache_dir = tmp_path / "assets" / "bulbagarden"
+    asset_cache_dir.mkdir(parents=True)
+
+    card = data_source.load_from_team_id(
+        "team-1", normalized_dir=normalized_dir, asset_cache_dir=asset_cache_dir
+    )
+
+    assert card.player_name is None
+    assert card.country is None
+    assert card.slots[0].nature is None
 
 
 def test_load_from_team_id_raises_for_unknown_team(tmp_path):
@@ -137,6 +186,28 @@ def test_load_from_spec_resolves_against_ingested_dataset(tmp_path):
     assert slot.pokemon_name == "Incineroar"
     assert slot.nature == "Impish"
     assert slot.sprite_path == asset_cache_dir / "0727.png"
+
+
+def test_load_from_spec_reads_player_name_and_country(tmp_path):
+    normalized_dir, asset_cache_dir = _populate_normalized(tmp_path)
+    spec_path = tmp_path / "spec.json"
+    spec_path.write_text(
+        json.dumps(
+            {
+                "team_name": "Worlds 2026",
+                "player_name": "Wolfe Glick",
+                "country": "US",
+                "slots": [{"pokemon_name": "Incineroar", "form_name": "incineroar", "moves": []}],
+            }
+        )
+    )
+
+    card = data_source.load_from_spec(
+        spec_path, normalized_dir=normalized_dir, asset_cache_dir=asset_cache_dir
+    )
+
+    assert card.player_name == "Wolfe Glick"
+    assert card.country == "US"
 
 
 def test_load_from_spec_degrades_gracefully_for_uningested_pokemon(tmp_path):

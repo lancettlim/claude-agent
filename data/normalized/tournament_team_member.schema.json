@@ -13,6 +13,7 @@
     {"name": "item_name", "type": "string", "required": false, "description": "Held item for the roster slot, if reported"},
     {"name": "ability", "type": "string", "required": false, "description": "Ability for the roster slot, if reported"},
     {"name": "tera_type", "type": "string", "required": false, "description": "Tera type for the roster slot, if reported"},
+    {"name": "nature", "type": "string", "required": false, "description": "Nature for the roster slot, if reported"},
     {"name": "moves", "type": "string", "required": false, "description": "Pipe-delimited (|) move list for the roster slot, if reported"},
     {"name": "source_name", "type": "string", "required": true, "description": "Constant: MunchStats"},
     {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},

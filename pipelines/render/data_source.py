@@ -18,6 +18,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pipelines.dashboard.data import to_pascal_case
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 DEFAULT_ASSET_CACHE_DIR = REPO_ROOT / "data" / "assets" / "bulbagarden"
@@ -48,6 +50,8 @@ class CardSlot:
 class CardModel:
     team_name: str
     subtitle: str | None = None
+    player_name: str | None = None
+    country: str | None = None
     slots: list[CardSlot] = field(default_factory=list)
 
 
@@ -126,14 +130,16 @@ def load_from_team_id(
         )
         raw_moves = [m for m in (row.get("moves") or "").split("|") if m]
         moves, types = _resolve_moves(raw_moves, move_types)
+        display_name = to_pascal_case(pokemon_key) if pokemon_key else "Unknown"
         slots.append(
             CardSlot(
                 slot_number=int(row["slot_number"]),
-                pokemon_name=pokemon.get("pokemon_name", pokemon_key or "Unknown"),
+                pokemon_name=display_name,
                 form_name=pokemon.get("form_name", pokemon_key or ""),
                 sprite_path=sprite_path,
                 item_name=row.get("item_name") or None,
                 ability=row.get("ability") or None,
+                nature=row.get("nature") or None,
                 tera_type=row.get("tera_type") or None,
                 moves=moves,
                 move_types=types,
@@ -141,10 +147,12 @@ def load_from_team_id(
         )
 
     team = teams.get(team_id, {})
-    subtitle_bits = [bit for bit in [team.get("player_id"), team.get("placement")] if bit]
+    placement = team.get("placement")
     return CardModel(
         team_name=team_id,
-        subtitle=" · ".join(subtitle_bits) if subtitle_bits else None,
+        subtitle=f"Placement: {placement}" if placement else None,
+        player_name=team.get("player_name") or None,
+        country=team.get("player_country") or None,
         slots=slots,
     )
 
@@ -157,10 +165,14 @@ def load_from_spec(
 ) -> CardModel:
     """Build a CardModel from a hand-authored ad-hoc JSON build spec:
 
-    {"team_name": "...", "subtitle": "...",
+    {"team_name": "...", "subtitle": "...", "player_name": "...", "country": "...",
      "slots": [{"pokemon_name": "...", "form_name": "...", "item_name": "...",
                 "ability": "...", "nature": "...", "tera_type": "...",
                 "moves": ["...", "..."]}]}
+
+    player_name/country are optional, for recreating a real broadcast-style
+    card (e.g. a Pro Team Gallery entry) that isn't in MunchStats's
+    tournament coverage.
 
     Sprite/icon resolution is attempted against the ingested dataset (by
     matching form_name against pokemon.csv/pokemon_asset.csv) but degrades
@@ -203,5 +215,7 @@ def load_from_spec(
     return CardModel(
         team_name=spec.get("team_name", ""),
         subtitle=spec.get("subtitle"),
+        player_name=spec.get("player_name"),
+        country=spec.get("country"),
         slots=slots,
     )
