@@ -185,6 +185,11 @@ from a branch", branch `main` (or whichever branch is the default), folder
 `https://<owner>.github.io/<repo>/dashboard/` — for this repo, that's
 https://lancettlim.github.io/claude-agent/dashboard/.
 
+`docs/index.html` is a static redirect stub (meta-refresh + JS
+`location.replace`, so it works with JS disabled too) that sends
+`https://<owner>.github.io/<repo>/` itself to `dashboard/` — the site root
+would otherwise 404, since nothing else lives at `docs/`'s top level.
+
 ## Data-reality caveats
 
 As of this writing:
