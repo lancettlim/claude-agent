@@ -28,14 +28,17 @@ DEFAULT_NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 # column is left as a string.
 MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pokemon_usage_summary": (("usage_count", "usage_rank"), ("usage_share",)),
-    "legality_summary_by_regulation": (("legal_pokemon_count",), ()),
+    "legality_summary_by_regulation": (
+        ("legal_pokemon_count", "cumulative_legal_pokemon_count"),
+        (),
+    ),
     "pokemon_win_rate_summary": (
         ("total_wins", "total_losses", "record_count"),
         ("win_rate",),
     ),
-    "pokemon_build_usage": (("usage_count", "usage_rank"), ()),
-    "pokemon_move_usage": (("usage_count", "usage_rank"), ()),
-    "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ()),
+    "pokemon_build_usage": (("usage_count", "usage_rank"), ("build_share",)),
+    "pokemon_move_usage": (("usage_count", "usage_rank"), ("move_share",)),
+    "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ("partner_share",)),
     "pokemon_champions_profile": (
         (
             "hp",
@@ -49,6 +52,14 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
             "record_count",
         ),
         ("usage_share", "win_rate"),
+    ),
+    "pokemon_archetype_usage": (
+        ("record_count", "member_rank"),
+        ("usage_share", "win_rate"),
+    ),
+    "archetype_summary": (
+        ("member_count",),
+        ("combined_usage_share", "avg_win_rate"),
     ),
 }
 
@@ -142,7 +153,11 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 
     latest_snapshot_date = max((r["snapshot_date"] for r in legality_rows), default=None)
     legal_pool_by_regulation = [
-        {"regulation_code": r["regulation_code"], "legal_pokemon_count": r["legal_pokemon_count"]}
+        {
+            "regulation_code": r["regulation_code"],
+            "legal_pokemon_count": r["legal_pokemon_count"],
+            "cumulative_legal_pokemon_count": r["cumulative_legal_pokemon_count"],
+        }
         for r in legality_rows
         if r["snapshot_date"] == latest_snapshot_date
     ]
@@ -156,12 +171,27 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     top_win_rate_pool = qualified_win_rates or win_rate_rows
     top_win_rate = max(top_win_rate_pool, key=lambda r: r["win_rate"], default=None)
 
+    # Overview tab spotlight/ranked lists (dashboard "show top 12 + 30" ask):
+    # both drawn from the same overall usage ranking, just sliced to
+    # different lengths -- top_12 for the compact spotlight grid, top_30
+    # for the fuller ranked list. pokemon_usage_summary itself has no
+    # win_rate column, so it's joined in here (win_rate stays None if the
+    # Pokémon has no recorded win/loss data) -- otherwise every spotlight
+    # card would show a uniform, uninformative "no win rate" placeholder.
+    win_rate_by_key = {r["pokemon_key"]: r["win_rate"] for r in win_rate_rows}
+    ranked_usage = sorted(usage_rows, key=lambda r: r["usage_rank"])
+    ranked_usage = [{**r, "win_rate": win_rate_by_key.get(r["pokemon_key"])} for r in ranked_usage]
+    top_12_pokemon = ranked_usage[:12]
+    top_30_pokemon = ranked_usage[:30]
+
     return {
         "latest_snapshot_date": latest_snapshot_date,
         "legal_pool_by_regulation": legal_pool_by_regulation,
         "distinct_pokemon_used": len(usage_rows),
         "top_used_pokemon": top_used,
         "top_win_rate_pokemon": top_win_rate,
+        "top_12_pokemon": top_12_pokemon,
+        "top_30_pokemon": top_30_pokemon,
     }
 
 

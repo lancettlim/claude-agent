@@ -32,11 +32,31 @@ color, spacing, or radius value that already has a token — add one instead.
 | `--positive` / `--positive-bg` | `#1f8a4c` / `#e8f7ee` | Reserved for future positive-delta indicators (e.g. a stat gainer, once `stat_change_leaderboard` has real deltas — see "Removed sections" in `docs/dashboard.md`) |
 | `--warning` / `--warning-bg` | `#a8710a` / `#fbf1e0` | Reserved for caution states |
 | `--danger` / `--danger-bg` | `#b23434` / `#fbe9e9` | Destructive actions (Team Builder's remove button), Blazing speed tier |
+| `--panel-dark` | `#12131a` | Broadcast color-block section/page header background (see "Broadcast color-block header" below) |
+| `--accent-red` / `--accent-red-bg` | `#e3323c` / `#fce7e8` | Broadcast accent: active tab, ranked-list leader bar, Archetype Explorer's selected card |
+| `--accent-gold` | `#f4b942` | Broadcast accent: reserved for #1-rank/MVP highlighting |
 
 Speed-tier colors (`--speed-blazing`, `--speed-fast`, `--speed-average`,
 `--speed-slow`, each with a `-bg` pair) are documented under "Speed-tier
 badge" below rather than here, since they're paired directly with the
 bucketing thresholds.
+
+### Icon size scale
+
+Three tokens replace what used to be four ad-hoc pixel values scattered
+across the stylesheet/JS (40px KPI sprite, 32px roster picker, 24px table
+cell, 22px chart axis):
+
+| Token | Value | Use |
+|---|---|---|
+| `--icon-sm` | 32px | Table/list cells, ranked-list rows, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
+| `--icon-md` | 48px | Roster picker rows, Archetype Explorer member chips (`ICON_SIZES.md`) |
+| `--icon-lg` | 72px | KPI hero sprite, team slot, Pokémon Profile hero, Overview spotlight card (`ICON_SIZES.lg`) |
+
+**Every sprite/item/type image must use one of these three tokens** (or
+the matching `ICON_SIZES` constant in JS) — no other pixel value. This is
+a floor, not a ceiling: 32px is the smallest icon size anywhere in the
+dashboard now, up from the previous 22–24px minimum.
 
 ### Spacing
 
@@ -57,8 +77,9 @@ webfont, keeping the page dependency-free.
 
 ## Layout primitives
 
-- **`header`** — page title + generation timestamp, centered, white on the
-  page background.
+- **`header`** — page title + generation timestamp, centered, white text on
+  a `--panel-dark` color-blocked background (the broadcast/esports theme's
+  most visible landmark — see "Broadcast color-block header" below).
 - **`main`** — centered content column, `max-width: 1100px`.
 - **`.kpi-row`** — responsive grid of `.kpi-card`s (`auto-fit,
   minmax(200px, 1fr)`), always the first thing under the header.
@@ -66,30 +87,36 @@ webfont, keeping the page dependency-free.
   (`app.js`'s `setupTabs`). Every dashboard view beyond the KPI row lives in
   a tab, not a scrolling section — this was a deliberate M6 redesign
   decision (see `docs/todo.md`'s "Dashboard full redesign" entry) to keep
-  the page scannable as views are added.
-- **`section` (`.tab-panel`)** — a bordered white card per tab, `h2` title,
-  optional `.controls` filter row, then chart and/or table content.
+  the page scannable as views are added. Current tabs: Overview, Usage,
+  Pokémon Profile, Archetypes, Regulations, Speed Tiers, Team Builder.
+- **`section` (`.tab-panel`)** — a bordered white card per tab, `h2` title
+  rendered as a broadcast color-block header, optional `.controls` filter
+  row, then ranked-list and/or table content.
 
 ## Component catalog
 
 ### KPI card
 
-`.kpi-card`: a bordered white card with an optional 40px sprite, a
-`.label` (uppercase, muted, small), a `.value` (bold, large), and an
-optional `.sub` (muted, small) for supporting detail like a percentage or
-date. Used only in the top `.kpi-row` — don't reuse this class for
-in-tab summary stats; use `.stat-summary-row .stat` instead (see Team
-Builder below), which is denser and doesn't compete visually with the
-page-level KPIs.
+`.kpi-card`: a bordered white card with an optional `--icon-lg` (72px)
+sprite, a `.label` (uppercase, muted, small), a `.value` (bold, large,
+wraps rather than overflows for long names), and an optional `.sub`
+(muted, small) for supporting detail like a percentage or date. Used only
+in the top `.kpi-row` — don't reuse this class for in-tab summary stats;
+use `.stat-summary-row .stat` instead (see Team Builder below), which is
+denser and doesn't compete visually with the page-level KPIs.
 
 ### Leaderboard table
 
 The recurring pattern for "top N Pokémon by some metric" (Usage leaders,
-Win rate leaders, Speed tiers): a `<table>` inside `.table-scroll`, first
-column a `.badge.badge-rank` (`#1`, `#2`, …), second column a
-`pokemonCell()`-rendered sprite+name, remaining columns the metric(s). All
-three of these tables are sorted server-computed-rank-then-client-rendered
-in *descending* order of their primary metric by default — see "Ordering
+Win rate leaders, Speed Tiers, Archetype Explorer's member table): a
+`<table>` inside `.table-scroll`, first column a `.badge.badge-rank`
+(`#1`, `#2`, …), second column a `pokemonCell()`-rendered sprite+name,
+remaining columns the metric(s). Columns with `<th class="sortable"
+data-sort-key="...">` are click-to-sort (`makeSortableTable()` in
+`app.js`, toggling ascending/descending, `▲`/`▼` indicator appended to the
+active header) — every leaderboard table added since the broadcast
+redesign uses this; a table's *default* order (before any header click)
+is still descending by its primary relevance metric, per "Ordering
 convention" below.
 
 ### Badge
@@ -105,25 +132,41 @@ not one-off inline styles.
 ### Sprite / icon cell
 
 `pokemonCell(pokemonKey, pokemonName)` (in `app.js`) is the canonical way
-to render a Pokémon in a table cell: a 24px sprite (from the `sprites` map,
-keyed by `pokemon_key`) next to the display name, wrapped in
+to render a Pokémon in a table cell: an `--icon-sm` (32px) sprite (from the
+`sprites` map, keyed by `pokemon_key`) next to the display name, wrapped in
 `.cell-with-icon`. `itemCell()` follows the same pattern for held items.
 **Any new table or list that references a specific Pokémon should use
 `pokemonCell()` (or `spriteImg()` directly for non-table contexts, as
 Team Builder's roster list and team slots do) rather than rendering a bare
 name** — see "Representing Pokémon" below.
 
-### Chart (bar, with sprite axis + external tooltip)
+### Ranked list (replaces bar charts)
 
-`drawBarChart()` is the single shared Chart.js wrapper (Usage, Moves,
-Team Cores, and Speed Tiers charts all call it). It handles: collapsing
-gracefully when Chart.js's CDN didn't load, an optional `spriteAxisPlugin`
-that draws a 22px Pokémon sprite under each x-axis tick instead of a text
-label, and an optional DOM-based external tooltip (`.chart-tooltip`) that
-can embed a sprite/icon image next to the value — Chart.js's canvas
-tooltips can't embed `<img>` elements natively. New charts referencing
-Pokémon should pass `spriteSources`/`tooltipInfoFn` rather than drawing a
-bespoke chart.
+`renderRankedList(container, rows, opts)` (in `app.js`) is the dashboard's
+**only** data-visualization component — Chart.js and its CDN dependency
+were removed entirely as part of the broadcast redesign (dashboard
+"remove bar charts... focus on percentages" ask), a net simplification
+since there's no longer a "chart library didn't load" degradation path to
+handle. It renders a dependency-free `.ranked-row` list: rank number,
+optional icon (`keyFn` → sprite lookup, or `iconFn` for a direct icon src
+like a move-type icon), label, a `.ranked-bar-fill` bar whose width is
+relative to the *largest* value among the rows being shown (not a fixed
+0–100% scale — this is a ranked comparison, not an absolute gauge), and a
+right-aligned value (`displayFn`). The #1 row gets `.is-leader`
+(`--accent-red` fill instead of `--blue`). Used by: Overview's Top 12/30,
+Usage's per-tier ranked list, Pokémon Profile's move/team-core lists, and
+Speed Tiers' top-20 list. Any new "top N by metric" visual should use this
+instead of introducing a new charting approach.
+
+### Broadcast color-block header
+
+Section (`<h2>`) and page (`<header>`) titles are uppercase, `font-weight:
+800`, `letter-spacing: 0.04em`, white text on a `--panel-dark` bar — this,
+plus the `--accent-red`/`--accent-gold` accent tokens, is what gives the
+dashboard its broadcast/esports look (dashboard "more Pokémon-like
+features" ask). Deliberately **not** a webfont change — the effect comes
+entirely from color-blocking and weight/case, preserving the
+dependency-free-page convention "Type scale" above already established.
 
 ### Filter control
 
@@ -173,10 +216,44 @@ tier list.
 ### Team slot / roster item
 
 Two small, Team-Builder-specific patterns:
-- `.team-slot` — a bordered card (filled) or dashed placeholder (`.empty`)
-  representing one of the team's 6 roster positions.
-- `.roster-item` — a horizontal row (sprite, name, usage/win-rate/speed
-  sub-text, Add button) in the scrollable "Legal pool" picker list.
+- `.team-slot` — a bordered card (filled, `--icon-lg` sprite) or dashed
+  placeholder (`.empty`) representing one of the team's 6 roster
+  positions.
+- `.roster-item` — a horizontal row (`--icon-md` sprite, name,
+  usage/win-rate/speed sub-text, Add button) in the scrollable "Legal
+  pool" picker list.
+
+### Spotlight card (Overview "Top 12")
+
+`.spotlight-card`: a bordered card with a rank badge, `--icon-lg` sprite,
+name, and a one-line usage%/win-rate% sub-stat, laid out in
+`.spotlight-grid` (`auto-fill, minmax(140px, 1fr)`). Denser than a KPI
+card, meant for a grid of many at once rather than 3–4 headline stats.
+
+### Archetype card
+
+`.archetype-card`: a clickable card (`<button>`, `aria-pressed` toggled)
+showing an archetype's name, member count, combined usage share, average
+win rate, and up to 3 member sprites (`--icon-md`). Selecting a card
+filters the member table below it (see "Leaderboard table"). Exactly one
+card is selected at a time; the highest-combined-usage archetype is
+selected by default on tab load. **Always paired with the disclaimer
+copy** in `index.html.jinja` making clear archetype membership is curated
+editorial judgment (`dbt/seeds/archetype_pokemon_map.csv`), not sourced
+tournament data — never present an archetype grouping as an extracted
+signal.
+
+### Gallery card (Pro Team Gallery)
+
+`.gallery-card`: a bordered card wrapping a pre-rendered team-card PNG
+(`pipelines/render/`, see `docs/dashboard.md`'s "Pro Team Gallery"
+section) plus a caption (player name, country, event, placement,
+archetype tag) and a "Load into my builder" button that copies the
+gallery team's Pokémon into the Team Builder roster above it. Laid out in
+`.gallery-grid` (`auto-fill, minmax(220px, 1fr)`), inside the Team
+Builder tab but visually and functionally distinct from the roster
+planner above it — this is a separate, read-only reference feature and
+is never itself labeled "Team Builder."
 
 ## Representing Pokémon
 
@@ -229,31 +306,56 @@ Two things worth calling out about this choice:
 ### Ordering convention
 
 Pokémon-keyed lists default to **descending order by their most relevant
-ranking metric**, not alphabetical — usage count/share for usage-oriented
-views, win rate for win-rate-oriented views, speed for the Speed Tiers
-view. This applies to: the Usage leaders and Win rate leaders tables, the
-Usage/Speed bar charts (top 15–20 by that metric), and Team Builder's
-"Legal pool" picker (sortable between Usage / Win rate / Speed, all
-descending).
+ranking metric**, not alphabetical — usage share for usage-oriented views,
+win rate for win-rate-oriented views, speed for the Speed Tiers view. This
+applies to every Pokémon-keyed list in the dashboard: leaderboard tables,
+ranked lists, Team Builder's "Legal pool" picker (sortable between Usage /
+Win rate / Speed, all descending) — **and now every Pokémon-picker
+`<select>` dropdown too** (Pokémon Profile's picker), via
+`distinctSortedByMetric()` in `app.js`, which orders by descending
+`usage_share`.
 
-The one deliberate exception: the plain `<select>` filter dropdowns (Build,
-Moves, Team Cores tabs' Pokémon picker) stay **alphabetical**
-(`distinctSorted()` in `app.js`) — for a dropdown a user is scanning to
-find one specific Pokémon by name, alphabetical is more findable than
-ranked; ranking only matters once you're looking at a list of *multiple*
-Pokémon compared against each other.
+This supersedes an earlier version of this convention that kept plain
+`<select>` dropdowns alphabetical for findability — the dashboard has no
+alphabetical Pokémon lists anywhere now; the ranked order is treated as
+more useful than alphabetical scanning even in a dropdown. Non-Pokémon
+selects (tournament tier) are unaffected and keep `distinctSorted()`'s
+natural/alphabetical order, since there's no usage-relevance ranking that
+applies to a tier name.
 
-### Percentage usage
+### Percentages, not raw counts
 
-Raw usage counts are supplemented with **usage share** —
-`pokemon_usage_summary.usage_share`, a Pokémon's fraction of total roster
-appearances within its `event_tier` partition (overall or a specific
-tier) — computed in dbt (`sum(usage_count) over (partition by
-event_tier)`), not client-side, so overall and per-tier shares stay
-consistent with each other. Displayed as a percentage (`formatPercent()`
-in `app.js`) next to the raw count wherever usage is shown: the "Most
-Used" KPI card, the Usage leaders table, and Team Builder's roster picker
-sub-text.
+The dashboard shows **percentages/shares, not raw counts**, wherever a
+share metric exists (dashboard "focus on percentages" ask):
+`pokemon_usage_summary.usage_share`, `pokemon_build_usage.build_share`,
+`pokemon_move_usage.move_share`, `pokemon_team_core_usage.partner_share`,
+`archetype_summary.combined_usage_share`/`avg_win_rate` — all computed in
+dbt (a `sum(x) over (partition by ...)` window function per mart), not
+client-side, so shares stay internally consistent. Raw `usage_count`,
+`total_wins`/`total_losses`, and `co_occurrence_count` are no longer
+displayed anywhere in the UI (they still exist in the underlying CSVs for
+ranking/testing purposes).
+
+The one deliberate exception is **win rate's sample size**: hiding
+`record_count` entirely risked a 100% win rate on a single recorded match
+reading as more authoritative than a well-established Pokémon's 51% on
+thousands of matches, so the Win rate leaders table and its `record_count`
+filter (see below) keep a small `(n=X)` annotation next to the percentage
+— a minimum-record-count filter, not a raw-count column. Base stats
+(Speed, HP, Attack, etc. on the Pokémon Profile tab) aren't percentages
+and are unaffected by this convention — they're numbers with no
+"share of a whole" meaning to convert to.
+
+### Filters beyond Pokémon/tier
+
+Beyond the pre-existing tournament-tier filter (Usage tab), two more
+filters were added: a **minimum recorded matches** threshold (Win rate
+leaders table, `#win-rate-min-record-count-filter`, options 5/10/20/50 —
+the same `RECORD_COUNT_FLOOR` idea `compute_kpis()`'s KPI card already
+used, now user-adjustable) and the archetype/regulation dimensions
+exposed as their own tabs (Archetype Explorer, Regulation Comparison)
+rather than as `<select>` filters on existing tabs, since neither
+dimension applies to the marts those existing tabs are built from.
 
 ## Team Builder
 
@@ -279,6 +381,12 @@ never sent to a server or embedded in the published HTML; this stays true
 to the dashboard's "static site, no backend" architecture
 (`docs/dashboard.md`'s "Stack decision").
 
+Below the roster planner, the same tab also hosts the **Pro Team
+Gallery** (see "Gallery card" above and `docs/dashboard.md`'s "Pro Team
+Gallery" section) — a read-only reference feature, unrelated to and
+visually distinct from the roster planner, never itself called "Team
+Builder."
+
 ## Responsive behavior
 
 Breakpoints match `docs/dashboard.md`'s existing convention: 720px (KPI
@@ -291,8 +399,8 @@ tables and the Speed Tiers table.
 
 ## Backlog: not yet buildable
 
-Two explicitly-requested capabilities aren't in this pass because the
-underlying data doesn't exist in this dataset yet — adding them as a
+One explicitly-requested capability still isn't in this pass because the
+underlying data doesn't exist in this dataset yet — adding it as a
 frontend-only feature would mean fabricating data, which this repo's
 "provenance is mandatory" convention (`CLAUDE.md`) rules out:
 
@@ -307,12 +415,15 @@ frontend-only feature would mean fabricating data, which this repo's
   pass) or a battle-log source neither currently in scope nor deferred
   source (Limitless VGC, Victory Road) is confirmed to provide. Tracked in
   `docs/todo.md`'s M6 backlog.
-- **Sortable table columns.** Already tracked in `docs/todo.md`'s existing
-  M6 backlog entry; the new Usage leaders and Speed Tiers tables inherit
-  the same fixed-sort limitation as the pre-existing tables and should get
-  sortable headers in the same follow-up pass, not a bespoke one-off.
+- **Date-range filtering / trend charts.** Only one `snapshot_date` exists
+  in the data so far, so a date-range control would have nothing to range
+  over — see `docs/dashboard.md`'s "Removed sections" for the same
+  degenerate-data reasoning applied to the earlier legal-pool-trend
+  section. Tracked in `docs/todo.md`.
 
-See `docs/todo.md`'s M6 backlog section for the full, current list
-(regulation/date filters, the Streamlit dynamic-dashboard idea, etc.) —
-this document only calls out the two items directly relevant to this
-pass's design-system/Pokémon-representation scope.
+Sortable table columns (previously listed here as backlog) are now
+shipped — see "Leaderboard table" above.
+
+See `docs/todo.md`'s M6 backlog section for the full, current list — this
+document only calls out the items directly relevant to this pass's
+design-system/Pokémon-representation scope.

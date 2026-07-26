@@ -11,20 +11,22 @@ Repo layout (see the repo's README "Data Files" section):
   stats/tournaments/tournaments_index.json      one entry per scraped tournament
   stats/tournaments/{tournament_id}/metadata.json   event name/date/location/type
   stats/tournaments/{tournament_id}/players.json    list of {name, country,
-      placement, team: [{pokemon, item, ability, tera_type, moves}, ...],
+      placement, team: [{pokemon, item, ability, tera_type, nature, moves}, ...],
       day_reached, team_link, record}
 
 MunchStats doesn't expose an opaque per-player ID or a separately reported
 form label (forms like "Urshifu-Rapid-Strike" are embedded in `pokemon`
 name) — both are known risks called out in the schema contract. `player_id`
 is derived from a hash of the player's name and country; `form_name` is
-left blank pending normalization.
+left blank pending normalization. `player_name` and `player_country` (a
+two-letter code, e.g. "IT", "ES") are captured as their own columns
+alongside `player_id` — real, sourced fields, not fabricated.
 
 `metadata.json`'s `type` (tournament tier, e.g. "International"/"Regional"),
 `players.json`'s `record` (win/loss count), and team-member `item`/
-`ability`/`tera_type`/`moves` are captured too, duplicated onto every
-roster-slot row like `placement` already is; `moves` is a pipe-delimited
-string since a roster slot can carry more than one.
+`ability`/`tera_type`/`nature`/`moves` are captured too, duplicated onto
+every roster-slot row like `placement` already is; `moves` is a
+pipe-delimited string since a roster slot can carry more than one.
 """
 
 from __future__ import annotations
@@ -49,6 +51,8 @@ FIELDNAMES = [
     "event_tier",
     "team_id",
     "player_id",
+    "player_name",
+    "player_country",
     "placement",
     "record_wins",
     "record_losses",
@@ -58,6 +62,7 @@ FIELDNAMES = [
     "item_name",
     "ability",
     "tera_type",
+    "nature",
     "moves",
     "source_name",
     "source_url",
@@ -114,6 +119,8 @@ def _rows_for_tournament(
                     "event_tier": metadata.get("type", ""),
                     "team_id": team_id,
                     "player_id": player_id,
+                    "player_name": player.get("name", ""),
+                    "player_country": player.get("country", ""),
                     "placement": player["placement"],
                     "record_wins": record.get("wins", ""),
                     "record_losses": record.get("losses", ""),
@@ -123,6 +130,7 @@ def _rows_for_tournament(
                     "item_name": member.get("item", ""),
                     "ability": member.get("ability", ""),
                     "tera_type": member.get("tera_type", ""),
+                    "nature": member.get("nature", ""),
                     "moves": "|".join(member.get("moves", [])),
                     "source_name": SOURCE_NAME,
                     "source_url": players_url,

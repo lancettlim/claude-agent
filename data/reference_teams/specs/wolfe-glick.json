@@ -1,0 +1,48 @@
+{
+  "team_name": "Wolfe Glick",
+  "country": "US",
+  "slots": [
+    {
+      "pokemon_name": "Charizard",
+      "form_name": "charizard",
+      "ability": "Blaze",
+      "nature": "Timid",
+      "moves": ["Protect", "Heat Wave", "Solar Beam", "Weather Ball"]
+    },
+    {
+      "pokemon_name": "Hydreigon",
+      "form_name": "hydreigon",
+      "ability": "Levitate",
+      "nature": "Modest",
+      "moves": ["Dark Pulse", "Earth Power", "Snarl", "Draco Meteor"]
+    },
+    {
+      "pokemon_name": "Incineroar",
+      "form_name": "incineroar",
+      "ability": "Intimidate",
+      "nature": "Impish",
+      "moves": ["Fake Out", "Parting Shot", "Flare Blitz", "Throat Chop"]
+    },
+    {
+      "pokemon_name": "Mamoswine",
+      "form_name": "mamoswine",
+      "ability": "Oblivious",
+      "nature": "Adamant",
+      "moves": ["Protect", "Icicle Crash", "Earthquake", "Ice Shard"]
+    },
+    {
+      "pokemon_name": "Sneasler",
+      "form_name": "sneasler",
+      "ability": "Unburden",
+      "nature": "Jolly",
+      "moves": ["Protect", "Close Combat", "Fake Out", "Dire Claw"]
+    },
+    {
+      "pokemon_name": "Toxapex",
+      "form_name": "toxapex",
+      "ability": "Regenerator",
+      "nature": "Bold",
+      "moves": ["Baneful Bunker", "Infestation", "Toxic", "Wide Guard"]
+    }
+  ]
+}

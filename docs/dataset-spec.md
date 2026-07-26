@@ -114,11 +114,13 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **Purpose**: team-level tournament metadata
   - **Primary key**: `team_id`
   - **Join keys**: `event_id`, `player_id`, `team_id`
-  - **Required fields**: `team_id`, `event_id`, `player_id`, `placement`,
-    `source_name`, `source_url`, `source_record_id`, `extracted_at_utc`,
-    `dataset_version`
-  - **Optional fields**: `record_wins`, `record_losses` (win-rate proxy —
-    nullable since MunchStats doesn't report a record for every player)
+  - **Required fields**: `team_id`, `event_id`, `player_id`, `player_name`,
+    `placement`, `source_name`, `source_url`, `source_record_id`,
+    `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `player_country` (two-letter code, e.g. "IT" —
+    nullable since MunchStats doesn't report it for every player),
+    `record_wins`, `record_losses` (win-rate proxy — nullable since
+    MunchStats doesn't report a record for every player)
 - `tournament_team_member`
   - **Purpose**: one row per Pokémon on a normalized tournament team
   - **Primary key**: `team_member_id`
@@ -126,9 +128,9 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **Required fields**: `team_member_id`, `team_id`, `event_id`, `pokemon_key`,
     `pokemon_id`, `slot_number`, `source_name`, `source_url`,
     `source_record_id`, `extracted_at_utc`, `dataset_version`
-  - **Optional fields**: `item_name`, `ability`, `tera_type`, `moves`
-    (pipe-delimited) — nullable since MunchStats doesn't report a full
-    build for every roster slot
+  - **Optional fields**: `item_name`, `ability`, `tera_type`, `nature`,
+    `moves` (pipe-delimited) — nullable since MunchStats doesn't report a
+    full build for every roster slot
 - `pokemon_asset`
   - **Purpose**: sprite/menu-icon image manifest for Pokémon/form
     references, sourced from Bulbagarden Archives

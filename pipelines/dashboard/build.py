@@ -16,6 +16,12 @@ sprites and type icons are purely local file copies (offline); item icons
 are the one part of a dashboard build that needs network access, since
 item names are data-dependent and not practical to bundle in advance — see
 the fetch_icons parameter below.
+
+The Team Builder tab's Pro Team Gallery (curated real tournament teams
+rendered as broadcast-style cards) is likewise a local file copy, not a
+network fetch or a Playwright render at build time — see
+_load_reference_teams and docs/dashboard.md's "Pro Team Gallery" section
+for how those card PNGs are produced ahead of time.
 """
 
 from __future__ import annotations
@@ -38,6 +44,7 @@ STATIC_ICONS_DIR = STATIC_DIR / "icons"
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "docs" / "dashboard"
 DEFAULT_ITEM_ICON_CACHE_DIR = REPO_ROOT / "data" / "assets" / "dashboard_icons"
+DEFAULT_REFERENCE_TEAMS_DIR = REPO_ROOT / "data" / "reference_teams"
 
 
 def _make_environment() -> Environment:
@@ -132,6 +139,39 @@ def _resolve_item_icons(
     return resolved
 
 
+def _load_reference_teams(output_dir: Path, reference_teams_dir: Path) -> list[dict[str, Any]]:
+    """Pro Team Gallery feed (Team Builder tab): reads curated real-team
+    metadata from reference_teams_dir/reference_teams.json and copies each
+    entry's pre-rendered card PNG (reference_teams_dir/cards/<file>) into
+    output_dir/images/reference_teams/. Cards are pre-rendered ahead of
+    time via `render-card` (see docs/dashboard.md's "Pro Team Gallery"
+    section) -- this function only copies already-built PNGs, so a
+    dashboard build never needs Playwright/Chromium itself. Degrades to []
+    (not an error) if the directory or metadata file doesn't exist yet,
+    matching every other mart/asset's missing-input behavior."""
+    metadata_path = reference_teams_dir / "reference_teams.json"
+    if not metadata_path.exists():
+        return []
+
+    entries = json.loads(metadata_path.read_text(encoding="utf-8"))
+    dest_dir = output_dir / "images" / "reference_teams"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    resolved: list[dict[str, Any]] = []
+    for entry in entries:
+        entry = dict(entry)
+        card_image = entry.get("card_image")
+        if card_image:
+            source_path = reference_teams_dir / "cards" / card_image
+            if source_path.exists():
+                shutil.copyfile(source_path, dest_dir / source_path.name)
+                entry["card_image"] = f"images/reference_teams/{source_path.name}"
+            else:
+                entry["card_image"] = None
+        resolved.append(entry)
+    return resolved
+
+
 def build(
     *,
     marts_dir: Path = data.DEFAULT_MARTS_DIR,
@@ -139,6 +179,7 @@ def build(
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     asset_cache_dir: Path = sprites.DEFAULT_ASSET_CACHE_DIR,
     item_icon_cache_dir: Path = DEFAULT_ITEM_ICON_CACHE_DIR,
+    reference_teams_dir: Path = DEFAULT_REFERENCE_TEAMS_DIR,
     fetch_icons: bool = True,
 ) -> dict[str, Any]:
     """Renders templates/index.html.jinja with the marts payload baked in,
@@ -166,6 +207,7 @@ def build(
         icon_cache_dir=item_icon_cache_dir,
         fetch_icons=fetch_icons,
     )
+    payload["reference_teams"] = _load_reference_teams(output_dir, reference_teams_dir)
 
     env = _make_environment()
     template = env.get_template("index.html.jinja")

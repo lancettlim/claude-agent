@@ -1,0 +1,19 @@
+[
+  {
+    "team_id": "wolfe-glick",
+    "player_name": "Wolfe Glick",
+    "country": "US",
+    "event_name": "VGC broadcast team reference",
+    "placement": null,
+    "archetype_key": null,
+    "pokemon_keys": [
+      "charizard",
+      "hydreigon",
+      "incineroar",
+      "mamoswine",
+      "sneasler",
+      "toxapex"
+    ],
+    "card_image": "wolfe-glick.png"
+  }
+]

@@ -127,6 +127,37 @@ seeds:
       - name: move_type
         description: Move's type, lowercase (e.g. "ice").
 
+  - name: archetype_pokemon_map
+    description: >
+      Competitive-archetype membership map for the dashboard's Archetype
+      Explorer tab (docs/todo.md M6 backlog). Unlike every other seed in
+      this file, this is NOT derived from any extractor or external
+      source -- it's editorial curation by this dashboard's maintainers,
+      naming known competitive strategies/team-compositions (e.g. "Rain",
+      "Trick Room", "Sun") and listing the Pokémon commonly associated with
+      each, an explicit and deliberate exception to this repo's
+      "provenance is mandatory" convention (CLAUDE.md), justified because
+      no in-scope source publishes team-composition/archetype labels at
+      all (dbt/models/marts/schema.yml's filter-dimension coverage block).
+      The dashboard must present archetype data as curated judgment, not
+      as an extracted signal.
+
+      Many-to-many by design: a Pokémon may belong to more than one
+      archetype (e.g. Landorus-Therian anchors both Sand and Bulky
+      Balance), reflecting real team-building flexibility. Maintained by
+      hand -- to add, remove, or retire an archetype as the meta shifts,
+      edit this CSV directly; no other pipeline step regenerates it. One
+      row per (archetype_key, pokemon_key) pair; duplicate pairs are a
+      seed-authoring error, not intentional, and are caught by
+      dbt/tests/singular/assert_duplicate_key_archetype_pokemon_map.sql.
+    columns:
+      - name: archetype_key
+        description: Archetype slug (e.g. "trick-room"), stable identifier.
+      - name: archetype_name
+        description: Archetype display name (e.g. "Trick Room").
+      - name: pokemon_key
+        description: A member Pokémon's pokemon_key, must resolve to pokemon.
+
   - name: pokebase_slug_to_pokeapi_form
     description: >
       Controlled name/form mapping from every distinct `form_name` (slug)
