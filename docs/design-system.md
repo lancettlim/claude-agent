@@ -189,18 +189,18 @@ Sprites come from Bulbagarden Archives via `pokemon_asset.csv`
 (`docs/dashboard.md`'s "Icon sources"); a Pokémon with no resolvable sprite
 degrades to text-only, never a broken image.
 
-### Pokémon name formatting: camelCase
+### Pokémon name formatting: PascalCase
 
-Display names are **camelCase**, derived from `pokemon_key` (PokéAPI's own
+Display names are **PascalCase**, derived from `pokemon_key` (PokéAPI's own
 form slug, e.g. `landorus-therian`, `charizard-mega-x`) via
-`pipelines/dashboard/data.py`'s `to_camel_case()`:
+`pipelines/dashboard/data.py`'s `to_pascal_case()`:
 
 ```
-landorus-therian    -> landorusTherian
-charizard-mega-x    -> charizardMegaX
-great-tusk           -> greatTusk
-urshifu-rapid-strike -> urshifuRapidStrike
-porygon-z            -> porygonZ
+landorus-therian    -> LandorusTherian
+charizard-mega-x    -> CharizardMegaX
+great-tusk           -> GreatTusk
+urshifu-rapid-strike -> UrshifuRapidStrike
+porygon-z            -> PorygonZ
 ```
 
 This is computed once, server-side, when the dashboard payload is built
@@ -218,12 +218,13 @@ Two things worth calling out about this choice:
   any per-Pokémon list, table, or filter. Deriving from the form slug
   instead is what actually makes every legal Pokémon/form uniquely
   and correctly named.
-- camelCase (not Title Case with spaces, e.g. "Landorus Therian") is a
+- PascalCase (not Title Case with spaces, e.g. "Landorus Therian") is a
   deliberate, explicit convention for this dashboard, not an
   accident of using the raw slug. It keeps names compact in dense table
   cells and select options and gives every name a single unambiguous
   rendering with no hyphen/space/case inconsistency to normalize per
-  view.
+  view — while still reading as a proper noun (capitalized first letter),
+  unlike a strict camelCase rendering would.
 
 ### Ordering convention
 

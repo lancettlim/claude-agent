@@ -53,10 +53,10 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 }
 
 
-def to_camel_case(slug: str) -> str:
+def to_pascal_case(slug: str) -> str:
     """Converts a hyphen-delimited PokéAPI form slug (e.g.
-    "landorus-therian", "charizard-mega-x") into a camelCase display name
-    ("landorusTherian", "charizardMegaX") per the dashboard design system's
+    "landorus-therian", "charizard-mega-x") into a PascalCase display name
+    ("LandorusTherian", "CharizardMegaX") per the dashboard design system's
     Pokémon-naming convention (docs/design-system.md). Applied to
     pokemon_key/form_name rather than the raw species-only pokemon_name
     column, since form_name is what's actually unique per row — using the
@@ -65,7 +65,7 @@ def to_camel_case(slug: str) -> str:
     parts = [part for part in slug.split("-") if part]
     if not parts:
         return slug
-    return parts[0].lower() + "".join(part.capitalize() for part in parts[1:])
+    return "".join(part.capitalize() for part in parts)
 
 
 def _read_csv_rows(path: Path) -> list[dict[str, str]]:
@@ -96,13 +96,13 @@ def load_mart(marts_dir: Path, mart_name: str) -> list[dict[str, Any]]:
 
 
 def load_pokemon_names(normalized_dir: Path = DEFAULT_NORMALIZED_DIR) -> dict[str, str]:
-    """pokemon_key -> camelCase display name, for friendlier labels than
+    """pokemon_key -> PascalCase display name, for friendlier labels than
     raw keys. Derived from pokemon_key itself (== form_name) via
-    to_camel_case rather than the CSV's own pokemon_name column, which is
+    to_pascal_case rather than the CSV's own pokemon_name column, which is
     species-only and collides across a species' multiple forms. Returns {}
     gracefully if data/normalized/pokemon.csv isn't present."""
     return {
-        row["pokemon_key"]: to_camel_case(row["pokemon_key"])
+        row["pokemon_key"]: to_pascal_case(row["pokemon_key"])
         for row in _read_csv_rows(normalized_dir / "pokemon.csv")
     }
 

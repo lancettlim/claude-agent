@@ -41,11 +41,11 @@ def test_load_mart_coerces_numeric_fields(tmp_path):
     ]
 
 
-def test_to_camel_case():
-    assert data.to_camel_case("pikachu") == "pikachu"
-    assert data.to_camel_case("landorus-therian") == "landorusTherian"
-    assert data.to_camel_case("charizard-mega-x") == "charizardMegaX"
-    assert data.to_camel_case("porygon-z") == "porygonZ"
+def test_to_pascal_case():
+    assert data.to_pascal_case("pikachu") == "Pikachu"
+    assert data.to_pascal_case("landorus-therian") == "LandorusTherian"
+    assert data.to_pascal_case("charizard-mega-x") == "CharizardMegaX"
+    assert data.to_pascal_case("porygon-z") == "PorygonZ"
 
 
 def test_load_pokemon_names_returns_empty_dict_when_file_missing(tmp_path):
@@ -65,8 +65,8 @@ def test_load_pokemon_names(tmp_path):
         ],
     )
     assert data.load_pokemon_names(tmp_path) == {
-        "pikachu": "pikachu",
-        "landorus-therian": "landorusTherian",
+        "pikachu": "Pikachu",
+        "landorus-therian": "LandorusTherian",
     }
 
 
@@ -92,11 +92,11 @@ def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
             "usage_count": 100,
             "usage_rank": 1,
             "usage_share": None,
-            "pokemon_name": "pikachu",
+            "pokemon_name": "Pikachu",
         }
     ]
     assert payload["kpis"]["distinct_pokemon_used"] == 1
-    assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "pikachu"
+    assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "Pikachu"
     assert "generated_at_utc" in payload
 
 
@@ -208,7 +208,7 @@ def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
             "partner_pokemon_key": "raichu",
             "co_occurrence_count": 3,
             "usage_rank": 1,
-            "pokemon_name": "pikachu",
-            "partner_pokemon_name": "raichu",
+            "pokemon_name": "Pikachu",
+            "partner_pokemon_name": "Raichu",
         }
     ]
