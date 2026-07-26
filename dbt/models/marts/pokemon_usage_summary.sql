@@ -8,6 +8,12 @@
 -- (event_tier is null) plus one row per tournament tier it appears in,
 -- each ranked within its own event_tier partition — so the overall
 -- ranking is unaffected by adding the per-tier breakdown.
+--
+-- usage_share is usage_count's fraction of total roster appearances within
+-- the same event_tier partition (dashboard "include percentage usage"
+-- ask): a Pokémon's share of the meta, not just a raw count, so the
+-- Usage tab can rank and label leaders by percentage the same way
+-- pokemon_win_rate_summary already does for win_rate.
 with overall as (
   select
     member.pokemon_key,
@@ -37,6 +43,10 @@ select
   pokemon_key,
   event_tier,
   usage_count,
+  round(
+    usage_count::double / sum(usage_count) over (partition by event_tier),
+    4
+  ) as usage_share,
   row_number() over (partition by event_tier order by usage_count desc) as usage_rank
 from (
   select * from overall

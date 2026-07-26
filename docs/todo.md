@@ -195,10 +195,40 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   Pokémon, team core, move, and item usage") but never built until now.
   The stat-change leaderboard and legal-pool-trend sections stay removed
   (still genuinely data-starved, see above) and were not part of this pass.
+- [x] Write a UX design system for the dashboard
+  (`docs/design-system.md`: design tokens, component catalog, Pokémon-
+  representation and naming conventions, ordering conventions) and apply
+  it: camelCase Pokémon display names derived from `pokemon_key`/
+  `form_name` instead of the species-only `pokemon_name` column (fixes a
+  real bug where alternate forms of one species, e.g. Landorus-Incarnate
+  vs. Landorus-Therian, displayed identically —
+  `pipelines/dashboard/data.py`'s `to_camel_case()`); usage-percentage
+  (`pokemon_usage_summary.usage_share`) surfaced on the "Most Used" KPI
+  card and a new Usage leaders table; explicit descending order-by-usage/
+  order-by-win-rate on every Pokémon leaderboard/picker (see
+  `docs/design-system.md`'s "Ordering convention"); a new **Speed Tiers**
+  tab (bar chart + full table, bucketed into Blazing/Fast/Average/Slow
+  badges) built on a new `pokemon_champions_profile` mart (one row per
+  legal Pokémon: Champions-format base stats + usage/win-rate); and a new
+  **Team Builder** tab (fully client-side, `localStorage`-persisted,
+  no backend) for assembling a roster of up to 6 from the legal pool,
+  sortable by usage/win-rate/speed, with a speed-order readout reusing
+  the Speed Tiers badge scale. Rank badges added to the Usage and Win-rate
+  leaders tables for a consistent leaderboard pattern across tabs.
+- [ ] Backlog: type-effectiveness / head-to-head matchups. Not buildable
+  today: no in-scope source publishes Pokémon types, and MunchStats
+  reports team-level win/loss records, not individual battle outcomes
+  against a named opponent, so there's no real signal for "what beats
+  Pokémon X." Closing the type half is plausible in a future pass via
+  PokéAPI's own `/type` endpoints (already an in-scope source, just an
+  unfetched endpoint); the battle-log half would need a new source not
+  currently in scope or deferred (see `docs/design-system.md`'s
+  "Backlog: not yet buildable").
 - [ ] Backlog: further dashboard capability items not covered by the above
   redesign: regulation-code filter on the KPI row and usage/win-rate views,
   a tournament-event/date filter once multiple snapshots exist, sortable
-  table columns (currently fixed-sort), and a loading/empty state for the
+  table columns (currently fixed-sort — now also applies to the new Usage
+  leaders and Speed Tiers tables), and a loading/empty state for the
   build/move/team-core drill-downs before a Pokémon is picked instead of
   defaulting to the first alphabetically
 - [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of

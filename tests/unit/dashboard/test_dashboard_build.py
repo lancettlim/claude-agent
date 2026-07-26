@@ -101,7 +101,7 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     embedded = _embedded_payload(html)
     assert embedded["kpis"]["distinct_pokemon_used"] == payload["kpis"]["distinct_pokemon_used"]
-    assert "Pikachu" in html
+    assert "pikachu" in html
 
 
 def test_build_omits_removed_stat_change_and_trend_sections(tmp_path):
@@ -119,7 +119,7 @@ def test_build_omits_removed_stat_change_and_trend_sections(tmp_path):
     assert 'id="legality-chart"' not in html
 
 
-def test_build_has_tab_markup_for_all_five_tabs(tmp_path):
+def test_build_has_tab_markup_for_all_tabs(tmp_path):
     marts_dir = tmp_path / "marts"
     normalized_dir = tmp_path / "normalized"
     output_dir = tmp_path / "out"
@@ -128,7 +128,15 @@ def test_build_has_tab_markup_for_all_five_tabs(tmp_path):
     _build(marts_dir, normalized_dir, output_dir)
     html = (output_dir / "index.html").read_text(encoding="utf-8")
 
-    for tab in ("overview", "usage", "builds", "moves", "team-cores"):
+    for tab in (
+        "overview",
+        "usage",
+        "builds",
+        "moves",
+        "team-cores",
+        "speed-tiers",
+        "team-builder",
+    ):
         assert f'data-tab="{tab}"' in html
         assert f'data-panel="{tab}"' in html
 

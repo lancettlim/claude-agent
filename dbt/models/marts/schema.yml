@@ -46,6 +46,13 @@ models:
       pair appears twice (once per anchor direction) so either Pokémon
       in the pair can be the drill-down's selected anchor. Written to
       data/marts/pokemon_team_core_usage.csv.
+  - name: pokemon_champions_profile
+    description: >
+      Denormalized per-Pokémon profile for the Speed Tiers and Team
+      Builder dashboard views: one row per currently legal Pokémon with
+      its Champions-format base stats (including speed) plus nullable
+      overall usage_count/usage_share/win_rate/record_count. Written to
+      data/marts/pokemon_champions_profile.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
@@ -63,6 +70,17 @@ models:
 #     pokemon_move_usage (moves)
 #   - team-core drill-down: pokemon_team_core_usage, self-joining
 #     tournament_team_member on team_id
+#   - usage as a percentage of the meta: pokemon_usage_summary.usage_share
+#   - speed tiers / team builder: pokemon_champions_profile, one row per
+#     legal Pokémon with Champions-format speed plus usage/win-rate
+#
+# Still a real gap (see docs/todo.md's backlog): type-effectiveness /
+# head-to-head matchup data. No in-scope source publishes Pokémon types or
+# battle-level opponent results (MunchStats reports team rosters and a
+# team's overall win/loss record, not individual battle outcomes against a
+# named opponent), so a genuine "matchups" view isn't buildable from real
+# data today without a new source or a hardcoded, unsourced type chart —
+# which would violate this repo's "provenance is mandatory" convention.
 #
 # All fields these depend on (event_tier, record_wins/record_losses,
 # item_name/ability/tera_type/moves) are optional in the source data — see
