@@ -201,7 +201,16 @@
   // functions). spriteSources/tooltipInfoFn are both optional.
   function drawBarChart(canvasId, config) {
     var canvas = document.getElementById(canvasId);
-    if (!canvas || typeof Chart === "undefined") return null;
+    if (!canvas) return null;
+    var wrap = canvas.parentNode;
+    if (typeof Chart === "undefined") {
+      // Chart.js didn't load (e.g. the CDN is unreachable). Collapse the
+      // reserved chart area instead of leaving a blank box the height of a
+      // chart — the table below still has the full data.
+      if (wrap) wrap.style.display = "none";
+      return null;
+    }
+    if (wrap) wrap.style.display = "";
     var options = {
       responsive: true,
       maintainAspectRatio: false,
@@ -375,6 +384,18 @@
             };
           },
         });
+
+        var tbody = document.querySelector("#move-table tbody");
+        if (tbody) {
+          renderRows(tbody, filtered, function (r) {
+            var typeSrc = typeIcons[moveTypes[r.move_name]];
+            var icon = typeSrc ? '<img class="cell-icon" src="' + typeSrc + '" alt="">' : "";
+            return (
+              '<td><div class="cell-with-icon">' + icon + "<span>" + escapeHtml(r.move_name) + "</span></div></td>" +
+              "<td>" + r.usage_count + "</td>"
+            );
+          });
+        }
       },
     });
   }
