@@ -129,22 +129,40 @@ seeds:
 
   - name: archetype_pokemon_map
     description: >
-      Competitive-archetype membership map for the dashboard's Archetype
-      Explorer tab (docs/todo.md M6 backlog). Unlike every other seed in
-      this file, this is NOT derived from any extractor or external
-      source -- it's editorial curation by this dashboard's maintainers,
-      naming known competitive strategies/team-compositions (e.g. "Rain",
-      "Trick Room", "Sun") and listing the Pokémon commonly associated with
-      each, an explicit and deliberate exception to this repo's
-      "provenance is mandatory" convention (CLAUDE.md), justified because
-      no in-scope source publishes team-composition/archetype labels at
-      all (dbt/models/marts/schema.yml's filter-dimension coverage block).
-      The dashboard must present archetype data as curated judgment, not
-      as an extracted signal.
+      Competitive-archetype membership map (docs/todo.md M6 backlog).
+      Originally built for the dashboard's Archetype Explorer tab, which
+      was removed in a later competitive-UX redesign pass (see
+      docs/design-system.md's "Removed tabs and components") -- this seed
+      is kept, unused by the dashboard for now, in case a future pass
+      wants to reintroduce archetype context elsewhere (e.g. a Team
+      Builder tag). Unlike every other seed in this file, this is NOT
+      derived from any extractor or external source -- it's editorial
+      curation by this dashboard's maintainers, naming known competitive
+      strategies/team-compositions (e.g. "Rain", "Trick Room", "Sun") and
+      listing the Pokémon commonly associated with each, an explicit and
+      deliberate exception to this repo's "provenance is mandatory"
+      convention (CLAUDE.md), justified because no in-scope source
+      publishes team-composition/archetype labels at all
+      (dbt/models/marts/schema.yml's filter-dimension coverage block). The
+      dashboard must present archetype data as curated judgment, not as an
+      extracted signal.
+
+      **Every member must actually appear in this dataset's Champions
+      pool** -- i.e. resolve to a row in
+      `releases/data/<version>/pokemon_stat_champions.csv`, not just be a
+      real Pokémon in general. A 2026-07 audit found 17 of ~28 rows named
+      Pokémon (e.g. Flutter Mane, Iron Hands, Chien-Pao) that were never
+      captured by this project's OP.GG extraction at all -- not banned,
+      simply never in scope -- apparently authored from general
+      real-world VGC knowledge rather than this project's actual roster;
+      those rows were removed rather than replaced with guessed
+      substitutes, since inventing membership would itself violate the
+      provenance exception's spirit (curated judgment about real
+      candidates, not fabricated ones). Check any new entry against a
+      current `pokemon_stat_champions.csv` before adding it.
 
       Many-to-many by design: a Pokémon may belong to more than one
-      archetype (e.g. Landorus-Therian anchors both Sand and Bulky
-      Balance), reflecting real team-building flexibility. Maintained by
+      archetype, reflecting real team-building flexibility. Maintained by
       hand -- to add, remove, or retire an archetype as the meta shifts,
       edit this CSV directly; no other pipeline step regenerates it. One
       row per (archetype_key, pokemon_key) pair; duplicate pairs are a
