@@ -304,6 +304,36 @@ not yet committed to.
   real Champions rebalance) to justify the added hosting complexity beyond
   today's free static GitHub Pages site — not part of this pass's scope
 
+## Foundational enablers (backlog Section 0)
+
+The five items below are mirrored in `docs/backlog.md`'s "Section 0 — Foundational
+enablers" (items #1-#5); restating them here per `.claude/loop.md`'s backlog-grooming
+loop. Item #1 is the highest-leverage: it unblocks eight other backlog entries.
+
+- [ ] Backlog: Append-only staging snapshot history — rewrite all five
+  `pipelines/extract/*.py` modules (currently `open(..., "w")`, overwriting each run)
+  to write date-partitioned snapshots (e.g. `data/staging/<source>/<date>.csv`);
+  update `dbt/models/staging/_sources.yml` to read the partition set; decide a
+  retention policy and format (CSV vs. Parquet) given `munchstats.csv` alone is
+  ~37MB (`docs/backlog.md` #1)
+- [ ] Backlog: Snapshot-aware dbt layer — make `snapshot_date` a groupable
+  dimension across `dbt/models/staging/`, `intermediate/`, and `normalized/`;
+  decide whether normalized entities become snapshot-scoped or a parallel history
+  layer sits alongside them (`legality_snapshot` is the model to follow); blocked
+  by the item above (`docs/backlog.md` #2)
+- [ ] Backlog: Scheduled refresh automation — add a `.github/workflows/` job plus
+  `pipelines/cli.py` support to run extraction on the cadences
+  `docs/dataset-spec.md` already specifies per source, leaving Bulbagarden
+  on-demand per its rate-limit caveat (`docs/backlog.md` #3)
+- [ ] Backlog: Plumb `dataset_version` through extraction — pass a real
+  `dataset_version` from `pipelines/cli.py:36-39` into each extractor instead of
+  the `"0.0.0-dev"` default, and fix `pipelines/validate/report.py:237`'s
+  hardcoded `"0.1.0"` default so the validation report reflects the actual
+  published version (`docs/backlog.md` #4)
+- [ ] Backlog: Orchestration entry point — add an `extract all` command and chain
+  extract → dbt build → validate → release in `pipelines/cli.py`/`Makefile`,
+  matching the existing `make dashboard` chaining pattern (`docs/backlog.md` #5)
+
 ## Release readiness (v1 definition of done)
 
 All release gates pass as of this writing (see
