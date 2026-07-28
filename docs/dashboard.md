@@ -294,19 +294,30 @@ python -m http.server --directory docs/dashboard
 Unlike other pipeline output in this repo (`data/normalized/`,
 `data/marts/`, `data/staging/` are all gitignored regenerated build
 output), **`docs/dashboard/index.html`, `docs/dashboard/app.js`, and
-`docs/dashboard/images/` are committed to git.** There is no CI/Actions
-workflow that rebuilds the dashboard — GitHub Pages serves exactly what's
-checked in, so after running `make dashboard`, `git add`/commit the
-regenerated files (including `images/`) for the live site to update.
+`docs/dashboard/images/` are committed to git.** There is still no CI/
+Actions workflow that *rebuilds* the dashboard (that would require live
+network access to all five extractors' upstream sources, which isn't
+something CI should do unsupervised) — after running `make dashboard`,
+`git add`/commit the regenerated files (including `images/`) as before.
 
-`docs/.nojekyll` is committed alongside them so GitHub Pages serves the
-`/docs` folder as plain static files, without Jekyll trying to process the
-generated HTML or the repo's other `docs/*.md` narrative files.
+What *is* automated (`.github/workflows/deploy-dashboard.yml`) is
+*publishing* what's committed: a push to `main` touching anything under
+`docs/` triggers a GitHub Actions job that uploads the `docs/` folder as a
+Pages artifact and deploys it via `actions/deploy-pages`, rather than
+relying on GitHub Pages' own branch-polling deployment (which is what
+caused stale/inconsistently-refreshed live-site content before this
+workflow existed). It can also be run manually via the Actions tab
+(`workflow_dispatch`).
 
-**Enabling GitHub Pages itself is a manual step that can't be done via
-git**: in the repo's GitHub Settings → Pages, set the source to "Deploy
-from a branch", branch `main` (or whichever branch is the default), folder
-`/docs`. Once enabled, the dashboard is reachable at
+`docs/.nojekyll` is committed alongside the dashboard files so the
+published site serves plain static files, without Jekyll trying to process
+the generated HTML or the repo's other `docs/*.md` narrative files.
+
+**Pointing GitHub Pages at Actions-based deployment is a manual step that
+can't be done via git**: in the repo's GitHub Settings → Pages, set the
+source to "GitHub Actions" (not "Deploy from a branch" — that's the older
+mode this workflow replaces). Once set, every push to `main` that touches
+`docs/` redeploys via the workflow above, and the dashboard is reachable at
 `https://<owner>.github.io/<repo>/dashboard/` — for this repo, that's
 https://lancettlim.github.io/claude-agent/dashboard/.
 
