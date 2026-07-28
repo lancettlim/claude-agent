@@ -28,6 +28,8 @@ See `docs/` for the full document set:
   decision, and how to build/view/publish it
 - `docs/todo.md` — outstanding work items and definition of done for the v1
   release
+- `docs/backlog.md` — post-v1 feature wish list, sized and dependency-tagged
+  (not a commitment; items graduate into `docs/todo.md` once accepted)
 
 `.claude/loop.md` documents how to use Claude Code's `/loop` skill against
 this repo (implementation, backlog grooming, tech-debt cleanup, and

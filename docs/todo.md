@@ -166,6 +166,11 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## M6 — Dashboard analytics release
 
+The three unchecked `Backlog:` items below are mirrored in `docs/backlog.md`
+(items #30, #34, and #31 respectively), alongside the wider post-v1 wish
+list. They stay here as the committed record; `backlog.md` holds everything
+not yet committed to.
+
 - [x] Stand up a first-party analytics dashboard (KPI overview cards;
   trend views by regulation window and tournament period; drill-down by
   Pokémon, team core, move, and item) on top of `data/marts/*.csv`, per
