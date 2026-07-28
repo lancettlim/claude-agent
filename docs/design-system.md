@@ -50,10 +50,10 @@ sprite, 32px roster picker, 24px table cell, 22px chart axis):
 
 | Token | Value | Use |
 |---|---|---|
-| `--icon-sm` | 32px | Table/list cells, `.grid-6xn` tiles, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
-| `--icon-md` | 48px | Roster picker rows, `.grid-6xn` tiles (`ICON_SIZES.md`) |
-| `--icon-lg` | 72px | KPI hero sprite, team slot, Pokémon Profile hero (`ICON_SIZES.lg`) |
-| `--icon-xl` | 96px | Pokémon Profile's dual-type badge only (`ICON_SIZES.xl`) — see "Type badge" below |
+| `--icon-sm` | 40px | Table/list cells, `.grid-6xn` tiles, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
+| `--icon-md` | 64px | Roster picker rows, `.grid-6xn` tiles (`ICON_SIZES.md`) |
+| `--icon-lg` | 96px | KPI hero sprite, team slot, Pokémon Profile hero (`ICON_SIZES.lg`) |
+| `--icon-xl` | 128px | Pokémon Profile's dual-type badge only (`ICON_SIZES.xl`) — see "Type badge" below |
 
 **Every sprite/item/type image must use one of these tokens** (or the
 matching `ICON_SIZES` constant in JS) — no other pixel value. `--icon-xl`
@@ -61,6 +61,15 @@ is a deliberate single-purpose exception, not a general-use size: it
 exists because the Profile header's type display is new, hero-level
 information (docs' "add descriptions and larger type" ask), not because
 the sm/md/lg floor moved. Everywhere else still uses sm/md/lg.
+
+**Sprites render at native resolution, smoothed, not pixelated.** Every
+sprite-bearing element (`.kpi-sprite`, `.cell-icon`, `.grid-6xn-tile img`,
+`.team-slot img`) used to force `image-rendering: pixelated` (a deliberate
+"retro pixel art" look) — this was dropped, along with the tier bump
+above, so upscaling the source art looks smooth rather than blocky. This
+enlarges and de-pixelates at the *existing* Bulbagarden source
+resolution; it isn't a switch to a higher-resolution image source (no
+such source is wired up in this repo today).
 
 ### Spacing
 
@@ -105,6 +114,18 @@ webfont, keeping the page dependency-free.
 - **`section` (`.tab-panel`)** — a bordered white card per tab, `h2` title
   rendered as a broadcast color-block header, optional `.controls` filter
   row, then content following the "3-tier tab layout convention" below.
+- **`.subtabs` / `.subtab-btn` / `.subtab-panel`** — a compact pill row
+  nested *inside* one top-level tab (`app.js`'s `setupSubTabs`), for
+  several equally-important views that would otherwise stack vertically
+  within one section. Deliberately lighter-weight than `.tabs` (a rounded
+  pill row, not an underlined bar) so it reads as a sub-navigation, not
+  another top-level tab strip — `.tabs` stays reserved for the page's
+  seven main tabs. Two uses today: the **Usage** tab's Usage-leaders/
+  Win-rate-leaders tables (previously two stacked `h2` sections), and the
+  **Pokémon Profile** tab's Items/Ability/Moves/Team Cores (previously
+  four stacked `.grid-6xn`s under separate `h3`s). Wired the same way as
+  `.tabs`: buttons carry `data-subtab`, panels carry `data-subpanel`,
+  matched by id, defaulting to the first button.
 
 ### 3-tier tab layout convention
 
@@ -120,21 +141,24 @@ follows the same three tiers, top to bottom:
 3. **Detail table** *(optional)* — a full sortable `<table>` for raw
    drill-down beyond what the grid's top ~18 rows show. Only present where
    it adds something the grid doesn't: Usage keeps both a Usage-leaders and
-   a Win-rate-leaders table; Overview has no table tier at all, since its
-   job is the headline Top 12, not a full leaderboard (that's what the
-   Usage tab is for) — this is also why Overview's old Top 30 ranked list
-   was removed rather than converted to a grid.
+   a Win-rate-leaders table, now as two `.subtabs` panels rather than two
+   stacked sections (see "Sub-tabs" above); Overview has no table tier at
+   all, since its job is the headline Top 12, not a full leaderboard
+   (that's what the Usage tab is for) — this is also why Overview's old
+   Top 30 ranked list was removed rather than converted to a grid.
 
 Not every tab needs all three tiers — Pokémon Profile, Matchup, and Team
 Builder are Pokémon/team-drill-down views built around a picker rather
-than a leaderboard, so they use tier 2 (grids) repeatedly without a tier-3
-table.
+than a leaderboard, so they use tier 2 (grids/tables) repeatedly without a
+tier-3 table. Pokémon Profile's four tier-2 views (Items/Ability/Moves/
+Team Cores) are sub-tabbed rather than stacked (see "Sub-tabs" above), so
+only one is visible at a time.
 
 ## Component catalog
 
 ### KPI card
 
-`.kpi-card`: a bordered white card with an optional `--icon-lg` (72px)
+`.kpi-card`: a bordered white card with an optional `--icon-lg` (96px)
 sprite, a `.label` (uppercase, muted, small), a `.value` (bold, large,
 wraps rather than overflows for long names), and an optional `.sub`
 (muted, small) for supporting detail like a percentage or date. Used only
@@ -169,7 +193,7 @@ not one-off inline styles.
 ### Sprite / icon cell
 
 `pokemonCell(pokemonKey, pokemonName)` (in `app.js`) is the canonical way
-to render a Pokémon in a table cell: an `--icon-sm` (32px) sprite (from the
+to render a Pokémon in a table cell: an `--icon-sm` (40px) sprite (from the
 `sprites` map, keyed by `pokemon_key`) next to the display name, wrapped in
 `.cell-with-icon`. `itemCell()` follows the same pattern for held items.
 **Any new table or list that references a specific Pokémon should use
@@ -269,27 +293,39 @@ tier list.
 Two small, Team-Builder-specific patterns:
 - `.team-slot` — a bordered card (filled, `--icon-lg` sprite) or dashed
   placeholder (`.empty`) representing one of the team's 6 roster
-  positions. A filled slot's `.slot-detail` lines show its base stats and
-  top recorded ability, plus a `<select>` of its top 4 recorded moves —
-  see "Team Builder" below for where that data comes from.
+  positions. A filled slot's `.slot-detail` line shows its base stats,
+  plus an item `<select>`, an ability `<select>`, and four move
+  `<select>`s — a real build, not a read-only display — see "Team
+  Builder" below for where that data comes from and how the selects are
+  populated/capped.
 - `.roster-item` — a horizontal row (`--icon-md` sprite, name,
   usage/win-rate/speed sub-text, Add button) in the scrollable "Legal
   pool" picker list, filterable by the type-filter chip row above it.
 
 ### Item / Ability / Move separation (Pokémon Profile)
 
-The Pokémon Profile tab shows three separate `.grid-6xn` sections instead
-of one combined item×ability build table: **Items** (top 5,
-`pokemon_item_usage`), **Ability** (top 5, `pokemon_ability_usage`), and
-**Moves** (top 15, `pokemon_move_usage`) — each capped independently
-rather than sharing one table's row budget, and each tile's `subFn` shows
-that item/ability/move's `short_effect` description text (PokéAPI, joined
-in dbt — see `docs/dataset-spec.md`'s `item_detail`/`ability_detail`/
-`move_detail` entities). Move tiles additionally use the move's own type
-(`move_type`, real per-move data now, not a name-matched lookup — see
-"Removed: the move-types seed lookup" below) as their icon. Team Cores
-keeps its own `.grid-6xn` section below these three, unchanged in spirit
-from before the split.
+The Pokémon Profile tab shows four separate views — one per `.subtabs`
+panel (see "Sub-tabs" above), not stacked — instead of one combined
+item×ability×move build table: **Items** (top 5, `pokemon_item_usage`,
+`.grid-6xn`), **Ability** (top 5, `pokemon_ability_usage`, `.grid-6xn`),
+**Moves** (top 15, `pokemon_move_usage`, a full sortable `<table>` — see
+below), and **Team Cores** (`.grid-6xn`, teammate co-usage) — each capped
+independently rather than sharing one table's row budget. The Items/
+Ability grid tiles' `subFn` shows that item/ability's `short_effect`
+description text (PokéAPI, joined in dbt — see `docs/dataset-spec.md`'s
+`item_detail`/`ability_detail` entities).
+
+**Moves is a table, not a grid** — real game mechanics need columns, not
+tiles: Move (with its own type icon — `move_type`, real per-move data,
+not a name-matched lookup, see "Removed: the move-types seed lookup"
+below), Usage %, Category, Power, Accuracy, PP, Priority, and Effect
+(`short_effect`), all joined from `move_detail` (PokéAPI) via
+`pokemon_move_usage`, sortable via the same `makeSortableTable` every
+other detail table uses. This replaced an earlier `.grid-6xn` tile
+version that only surfaced name/usage-share/one line of effect text —
+accuracy/PP/category/priority existed in the underlying data
+(`move_detail`) all along but weren't selected into the mart or shown
+anywhere.
 
 **Removed: the move-types seed lookup.** Before this pass, a move's type
 icon came from `dbt/seeds/pokeapi_move_types.csv` (a static name-matched
@@ -307,14 +343,37 @@ previously nonexistent in this pipeline; see `docs/dataset-spec.md`'s
 `pokemon` entity). `renderTypeBadgeRow(container, type1, type2, large)` in
 `app.js` renders one of two variants, both reusing the 18 committed
 move-type icons in `static/icons/types/` (the same icon set move types
-already used — no new asset work):
-- **Compact** (`large=false`): `.type-pill`, a small dark pill with an
-  18px type icon + type name. Used in the Matchup tab's attacker/defender
-  panels.
-- **Large** (`large=true`): `.type-badge-lg .type-pill-lg`, a stacked
-  `--icon-xl` (96px) icon over a bold pill label. Used once, in the
-  Pokémon Profile header — the one place in the dashboard that uses
-  `--icon-xl` (see "Icon size scale" above).
+already used — no new asset work). Both variants are **icon-only
+emblems** — no visible type-name text — with the type name exposed via
+`role="img"`/`aria-label` on the pill and a `title` attribute on the icon
+itself, so the badge stays accessible/hoverable without a text label
+cluttering it.
+
+**The source PNGs are wide "icon + type name" badges (200x40), not bare
+square icons** — a PokéAPI/sprites generation-ix asset with the symbol in
+a fixed-width square on the left edge and the type name filling the rest.
+Squishing the whole 5:1 image into a square (an earlier approach) just
+stretched the text into an illegible blob. `typeIconImg()` instead crops
+to that left square via `.type-icon-crop` (an `overflow:hidden` window
+sized to the target icon size, holding a height-constrained `<img>` that
+scales to its natural ~5:1 aspect so only the icon shows) — every
+type-icon use gets this crop, including the filter chips and Matchup
+effectiveness grid below, which keep their own separate text label
+alongside the now-icon-only symbol instead of the old doubled-up
+icon-with-baked-in-text-plus-a-second-text-label.
+- **Compact** (`large=false`): `.type-pill`, an 18px cropped type icon.
+  Used in the Matchup tab's attacker/defender panels.
+- **Large** (`large=true`): `.type-badge-lg .type-pill-lg`, a `--icon-xl`
+  (128px) cropped icon. Used once, in the Pokémon Profile header — the
+  one place in the dashboard that uses `--icon-xl` (see "Icon size scale"
+  above).
+
+Not icon-only: the type-filter chip row (`renderTypeFilterChips`, Usage/
+Speed Tiers/Team Builder) and the Matchup tab's type-effectiveness grid
+tiles both keep their visible type-name text — chips are pickers (a user
+needs to read what they're selecting) and effectiveness tiles are a
+lookup table (every row must be identifiable at a glance), so dropping
+text there would make the UI worse, not better.
 
 ### Gallery card (Pro Team Gallery)
 
@@ -484,11 +543,20 @@ Champions-format stats, type, and usage/win-rate). A visitor searches/
 sorts/type-filters the legal pool, adds up to 6 to a team, and sees:
 
 - their picks as filled **team slots** (empty slots shown as dashed
-  placeholders). Each filled slot now also shows a compact stats readout
-  (HP/Atk/Def/SpA/SpD/Spe), the Pokémon's top recorded ability
-  (`pokemon_ability_usage`), and a `<select>` of its top 4 recorded moves
-  (`pokemon_move_usage`) — the "Team Builder also include stats, move,
-  ability" ask.
+  placeholders). Each filled slot shows a compact stats readout
+  (HP/Atk/Def/SpA/SpD/Spe) plus a real build, not just a read-only
+  display: an **item `<select>`** (top 8 recorded, `pokemon_item_usage`),
+  an **ability `<select>`** (top 5 recorded, `pokemon_ability_usage`), and
+  **four move `<select>`s** (top 15 recorded pool, `pokemon_move_usage`,
+  each excluding whatever the slot's other three move selects already
+  chose so the same move can't be picked twice) — the "Team Builder
+  move/item/ability selector" ask. Every select defaults to that Pokémon's
+  top-recorded choice but is independently editable; `buildChoiceSelect()`
+  in `teams.js` always keeps the slot's current value present as an option
+  even if it falls outside the top-N cap (e.g. a pasted build), so editing
+  or importing a team never silently drops what was chosen. There is
+  deliberately no stat/EV/nature selector alongside these — see "Pokepaste
+  import/export" below for why.
 - a **speed order** list — their own picks, fastest-first, each tagged
   with its Speed-tier badge (see above) — the practical payoff of Team
   Builder and Speed Tiers pulling from the same
@@ -547,13 +615,17 @@ paste, not a URL.
 - **Import** (`parsePokepaste(text)` in `teams.js`): splits the pasted
   text on blank lines into per-Pokémon blocks, reads each block's first
   line (`Species [(Nickname)] [@ Item]`, tolerating a `(M)`/`(F)` gender
-  marker), and resolves the species name to a `pokemon_key` by
-  normalizing both sides (strip spaces/hyphens/periods, lowercase) and
-  matching against `DATA.pokemon_names`' PascalCase values — e.g. "Landorus-
-  Therian" and "LandorusTherian" both normalize to "landorustherian".
-  Unresolved names are reported (not silently dropped) in
-  `#pokepaste-status`, alongside how many Pokémon loaded.
-- **Export** (`exportTeamAsPokepaste(teamKeys)` in `teams.js`): the
+  marker) plus its `Ability: ...` line and `- Move` lines, and resolves
+  the species name to a `pokemon_key` by normalizing both sides (strip
+  spaces/hyphens/periods, lowercase) and matching against
+  `DATA.pokemon_names`' PascalCase values — e.g. "Landorus-Therian" and
+  "LandorusTherian" both normalize to "landorustherian". The pasted item/
+  ability/moves are carried into that slot as-is (not just the species),
+  so an imported team keeps its actual build rather than falling back to
+  that Pokémon's top-recorded one. Unresolved species names are reported
+  (not silently dropped) in `#pokepaste-status`, alongside how many
+  Pokémon loaded.
+- **Export** (`exportTeamAsPokepaste(teamSlots)` in `teams.js`): the
   reverse direction, for Team Builder's export button. Since the
   dashboard's own PascalCase display names (`LandorusTherian`) aren't
   real Showdown syntax, export re-derives a hyphenated Title Case name
@@ -561,9 +633,10 @@ paste, not a URL.
   `Landorus-Therian`) — closer to real pokepaste convention, and a
   deliberately different transform from the dashboard's own display-name
   convention (see "Pokémon name formatting: PascalCase" above, which is
-  unchanged for every other view). Each exported Pokémon uses its top
-  recorded item/ability/moves (same marts as the Profile tab and Team
-  Builder's slot detail), not an EV spread or nature — MunchStats' nature
+  unchanged for every other view). Each exported Pokémon uses that slot's
+  actual chosen item/ability/moves (whatever its selects currently hold,
+  defaulting to but not fixed at the top-recorded pick — see "Team
+  Builder" above), not an EV spread or nature — MunchStats' nature
   coverage is only ~17% (see `docs/dashboard.md`'s "Pro Team Gallery"
   section), so it's omitted rather than guessed.
 

@@ -240,11 +240,16 @@ Three distinct assets, three distinct strategies:
   `pipelines/render/assets.py`'s `ensure_type_icon()` and copied verbatim
   into `docs/dashboard/images/icons/types/` on every build. No network
   dependency — types never change.
-- **Item icons** (open-ended, data-dependent): resolved via
+- **Item icons** (open-ended, data-dependent): resolved for every distinct
+  `item_name` in `pokemon_item_usage`, preferring `pipelines/render/
+  bulbagarden_items.py`'s `ensure_item_icon_bulbagarden()` (Bulbagarden
+  Archives held-item sprites, "File:Bag &lt;Item Name&gt; Sprite.png" and a
+  couple of naming-variant fallbacks) and falling back per-item to
   `pipelines/render/assets.py`'s `ensure_item_icon()` (PokéAPI community
-  sprites) for every distinct `item_name` in `pokemon_item_usage`. This is
-  the one part of a dashboard build that needs network access. Pass
-  `--no-fetch-icons` to `build-dashboard` (or `fetch_icons=False` to
+  sprites) on a Bulbagarden resolution miss, so an item that used to
+  resolve via PokéAPI never regresses to no icon. This is the one part of
+  a dashboard build that needs network access. Pass `--no-fetch-icons` to
+  `build-dashboard` (or `fetch_icons=False` to
   `pipelines.dashboard.build.build`) for an offline build — item names
   render text-only in that case.
 - **Pokémon type icons**: the Pokémon Profile type badge and the Matchup

@@ -8,7 +8,16 @@
  * need to push Pokémon into the same saved team, regardless of which tab
  * the visitor is on when they do it) — see ensureTeamBuilder() below for
  * how that stays correct even if Top Teams is visited before Team Builder
- * ever wires up its DOM (tabs otherwise init lazily, on first activation). */
+ * ever wires up its DOM (tabs otherwise init lazily, on first activation).
+ *
+ * Each roster slot is a real build, not just a species pick: item,
+ * ability, and up to 4 moves are all user-selectable (defaulting to that
+ * Pokémon's top recorded choices), drawn from real recorded usage data
+ * (pokemon_item_usage/pokemon_ability_usage/pokemon_move_usage) — never
+ * invented options. There is deliberately no stat/EV/nature selector: no
+ * source in this dataset reports real EV/IV data and MunchStats' nature
+ * coverage is only ~17%, so building one would mean presenting invented
+ * numbers as if they were sourced (see docs/backlog.md item #25). */
 (function () {
   "use strict";
 
@@ -17,6 +26,11 @@
 
   var marts = App.marts;
   var sprites = App.sprites;
+
+  var ITEM_OPTION_CAP = 8;
+  var ABILITY_OPTION_CAP = 5;
+  var MOVE_OPTION_CAP = 15;
+  var MOVE_SLOT_COUNT = 4;
 
   function groupByPokemonKey(rows) {
     var out = {};
@@ -59,6 +73,10 @@
     return name.replace(/[-\s.']/g, "").toLowerCase();
   }
 
+  // Parses a Showdown-format team export into per-slot {key, item, ability,
+  // moves} objects, so a pasted team round-trips through Team Builder with
+  // its actual item/ability/moveset intact rather than falling back to
+  // that Pokémon's top-recorded build.
   function parsePokepaste(text) {
     var lookup = buildNameLookup();
     var blocks = text
@@ -67,45 +85,60 @@
         return b.trim();
       })
       .filter(Boolean);
-    var resolvedKeys = [];
+    var resolvedSlots = [];
     var unresolvedNames = [];
     blocks.forEach(function (block) {
-      var firstLine = block.split("\n")[0];
+      var lines = block.split("\n").map(function (l) {
+        return l.trim();
+      });
+      var firstLine = lines[0];
       var atIndex = firstLine.indexOf(" @ ");
       var namePart = atIndex !== -1 ? firstLine.slice(0, atIndex) : firstLine;
+      var itemPart = atIndex !== -1 ? firstLine.slice(atIndex + 3).trim() : "";
       var parenMatch = namePart.match(/\(([^)]+)\)/);
       var species = parenMatch ? parenMatch[1] : namePart;
       species = species.replace(/\s*\((M|F)\)/g, "").trim();
       var key = lookup[normalizeSpeciesName(species)];
-      if (key) {
-        resolvedKeys.push(key);
-      } else if (species) {
-        unresolvedNames.push(species);
+      if (!key) {
+        if (species) unresolvedNames.push(species);
+        return;
       }
+      var ability = null;
+      var moves = [];
+      lines.slice(1).forEach(function (line) {
+        if (/^Ability:\s*/i.test(line)) {
+          ability = line.replace(/^Ability:\s*/i, "").trim();
+        } else if (line.charAt(0) === "-") {
+          var move = line.slice(1).trim();
+          if (move) moves.push(move);
+        }
+      });
+      resolvedSlots.push({
+        key: key,
+        item: itemPart || null,
+        ability: ability,
+        moves: moves.slice(0, MOVE_SLOT_COUNT),
+      });
     });
-    return { resolvedKeys: resolvedKeys, unresolvedNames: unresolvedNames };
+    return { resolvedSlots: resolvedSlots, unresolvedNames: unresolvedNames };
   }
 
-  function exportTeamAsPokepaste(teamKeys) {
+  // Emits each slot's actually-chosen item/ability/moves (not just that
+  // Pokémon's top-recorded build), so the pokepaste export reflects real
+  // edits made in the builder.
+  function exportTeamAsPokepaste(teamSlots) {
     var byKey = {};
     (marts.pokemon_champions_profile || []).forEach(function (r) {
       byKey[r.pokemon_key] = r;
     });
-    var itemsByKey = groupByPokemonKey(marts.pokemon_item_usage);
-    var abilitiesByKey = groupByPokemonKey(marts.pokemon_ability_usage);
-    var movesByKey = groupByPokemonKey(marts.pokemon_move_usage);
-
-    var blocks = teamKeys
-      .map(function (key) {
-        if (!byKey[key]) return null;
-        var name = keyToShowdownName(key);
-        var topItem = sortByUsageRank(itemsByKey[key])[0];
-        var topAbility = sortByUsageRank(abilitiesByKey[key])[0];
-        var topMoves = sortByUsageRank(movesByKey[key]).slice(0, 4);
-        var lines = [name + (topItem ? " @ " + topItem.item_name : "")];
-        if (topAbility) lines.push("Ability: " + topAbility.ability);
-        topMoves.forEach(function (m) {
-          lines.push("- " + m.move_name);
+    var blocks = teamSlots
+      .map(function (slot) {
+        if (!byKey[slot.key]) return null;
+        var name = keyToShowdownName(slot.key);
+        var lines = [name + (slot.item ? " @ " + slot.item : "")];
+        if (slot.ability) lines.push("Ability: " + slot.ability);
+        (slot.moves || []).forEach(function (m) {
+          if (m) lines.push("- " + m);
         });
         return lines.join("\n");
       })
@@ -122,19 +155,51 @@
     rows.forEach(function (r) {
       byKey[r.pokemon_key] = r;
     });
+    var itemsByKey = groupByPokemonKey(marts.pokemon_item_usage);
     var abilitiesByKey = groupByPokemonKey(marts.pokemon_ability_usage);
     var movesByKey = groupByPokemonKey(marts.pokemon_move_usage);
 
     var STORAGE_KEY = "pokemonChampionsTeamBuilder";
     var MAX_TEAM_SIZE = 6;
+
+    // Slot shape: {key, item, ability, moves: string[]} — item/ability
+    // default to that Pokémon's top-recorded pick, moves default to its
+    // top 4, all independently editable afterward (see makeDefaultSlot).
+    function makeDefaultSlot(key) {
+      var topItem = sortByUsageRank(itemsByKey[key])[0];
+      var topAbility = sortByUsageRank(abilitiesByKey[key])[0];
+      var topMoves = sortByUsageRank(movesByKey[key]).slice(0, MOVE_SLOT_COUNT);
+      return {
+        key: key,
+        item: topItem ? topItem.item_name : null,
+        ability: topAbility ? topAbility.ability : null,
+        moves: topMoves.map(function (m) {
+          return m.move_name;
+        }),
+      };
+    }
+
+    // Accepts either a bare pokemon_key (old localStorage format, or a
+    // gallery/pokepaste caller that only has a species) or an already-built
+    // slot object, and returns a valid slot or null if the key isn't
+    // (or is no longer) in the legal pool.
+    function normalizeEntry(entry) {
+      if (typeof entry === "string") {
+        return byKey[entry] ? makeDefaultSlot(entry) : null;
+      }
+      if (!entry || !byKey[entry.key]) return null;
+      return {
+        key: entry.key,
+        item: entry.item || null,
+        ability: entry.ability || null,
+        moves: (entry.moves || []).slice(0, MOVE_SLOT_COUNT),
+      };
+    }
+
     var team = [];
     try {
       var saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
-      team = saved
-        .filter(function (key) {
-          return byKey[key];
-        })
-        .slice(0, MAX_TEAM_SIZE);
+      team = saved.map(normalizeEntry).filter(Boolean).slice(0, MAX_TEAM_SIZE);
     } catch (e) {
       team = [];
     }
@@ -162,24 +227,22 @@
     }
 
     function addToTeam(key) {
-      if (team.length >= MAX_TEAM_SIZE || team.indexOf(key) !== -1 || !byKey[key]) return;
-      team.push(key);
+      if (team.length >= MAX_TEAM_SIZE || team.some(function (s) { return s.key === key; }) || !byKey[key]) return;
+      team.push(makeDefaultSlot(key));
       persist();
       renderAll();
     }
 
     function removeFromTeam(key) {
-      team = team.filter(function (k) {
-        return k !== key;
+      team = team.filter(function (s) {
+        return s.key !== key;
       });
       persist();
       renderAll();
     }
 
-    function loadTeam(keys) {
-      team = keys.filter(function (key) {
-        return byKey[key];
-      }).slice(0, MAX_TEAM_SIZE);
+    function loadTeam(entries) {
+      team = entries.map(normalizeEntry).filter(Boolean).slice(0, MAX_TEAM_SIZE);
       persist();
       renderAll();
     }
@@ -188,8 +251,11 @@
       if (!availableList) return;
       var query = ((searchInput && searchInput.value) || "").trim().toLowerCase();
       var sortBy = sortSelect ? sortSelect.value : "usage";
+      var teamKeys = team.map(function (s) {
+        return s.key;
+      });
       var candidates = rows.filter(function (r) {
-        if (team.indexOf(r.pokemon_key) !== -1) return false;
+        if (teamKeys.indexOf(r.pokemon_key) !== -1) return false;
         if (r.pokemon_name.toLowerCase().indexOf(query) === -1) return false;
         if (!App.passesTypeFilter(selectedTypes, r.type_1, r.type_2)) return false;
         return true;
@@ -223,43 +289,150 @@
       }
     }
 
+    // Builds a <select> whose options are `values`, always including
+    // `current` even if it falls outside that list (e.g. a pasted
+    // move/item outside the top-N recorded cap) so an edited/imported
+    // build never silently loses its chosen value. Fires onChange(value)
+    // (null for the blank option) on change.
+    function buildChoiceSelect(values, current, blankLabel, emptyLabel, onChange) {
+      var select = document.createElement("select");
+      var effectiveValues = values.slice();
+      if (current && effectiveValues.indexOf(current) === -1) effectiveValues.unshift(current);
+      if (!effectiveValues.length) {
+        select.disabled = true;
+        var placeholder = document.createElement("option");
+        placeholder.textContent = emptyLabel;
+        select.appendChild(placeholder);
+        return select;
+      }
+      var blank = document.createElement("option");
+      blank.value = "";
+      blank.textContent = blankLabel;
+      select.appendChild(blank);
+      effectiveValues.forEach(function (v) {
+        var opt = document.createElement("option");
+        opt.value = v;
+        opt.textContent = v;
+        select.appendChild(opt);
+      });
+      select.value = current || "";
+      select.addEventListener("change", function () {
+        onChange(select.value || null);
+      });
+      return select;
+    }
+
     // A named helper (rather than inline logic in renderSlots' for loop)
     // so each slot's remove handler closes over its own `key` — a `var`
     // declared inside a for-loop body is function-scoped, not
     // block-scoped, so handlers built directly in the loop would all end
     // up capturing the loop's final value instead of their own slot's.
-    function buildSlotElement(key) {
-      var slot = document.createElement("div");
-      if (key && byKey[key]) {
-        var r = byKey[key];
-        var topAbility = sortByUsageRank(abilitiesByKey[key])[0];
-        var moves = sortByUsageRank(movesByKey[key]).slice(0, 4);
-        slot.className = "team-slot";
-        slot.innerHTML =
-          (sprites[key] ? '<img src="' + sprites[key] + '" alt="">' : "") +
-          '<div class="slot-name">' + App.escapeHtml(r.pokemon_name) + "</div>" +
-          '<div class="slot-detail">HP ' + r.hp + " Atk " + r.attack + " Def " + r.defense +
-          " SpA " + r.sp_attack + " SpD " + r.sp_defense + " Spe " + r.speed + "</div>" +
-          (topAbility ? '<div class="slot-detail">' + App.escapeHtml(topAbility.ability) + "</div>" : "") +
-          (moves.length ? '<select class="slot-move-select" aria-label="Top recorded moves"></select>' : '<div class="slot-detail">No recorded moves</div>') +
-          '<button class="btn-remove" type="button" aria-label="Remove ' + App.escapeHtml(r.pokemon_name) + '">Remove</button>';
-        if (moves.length) {
-          var select = slot.querySelector(".slot-move-select");
-          moves.forEach(function (m) {
-            var opt = document.createElement("option");
-            opt.value = m.move_name;
-            opt.textContent = m.move_name;
-            select.appendChild(opt);
-          });
-        }
-        slot.querySelector(".btn-remove").addEventListener("click", function () {
-          removeFromTeam(key);
-        });
-      } else {
-        slot.className = "team-slot empty";
-        slot.textContent = "Empty slot";
+    function buildSlotElement(slot) {
+      var el = document.createElement("div");
+      if (!slot || !byKey[slot.key]) {
+        el.className = "team-slot empty";
+        el.textContent = "Empty slot";
+        return el;
       }
-      return slot;
+      var key = slot.key;
+      var r = byKey[key];
+      el.className = "team-slot";
+      el.innerHTML =
+        (sprites[key] ? '<img src="' + sprites[key] + '" alt="">' : "") +
+        '<div class="slot-name">' + App.escapeHtml(r.pokemon_name) + "</div>" +
+        '<div class="slot-detail">HP ' + r.hp + " Atk " + r.attack + " Def " + r.defense +
+        " SpA " + r.sp_attack + " SpD " + r.sp_defense + " Spe " + r.speed + "</div>";
+
+      var itemOptions = sortByUsageRank(itemsByKey[key])
+        .slice(0, ITEM_OPTION_CAP)
+        .map(function (it) {
+          return it.item_name;
+        });
+      var itemSelect = buildChoiceSelect(
+        itemOptions,
+        slot.item,
+        "No item",
+        "No recorded items",
+        function (value) {
+          slot.item = value;
+          persist();
+        }
+      );
+      itemSelect.setAttribute("aria-label", "Held item");
+      el.appendChild(itemSelect);
+
+      var abilityOptions = sortByUsageRank(abilitiesByKey[key])
+        .slice(0, ABILITY_OPTION_CAP)
+        .map(function (ab) {
+          return ab.ability;
+        });
+      var abilitySelect = buildChoiceSelect(
+        abilityOptions,
+        slot.ability,
+        "No ability",
+        "No recorded ability",
+        function (value) {
+          slot.ability = value;
+          persist();
+        }
+      );
+      abilitySelect.setAttribute("aria-label", "Ability");
+      el.appendChild(abilitySelect);
+
+      var movePool = sortByUsageRank(movesByKey[key])
+        .slice(0, MOVE_OPTION_CAP)
+        .map(function (m) {
+          return m.move_name;
+        });
+      if (movePool.length || slot.moves.some(Boolean)) {
+        var moveContainer = document.createElement("div");
+        moveContainer.className = "slot-move-selects";
+        for (var i = 0; i < MOVE_SLOT_COUNT; i++) {
+          (function (moveIndex) {
+            var current = slot.moves[moveIndex] || "";
+            // Exclude moves already picked in this slot's other move
+            // selects, so the same move can't be chosen twice — real
+            // Pokémon Champions movesets can't repeat a move either.
+            var chosenElsewhere = slot.moves.filter(function (m, idx) {
+              return idx !== moveIndex && m;
+            });
+            var available = movePool.filter(function (m) {
+              return chosenElsewhere.indexOf(m) === -1;
+            });
+            var moveSelect = buildChoiceSelect(
+              available,
+              current,
+              "— Move " + (moveIndex + 1) + " —",
+              "No recorded moves",
+              function (value) {
+                slot.moves[moveIndex] = value || "";
+                persist();
+                renderSlots();
+              }
+            );
+            moveSelect.setAttribute("aria-label", "Move " + (moveIndex + 1));
+            moveContainer.appendChild(moveSelect);
+          })(i);
+        }
+        el.appendChild(moveContainer);
+      } else {
+        var noMoves = document.createElement("div");
+        noMoves.className = "slot-detail";
+        noMoves.textContent = "No recorded moves";
+        el.appendChild(noMoves);
+      }
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "btn-remove";
+      removeBtn.type = "button";
+      removeBtn.setAttribute("aria-label", "Remove " + r.pokemon_name);
+      removeBtn.textContent = "Remove";
+      removeBtn.addEventListener("click", function () {
+        removeFromTeam(key);
+      });
+      el.appendChild(removeBtn);
+
+      return el;
     }
 
     function renderSlots() {
@@ -276,8 +449,8 @@
     function renderSpeedOrder() {
       if (!speedOrderEl) return;
       var members = team
-        .map(function (key) {
-          return byKey[key];
+        .map(function (slot) {
+          return byKey[slot.key];
         })
         .filter(Boolean)
         .sort(function (a, b) {
@@ -304,8 +477,8 @@
     function renderSummary() {
       if (!summaryEl) return;
       var members = team
-        .map(function (key) {
-          return byKey[key];
+        .map(function (slot) {
+          return byKey[slot.key];
         })
         .filter(Boolean);
       function avg(field) {
@@ -448,14 +621,14 @@
     if (loadBtn && input) {
       loadBtn.addEventListener("click", function () {
         var parsed = parsePokepaste(input.value || "");
-        if (!parsed.resolvedKeys.length) {
+        if (!parsed.resolvedSlots.length) {
           if (statusEl) statusEl.textContent = "No recognizable Pokémon found in that paste.";
           return;
         }
-        ensureTeamBuilder().loadTeam(parsed.resolvedKeys);
+        ensureTeamBuilder().loadTeam(parsed.resolvedSlots);
         if (statusEl) {
           statusEl.textContent =
-            "Loaded " + parsed.resolvedKeys.length + " Pokémon into Team Builder" +
+            "Loaded " + parsed.resolvedSlots.length + " Pokémon into Team Builder" +
             (parsed.unresolvedNames.length
               ? " (" + parsed.unresolvedNames.length + " not recognized: " + parsed.unresolvedNames.join(", ") + ")"
               : ".");

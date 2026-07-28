@@ -10,8 +10,8 @@
 -- share-of-own-total pattern pokemon_usage_summary.usage_share and
 -- pokemon_item_usage.item_share use.
 --
--- move_type/power/accuracy/category/priority/short_effect are joined from
--- move_detail (PokéAPI move detail) for the Pokémon Profile's Moves
+-- move_type/power/accuracy/category/priority/pp/short_effect are joined
+-- from move_detail (PokéAPI move detail) for the Pokémon Profile's Moves
 -- section and the Matchup tab's damage calculator; all nullable when that
 -- lookup didn't resolve.
 with counted as (
@@ -35,6 +35,7 @@ select
   move_detail.accuracy,
   move_detail.category,
   move_detail.priority,
+  move_detail.pp,
   move_detail.short_effect,
   counted.usage_count,
   round(
