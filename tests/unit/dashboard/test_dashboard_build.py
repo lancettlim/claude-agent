@@ -48,13 +48,27 @@ def _populate_marts(marts_dir, normalized_dir):
         ],
     )
     _write_csv(
-        marts_dir / "pokemon_build_usage.csv",
+        marts_dir / "pokemon_item_usage.csv",
         [
             {
                 "pokemon_key": "pikachu",
                 "item_name": "Light Ball",
-                "ability": "Static",
+                "short_effect": "Doubles Attack and Special Attack.",
                 "usage_count": "10",
+                "item_share": "1.0",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    _write_csv(
+        marts_dir / "pokemon_ability_usage.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "ability": "Static",
+                "short_effect": "May paralyze on contact.",
+                "usage_count": "10",
+                "ability_share": "1.0",
                 "usage_rank": "1",
             }
         ],
@@ -65,7 +79,14 @@ def _populate_marts(marts_dir, normalized_dir):
             {
                 "pokemon_key": "pikachu",
                 "move_name": "Thunderbolt",
+                "move_type": "electric",
+                "power": "90",
+                "accuracy": "100",
+                "category": "special",
+                "priority": "0",
+                "short_effect": "Has a 10% chance to paralyze.",
                 "usage_count": "8",
+                "move_share": "1.0",
                 "usage_rank": "1",
             }
         ],
@@ -102,8 +123,9 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     payload = _build(marts_dir, normalized_dir, output_dir)
 
     assert (output_dir / "index.html").exists()
-    assert (output_dir / "app.js").exists()
-    assert (output_dir / "app.js").read_bytes() == (build.STATIC_DIR / "app.js").read_bytes()
+    for script_name in ("app.js", "matchup.js", "teams.js"):
+        assert (output_dir / script_name).exists()
+        assert (output_dir / script_name).read_bytes() == (build.STATIC_DIR / script_name).read_bytes()
 
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     embedded = _embedded_payload(html)
@@ -139,10 +161,10 @@ def test_build_has_tab_markup_for_all_tabs(tmp_path):
         "overview",
         "usage",
         "pokemon-profile",
-        "archetypes",
-        "regulations",
         "speed-tiers",
+        "matchup",
         "team-builder",
+        "top-teams",
     ):
         assert f'data-tab="{tab}"' in html
         assert f'data-panel="{tab}"' in html

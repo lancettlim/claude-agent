@@ -11,6 +11,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import csv
 import subprocess
 import sys
 from pathlib import Path
@@ -23,19 +24,58 @@ from pipelines.validate import report
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DBT_PROJECT_DIR = REPO_ROOT / "dbt"
+STAGING_DIR = REPO_ROOT / "data" / "staging"
 
 _EXTRACTORS = {
-    "pokeapi": (pokeapi, REPO_ROOT / "data" / "staging" / "pokeapi.csv"),
-    "opgg": (opgg, REPO_ROOT / "data" / "staging" / "opgg_champions.csv"),
-    "munchstats": (munchstats, REPO_ROOT / "data" / "staging" / "munchstats.csv"),
-    "pokebase": (pokebase, REPO_ROOT / "data" / "staging" / "pokebase.csv"),
-    "bulbagarden": (bulbagarden, REPO_ROOT / "data" / "staging" / "bulbagarden.csv"),
+    "pokeapi": (pokeapi, STAGING_DIR / "pokeapi.csv"),
+    "opgg": (opgg, STAGING_DIR / "opgg_champions.csv"),
+    "munchstats": (munchstats, STAGING_DIR / "munchstats.csv"),
+    "pokebase": (pokebase, STAGING_DIR / "pokebase.csv"),
+    "bulbagarden": (bulbagarden, STAGING_DIR / "bulbagarden.csv"),
 }
+
+
+def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]:
+    """Read data/staging/munchstats.csv for the distinct move/ability/item
+    names real tournament rosters reported, so `extract pokeapi` can scope
+    its move/ability/item detail fetches to names that matter to the
+    dashboard instead of PokéAPI's full catalog. Reads munchstats.csv
+    directly (not the dbt-normalized tournament_team_member table) to avoid
+    a circular dependency on `dbt build` running before `extract pokeapi`.
+    """
+    munchstats_path = STAGING_DIR / "munchstats.csv"
+    if not munchstats_path.exists():
+        return set(), set(), set()
+
+    moves: set[str] = set()
+    abilities: set[str] = set()
+    items: set[str] = set()
+    with munchstats_path.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("ability"):
+                abilities.add(row["ability"])
+            if row.get("item_name"):
+                items.add(row["item_name"])
+            if row.get("moves"):
+                moves.update(name.strip() for name in row["moves"].split("|") if name.strip())
+    return moves, abilities, items
 
 
 def _run_extract(source: str) -> int:
     module, output_path = _EXTRACTORS[source]
     module.extract(output_path)
+    if source == "pokeapi":
+        moves, abilities, items = _referenced_move_ability_item_names()
+        if not moves and not abilities and not items:
+            print(
+                "Skipping move/ability/item detail extraction: "
+                "run `extract munchstats` first so there are names to scope to.",
+                file=sys.stderr,
+            )
+            return 0
+        pokeapi.extract_moves(STAGING_DIR / "pokeapi_move.csv", sorted(moves))
+        pokeapi.extract_abilities(STAGING_DIR / "pokeapi_ability.csv", sorted(abilities))
+        pokeapi.extract_items(STAGING_DIR / "pokeapi_item.csv", sorted(items))
     return 0
 
 

@@ -36,7 +36,6 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from pipelines.dashboard import data, sprites
 from pipelines.render import assets as render_assets
-from pipelines.render.data_source import load_move_types
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -68,6 +67,8 @@ def _referenced_pokemon_keys(marts: dict[str, list[dict[str, Any]]]) -> set[str]
                 keys.add(row["pokemon_key"])
             if row.get("partner_pokemon_key"):
                 keys.add(row["partner_pokemon_key"])
+            if row.get("pokemon_keys"):
+                keys.update(row["pokemon_keys"].split("|"))
     return keys
 
 
@@ -88,20 +89,6 @@ def _copy_type_icons(output_dir: Path) -> dict[str, str]:
     return resolved
 
 
-def _move_types_for(marts: dict[str, list[dict[str, Any]]]) -> dict[str, str]:
-    """move_name -> move_type, restricted to moves actually referenced by
-    pokemon_move_usage, from dbt/seeds/pokeapi_move_types.csv (already used
-    by pipelines/render/data_source.py for team-card rendering)."""
-    move_types_by_lower = load_move_types()
-    move_names = {row["move_name"] for row in marts.get("pokemon_move_usage", [])}
-    resolved = {}
-    for move_name in move_names:
-        move_type = move_types_by_lower.get(move_name.lower())
-        if move_type:
-            resolved[move_name] = move_type
-    return resolved
-
-
 def _resolve_item_icons(
     marts: dict[str, list[dict[str, Any]]],
     *,
@@ -109,7 +96,7 @@ def _resolve_item_icons(
     icon_cache_dir: Path,
     fetch_icons: bool,
 ) -> dict[str, str]:
-    """Resolves an icon for each distinct item_name in pokemon_build_usage
+    """Resolves an icon for each distinct item_name in pokemon_item_usage
     via pipelines.render.assets.ensure_item_icon (PokeAPI community sprites,
     cached to icon_cache_dir) and copies resolved icons into
     output_dir/images/icons/items/. Returns a {item_name: relative_path}
@@ -117,7 +104,7 @@ def _resolve_item_icons(
     a text-only item name in the UI. When fetch_icons is False (offline
     builds, tests), no network calls are made and this returns {}."""
     item_names = sorted(
-        {row["item_name"] for row in marts.get("pokemon_build_usage", []) if row.get("item_name")}
+        {row["item_name"] for row in marts.get("pokemon_item_usage", []) if row.get("item_name")}
     )
     if not item_names or not fetch_icons:
         return {}
@@ -200,7 +187,6 @@ def build(
         asset_cache_dir=asset_cache_dir,
     )
     payload["type_icons"] = _copy_type_icons(output_dir)
-    payload["move_types"] = _move_types_for(payload["marts"])
     payload["item_icons"] = _resolve_item_icons(
         payload["marts"],
         output_dir=output_dir,
@@ -215,6 +201,7 @@ def build(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "index.html").write_text(html, encoding="utf-8")
-    shutil.copyfile(STATIC_DIR / "app.js", output_dir / "app.js")
+    for script_name in ("app.js", "matchup.js", "teams.js"):
+        shutil.copyfile(STATIC_DIR / script_name, output_dir / script_name)
 
     return payload

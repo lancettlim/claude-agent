@@ -17,6 +17,8 @@
     {"name": "sp_defense", "type": "integer", "required": true, "description": "Base Special Defense stat"},
     {"name": "speed", "type": "integer", "required": true, "description": "Base Speed stat"},
     {"name": "stat_total", "type": "integer", "required": true, "description": "Sum of the six base stats"},
+    {"name": "type_1", "type": "string", "required": true, "description": "Primary Pokémon type (e.g. \"fire\"), from the form's PokéAPI types list slot 1"},
+    {"name": "type_2", "type": "string", "required": false, "description": "Secondary Pokémon type, if any (e.g. \"flying\"); null for single-type Pokémon"},
     {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéAPI"},
     {"name": "source_url", "type": "string", "required": true, "description": "API endpoint the record was extracted from"},
     {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéAPI resource ID"},

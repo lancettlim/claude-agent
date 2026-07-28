@@ -31,8 +31,15 @@ class _FakeSession:
 
 
 def _payload(
-    resource_id: int, name: str, stats: dict[str, int], *, species_name: str, species_id: int
+    resource_id: int,
+    name: str,
+    stats: dict[str, int],
+    *,
+    species_name: str,
+    species_id: int,
+    types: list[str] | None = None,
 ) -> dict:
+    types = types if types is not None else ["normal"]
     return {
         "id": resource_id,
         "name": name,
@@ -42,6 +49,9 @@ def _payload(
         },
         "stats": [
             {"base_stat": value, "stat": {"name": stat_name}} for stat_name, value in stats.items()
+        ],
+        "types": [
+            {"slot": slot, "type": {"name": type_name}} for slot, type_name in enumerate(types, 1)
         ],
     }
 
@@ -61,6 +71,7 @@ def test_extract_writes_rows_with_stats_and_provenance(tmp_path):
             },
             species_name="bulbasaur",
             species_id=1,
+            types=["grass", "poison"],
         ),
     }
     session = _FakeSession(payloads)
@@ -84,6 +95,8 @@ def test_extract_writes_rows_with_stats_and_provenance(tmp_path):
     assert row["sp_defense"] == "65"
     assert row["speed"] == "45"
     assert row["stat_total"] == "318"
+    assert row["type_1"] == "grass"
+    assert row["type_2"] == "poison"
     assert row["source_name"] == "PokéAPI"
     assert row["source_url"] == "https://pokeapi.co/api/v2/pokemon/bulbasaur"
     assert row["source_record_id"] == "1"
@@ -219,3 +232,155 @@ def test_extract_defaults_dataset_version_when_not_provided(tmp_path):
         row = next(csv.DictReader(fh))
 
     assert row["dataset_version"] == pokeapi.DEFAULT_DATASET_VERSION
+
+
+def test_extract_writes_null_type_2_for_single_type_pokemon(tmp_path):
+    payloads = {
+        "pikachu": _payload(
+            25,
+            "pikachu",
+            {
+                "hp": 35,
+                "attack": 55,
+                "defense": 40,
+                "special-attack": 50,
+                "special-defense": 50,
+                "speed": 90,
+            },
+            species_name="pikachu",
+            species_id=25,
+            types=["electric"],
+        ),
+    }
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi.csv"
+
+    pokeapi.extract(output_path, ["pikachu"], session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert row["type_1"] == "electric"
+    assert row["type_2"] == ""
+
+
+def _move_payload(move_id: int, name: str, **overrides) -> dict:
+    payload = {
+        "id": move_id,
+        "type": {"name": "electric"},
+        "power": 90,
+        "accuracy": 100,
+        "damage_class": {"name": "special"},
+        "priority": 0,
+        "pp": 15,
+        "effect_entries": [
+            {"language": {"name": "en"}, "short_effect": "Has a 10% chance to paralyze."}
+        ],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def test_extract_moves_writes_move_detail_rows(tmp_path):
+    payloads = {"thunderbolt": _move_payload(85, "thunderbolt")}
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi_move.csv"
+
+    pokeapi.extract_moves(output_path, ["Thunderbolt"], dataset_version="0.1.0", session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+
+    assert session.requested_urls == ["https://pokeapi.co/api/v2/move/thunderbolt"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["move_name"] == "Thunderbolt"
+    assert row["move_type"] == "electric"
+    assert row["power"] == "90"
+    assert row["accuracy"] == "100"
+    assert row["category"] == "special"
+    assert row["priority"] == "0"
+    assert row["pp"] == "15"
+    assert row["short_effect"] == "Has a 10% chance to paralyze."
+    assert row["source_name"] == "PokéAPI"
+    assert row["source_record_id"] == "85"
+    assert row["dataset_version"] == "0.1.0"
+
+
+def test_extract_moves_slugifies_multi_word_names(tmp_path):
+    payloads = {"ice-punch": _move_payload(8, "ice-punch", type={"name": "ice"})}
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi_move.csv"
+
+    pokeapi.extract_moves(output_path, ["Ice Punch"], session=session)
+
+    assert session.requested_urls == ["https://pokeapi.co/api/v2/move/ice-punch"]
+
+
+def test_extract_abilities_writes_ability_detail_rows(tmp_path):
+    payloads = {
+        "intimidate": {
+            "id": 22,
+            "effect_entries": [
+                {
+                    "language": {"name": "en"},
+                    "short_effect": "Lowers the foes' Attack stat by one stage on switch-in.",
+                }
+            ],
+        }
+    }
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi_ability.csv"
+
+    pokeapi.extract_abilities(
+        output_path, ["Intimidate"], dataset_version="0.1.0", session=session
+    )
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert session.requested_urls == ["https://pokeapi.co/api/v2/ability/intimidate"]
+    assert row["ability_name"] == "Intimidate"
+    assert row["short_effect"] == "Lowers the foes' Attack stat by one stage on switch-in."
+    assert row["source_record_id"] == "22"
+    assert row["dataset_version"] == "0.1.0"
+
+
+def test_extract_items_writes_item_detail_rows(tmp_path):
+    payloads = {
+        "choice-band": {
+            "id": 220,
+            "effect_entries": [
+                {
+                    "language": {"name": "en"},
+                    "short_effect": "Boosts Attack by 50%, but restricts the holder to one move.",
+                }
+            ],
+        }
+    }
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi_item.csv"
+
+    pokeapi.extract_items(output_path, ["Choice Band"], dataset_version="0.1.0", session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert session.requested_urls == ["https://pokeapi.co/api/v2/item/choice-band"]
+    assert row["item_name"] == "Choice Band"
+    assert row["short_effect"] == "Boosts Attack by 50%, but restricts the holder to one move."
+    assert row["source_record_id"] == "220"
+    assert row["dataset_version"] == "0.1.0"
+
+
+def test_extract_moves_handles_no_english_effect_entry(tmp_path):
+    payloads = {"splash": _move_payload(150, "splash", effect_entries=[])}
+    session = _FakeSession(payloads)
+    output_path = tmp_path / "pokeapi_move.csv"
+
+    pokeapi.extract_moves(output_path, ["Splash"], session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh))
+
+    assert row["short_effect"] == ""

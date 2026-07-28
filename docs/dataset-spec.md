@@ -66,8 +66,15 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **Primary key**: `pokemon_key`
   - **Join keys**: `pokemon_id`, `form_name`
   - **Required fields**: `pokemon_key`, `pokemon_id`, `pokemon_name`,
-    `form_name`, `source_name`, `source_url`, `source_record_id`,
+    `form_name`, `type_1`, `source_name`, `source_url`, `source_record_id`,
     `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `type_2` (secondary Pokémon type; nullable for
+    single-type Pokémon). Added in the dashboard competitive-UX pass: read
+    off the same PokéAPI `/pokemon/{form}` payload `pokemon_stat_canonical`
+    already fetches (`payload["types"]`), so no new HTTP call was needed —
+    see `pipelines/extract/pokeapi.py`'s docstring. Powers the dashboard's
+    Pokémon Profile type badge and Matchup tab (type effectiveness, damage
+    calculator).
 - `pokemon_stat_canonical`
   - **Purpose**: canonical PokéAPI stat snapshot
   - **Primary key**: `pokemon_stat_canonical_key`
@@ -143,6 +150,43 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **Optional fields**: `pokemon_id` (nullable only if a future source
     can't supply it directly; Bulbagarden rows always resolve it via the
     mapping seed)
+
+Three more entities were added in the dashboard competitive-UX pass, all
+sourced from PokéAPI, scoped to move/ability/item names actually reported
+in `tournament_team_member` (`data/staging/munchstats.csv`'s
+`moves`/`ability`/`item_name` fields) rather than PokéAPI's full catalog.
+**These are dashboard-support reference/lookup tables, not release-gated
+core v1 entities** — they don't join to `pokemon_key` and aren't part of
+the versioned release package (`releases/data/<version>/`); they still
+carry full provenance per this repo's "provenance is mandatory"
+convention, just outside the v1 scope-at-a-glance list above. A future
+pass may decide to promote them into the release package once their
+value there (vs. as dashboard-only support data) is clearer.
+
+- `move_detail`
+  - **Purpose**: move reference detail (type/power/accuracy/category/
+    priority/pp/short_effect) for the dashboard's Pokémon Profile move
+    descriptions and Matchup-tab damage calculator
+  - **Primary key**: `move_name`
+  - **Required fields**: `move_name`, `move_type`, `category`, `priority`,
+    `pp`, `source_name`, `source_url`, `source_record_id`,
+    `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `power`, `accuracy` (null for status/variable-
+    power/always-hit moves), `short_effect`
+- `ability_detail`
+  - **Purpose**: ability reference detail (short_effect) for the
+    dashboard's Pokémon Profile ability descriptions
+  - **Primary key**: `ability_name`
+  - **Required fields**: `ability_name`, `source_name`, `source_url`,
+    `source_record_id`, `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `short_effect`
+- `item_detail`
+  - **Purpose**: held-item reference detail (short_effect) for the
+    dashboard's Pokémon Profile item descriptions
+  - **Primary key**: `item_name`
+  - **Required fields**: `item_name`, `source_name`, `source_url`,
+    `source_record_id`, `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `short_effect`
 
 ### Locked required fields
 
@@ -234,16 +278,25 @@ Every release entry must summarize:
 ### PokéAPI
 
 - **Records to capture**
-  - Pokémon/form identity rows
+  - Pokémon/form identity rows, including `type_1`/`type_2`
   - Base stat rows for all Pokémon in the mapped Champions pool
+  - Move/ability/item reference detail (`move_detail`/`ability_detail`/
+    `item_detail` — dashboard competitive-UX pass), scoped to names
+    actually reported in `tournament_team_member`
 - **Refresh cadence**
   - Weekly scheduled refresh
 - **Mapping rules**
   - Treat PokéAPI numeric IDs as the canonical `pokemon_id`
   - Normalize form naming into the shared `form_name` convention
+  - Move/ability/item names are matched to PokéAPI resource slugs via a
+    lowercase/hyphenate transform (`pipelines/extract/pokeapi.py`'s
+    `_slugify`); a name that doesn't slug the same way is skipped rather
+    than mismapped
 - **Known risks**
   - Form-name mismatches between canonical and format-specific sources
   - Multi-form species that need explicit mapping rather than name-only joins
+  - A move/ability/item name PokéAPI doesn't recognize under the
+    `_slugify` transform simply won't resolve — no fuzzy matching
 
 ### OP.GG Pokémon Champions
 

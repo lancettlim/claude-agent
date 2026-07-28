@@ -1,0 +1,21 @@
+{
+  "table_name": "move_detail",
+  "purpose": "Move reference detail for the dashboard's Pokémon Profile move descriptions and Matchup-tab damage calculator. Dashboard-support reference data, not a release-gated core entity.",
+  "primary_key": "move_name",
+  "join_keys": [],
+  "fields": [
+    {"name": "move_name", "type": "string", "required": true, "description": "Move display name, matching tournament_team_member's moves list entries"},
+    {"name": "move_type", "type": "string", "required": true, "description": "Move's type, lowercase"},
+    {"name": "power", "type": "integer", "required": false, "description": "Base power; null for status/variable-power moves"},
+    {"name": "accuracy", "type": "integer", "required": false, "description": "Accuracy percentage; null for moves that always hit"},
+    {"name": "category", "type": "string", "required": true, "description": "Damage class: physical, special, or status"},
+    {"name": "priority", "type": "integer", "required": true, "description": "Move priority bracket"},
+    {"name": "pp", "type": "integer", "required": true, "description": "Base PP"},
+    {"name": "short_effect", "type": "string", "required": false, "description": "PokéAPI's English short effect description"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Originating source"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Source URL or endpoint the record was resolved from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream record identifier"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this row was published under"}
+  ]
+}

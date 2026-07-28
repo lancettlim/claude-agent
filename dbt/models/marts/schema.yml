@@ -31,20 +31,40 @@ models:
       across every roster slot that included the Pokémon, restricted to
       the current legal pool and to teams with a reported record. Written
       to data/marts/pokemon_win_rate_summary.csv.
-  - name: pokemon_build_usage
+  - name: pokemon_item_usage
     description: >
-      Item/ability drill-down: usage count and build_share (that count's
-      fraction of the Pokémon's own total build rows) per Pokémon x item
-      x ability combination, restricted to the current legal pool and to
-      roster slots reporting at least one of item/ability, ranked within
-      each Pokémon. Written to data/marts/pokemon_build_usage.csv.
+      Item drill-down for the Pokémon Profile tab's Items section (top 5
+      shown in the dashboard UI): usage count and item_share (that count's
+      fraction of the Pokémon's own total item rows) per Pokémon x item,
+      restricted to the current legal pool, ranked within each Pokémon,
+      with short_effect joined from item_detail. Written to
+      data/marts/pokemon_item_usage.csv. Replaces the old combined
+      pokemon_build_usage mart (see pokemon_ability_usage below for the
+      other half of that split).
+  - name: pokemon_ability_usage
+    description: >
+      Ability drill-down for the Pokémon Profile tab's Ability section:
+      usage count and ability_share (that count's fraction of the
+      Pokémon's own total ability rows) per Pokémon x ability, restricted
+      to the current legal pool, ranked within each Pokémon, with
+      short_effect joined from ability_detail. Written to
+      data/marts/pokemon_ability_usage.csv.
   - name: pokemon_move_usage
     description: >
-      Move drill-down: usage count and move_share (that count's fraction
-      of the Pokémon's own total move rows) per Pokémon x move, unnesting
+      Move drill-down for the Pokémon Profile tab's Moves section (top 15
+      shown in the dashboard UI) and the Matchup tab's damage calculator:
+      usage count and move_share (that count's fraction of the Pokémon's
+      own total move rows) per Pokémon x move, unnesting
       tournament_team_member's pipe-delimited moves list, restricted to
-      the current legal pool, ranked within each Pokémon. Written to
-      data/marts/pokemon_move_usage.csv.
+      the current legal pool, ranked within each Pokémon, with
+      move_type/power/accuracy/category/priority/short_effect joined from
+      move_detail. Written to data/marts/pokemon_move_usage.csv.
+  - name: top_tournament_teams
+    description: >
+      Top Teams tab's leaderboard feed: one row per tournament_team with a
+      reported win/loss record, ranked by win_rate, with event context and
+      full member roster (pokemon_keys, pipe-delimited in slot order).
+      Written to data/marts/top_tournament_teams.csv.
   - name: pokemon_team_core_usage
     description: >
       Team-core drill-down (docs/prd.md's "Drill-down by Pokémon, team
@@ -94,10 +114,13 @@ models:
 #     event_tier dimension
 #   - win-rate proxies: pokemon_win_rate_summary, built from
 #     tournament_team.record_wins/record_losses
-#   - move/item drill-down: pokemon_build_usage (item/ability) and
-#     pokemon_move_usage (moves)
+#   - move/item/ability drill-down: pokemon_item_usage, pokemon_ability_usage,
+#     and pokemon_move_usage, each with descriptive text joined from
+#     move_detail/ability_detail/item_detail (PokéAPI effect text)
 #   - team-core drill-down: pokemon_team_core_usage, self-joining
 #     tournament_team_member on team_id
+#   - top real tournament teams: top_tournament_teams, ranked by win_rate
+#     with full member rosters
 #   - usage as a percentage of the meta: pokemon_usage_summary.usage_share
 #   - speed tiers / team builder: pokemon_champions_profile, one row per
 #     legal Pokémon with Champions-format speed plus usage/win-rate
@@ -112,13 +135,20 @@ models:
 #     usage/win-rate data -- must be presented in the dashboard as
 #     editorial judgment, not as an extracted/sourced fact
 #
-# Still a real gap (see docs/todo.md's backlog): type-effectiveness /
-# head-to-head matchup data. No in-scope source publishes Pokémon types or
-# battle-level opponent results (MunchStats reports team rosters and a
-# team's overall win/loss record, not individual battle outcomes against a
-# named opponent), so a genuine "matchups" view isn't buildable from real
-# data today without a new source or a hardcoded, unsourced type chart —
-# which would violate this repo's "provenance is mandatory" convention.
+# Type-effectiveness is now closed for the type-per-Pokémon half: pokemon
+# (and pokemon_champions_profile) carry type_1/type_2 from PokéAPI, and
+# move_detail carries each move's type/power/accuracy/category, so the
+# dashboard's Matchup tab can compute real type effectiveness and a
+# stats/setup/weather-aware damage calculator client-side (the type chart
+# and weather-boost multipliers are universal game-mechanics constants, not
+# per-record data, and live in the dashboard's JS layer rather than a dbt
+# model — the same treatment already given to app.js's SPEED_TIERS
+# bucketing constant). Still a real gap: true head-to-head battle-outcome
+# matchups ("what beats Pokémon X X% of the time in practice"), since
+# MunchStats reports team-level win/loss records, not individual battle
+# outcomes against a named opponent — the Matchup tab's co-usage panel
+# (pokemon_team_core_usage) is an approximate teammate-based proxy, not a
+# real matchup-outcome signal. Tracked in docs/todo.md's backlog.
 #
 # All fields these depend on (event_tier, record_wins/record_losses,
 # item_name/ability/tera_type/moves) are optional in the source data — see
