@@ -19,3 +19,9 @@ models:
     description: "One row per Pokémon on a normalized tournament team. See data/normalized/tournament_team_member.schema.json."
   - name: pokemon_asset
     description: "Sprite/menu-icon image manifest for Pokémon/form references, sourced from Bulbagarden Archives. See data/normalized/pokemon_asset.schema.json."
+  - name: move_detail
+    description: "Move reference detail (type/power/accuracy/category/priority/pp/short_effect), scoped to moves seen in tournament rosters. Dashboard-support reference data, not a release-gated core entity. See data/normalized/move_detail.schema.json."
+  - name: ability_detail
+    description: "Ability reference detail (short_effect), scoped to abilities seen in tournament rosters. Dashboard-support reference data, not a release-gated core entity. See data/normalized/ability_detail.schema.json."
+  - name: item_detail
+    description: "Held-item reference detail (short_effect), scoped to items seen in tournament rosters. Dashboard-support reference data, not a release-gated core entity. See data/normalized/item_detail.schema.json."

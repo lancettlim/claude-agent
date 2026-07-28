@@ -36,8 +36,12 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("total_wins", "total_losses", "record_count"),
         ("win_rate",),
     ),
-    "pokemon_build_usage": (("usage_count", "usage_rank"), ("build_share",)),
-    "pokemon_move_usage": (("usage_count", "usage_rank"), ("move_share",)),
+    "pokemon_item_usage": (("usage_count", "usage_rank"), ("item_share",)),
+    "pokemon_ability_usage": (("usage_count", "usage_rank"), ("ability_share",)),
+    "pokemon_move_usage": (
+        ("usage_count", "usage_rank", "power", "accuracy", "priority"),
+        ("move_share",),
+    ),
     "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ("partner_share",)),
     "pokemon_champions_profile": (
         (
@@ -53,13 +57,9 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ),
         ("usage_share", "win_rate"),
     ),
-    "pokemon_archetype_usage": (
-        ("record_count", "member_rank"),
-        ("usage_share", "win_rate"),
-    ),
-    "archetype_summary": (
-        ("member_count",),
-        ("combined_usage_share", "avg_win_rate"),
+    "top_tournament_teams": (
+        ("record_wins", "record_losses", "placement", "team_rank"),
+        ("win_rate",),
     ),
 }
 
@@ -171,10 +171,12 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     top_win_rate_pool = qualified_win_rates or win_rate_rows
     top_win_rate = max(top_win_rate_pool, key=lambda r: r["win_rate"], default=None)
 
-    # Overview tab spotlight/ranked lists (dashboard "show top 12 + 30" ask):
-    # both drawn from the same overall usage ranking, just sliced to
-    # different lengths -- top_12 for the compact spotlight grid, top_30
-    # for the fuller ranked list. pokemon_usage_summary itself has no
+    # Overview tab spotlight grid (docs/design-system.md's "3-tier tab
+    # layout convention"): drawn from the overall usage ranking, sliced to
+    # a 6-wide-grid-friendly 12 -- the old Top 30 ranked list was removed
+    # (dashboard "remove top 30 in overview" ask) since the grid tier
+    # already covers the headline Pokémon and a full Usage-tab table
+    # exists for raw drill-down. pokemon_usage_summary itself has no
     # win_rate column, so it's joined in here (win_rate stays None if the
     # Pokémon has no recorded win/loss data) -- otherwise every spotlight
     # card would show a uniform, uninformative "no win rate" placeholder.
@@ -182,7 +184,6 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
     ranked_usage = sorted(usage_rows, key=lambda r: r["usage_rank"])
     ranked_usage = [{**r, "win_rate": win_rate_by_key.get(r["pokemon_key"])} for r in ranked_usage]
     top_12_pokemon = ranked_usage[:12]
-    top_30_pokemon = ranked_usage[:30]
 
     return {
         "latest_snapshot_date": latest_snapshot_date,
@@ -191,7 +192,6 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
         "top_used_pokemon": top_used,
         "top_win_rate_pokemon": top_win_rate,
         "top_12_pokemon": top_12_pokemon,
-        "top_30_pokemon": top_30_pokemon,
     }
 
 
@@ -205,4 +205,10 @@ def build_payload(
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "kpis": compute_kpis(marts),
         "marts": marts,
+        # Full pokemon_key -> display name map, needed client-side wherever
+        # a row can't be joined 1:1 by _join_pokemon_names -- e.g.
+        # top_tournament_teams' pipe-delimited pokemon_keys roster field,
+        # and the pokepaste import/export + Matchup tab's ad-hoc species
+        # lookups (docs/design-system.md's Top Teams / Matchup tabs).
+        "pokemon_names": pokemon_names,
     }

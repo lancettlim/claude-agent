@@ -1,10 +1,18 @@
 /* Plain vanilla JS — no bundler, no framework, no charting library. Reads
  * window.DASHBOARD_DATA (baked into index.html by pipelines/dashboard/
- * build.py) and wires up the tabs/filters/tables/ranked-lists declared in
+ * build.py) and wires up the tabs/filters/tables/grids declared in
  * index.html.jinja.
  *
- * Ranked visuals (see renderRankedList) are plain DOM/CSS bar rows, not
- * canvas charts — this dashboard has no Chart.js/CDN dependency. */
+ * This file owns the core framework (tabs, tables, the shared .grid-6xn
+ * component) plus the Overview/Usage/Pokémon Profile/Speed Tiers tabs, and
+ * exposes shared state/helpers on window.DashboardApp so matchup.js
+ * (Matchup tab) and teams.js (Team Builder + Top Teams tabs) — loaded
+ * right after this file — can reuse them instead of duplicating. See
+ * docs/design-system.md for the full component/token reference.
+ *
+ * Ranked/grid visuals (see renderGrid6xn/renderRankedList) are plain
+ * DOM/CSS, not canvas charts — this dashboard has no Chart.js/CDN
+ * dependency. */
 (function () {
   "use strict";
 
@@ -13,19 +21,25 @@
     kpis: {},
     sprites: {},
     type_icons: {},
-    move_types: {},
     item_icons: {},
     reference_teams: [],
+    pokemon_names: {},
   };
   var marts = DATA.marts || {};
   var sprites = DATA.sprites || {};
   var typeIcons = DATA.type_icons || {};
-  var moveTypes = DATA.move_types || {};
   var itemIcons = DATA.item_icons || {};
+  var pokemonNames = DATA.pokemon_names || {};
 
   // Icon-size tokens (docs/design-system.md's "Icon size scale") — mirrors
-  // the --icon-sm/md/lg CSS custom properties in index.html.jinja.
-  var ICON_SIZES = { sm: 32, md: 48, lg: 72 };
+  // the --icon-sm/md/lg/xl CSS custom properties in index.html.jinja.
+  var ICON_SIZES = { sm: 32, md: 48, lg: 72, xl: 96 };
+
+  var ALL_TYPES = [
+    "normal", "fire", "water", "electric", "grass", "ice", "fighting",
+    "poison", "ground", "flying", "psychic", "bug", "rock", "ghost",
+    "dragon", "dark", "steel", "fairy",
+  ];
 
   // ---------- generic helpers ----------
 
@@ -84,6 +98,40 @@
     return lookup;
   }
 
+  // pokemon_key -> its pokemon_champions_profile row (stats, type_1/type_2,
+  // usage/win-rate) — the shared join point for the Usage/Speed
+  // Tiers/Matchup tabs' type and stat-range filters.
+  function championsProfileByKey() {
+    var lookup = {};
+    (marts.pokemon_champions_profile || []).forEach(function (r) {
+      lookup[r.pokemon_key] = r;
+    });
+    return lookup;
+  }
+
+  // Rough physical/special/mixed role per Pokémon, derived from the
+  // damage-category split of its own recorded moveset (pokemon_move_usage,
+  // weighted by usage_count) — not a sourced attribute, a UX bucketing
+  // convention like SPEED_TIERS below. Status-only moves don't count
+  // toward either side.
+  function roleByKey() {
+    var counts = {};
+    (marts.pokemon_move_usage || []).forEach(function (r) {
+      if (r.category !== "physical" && r.category !== "special") return;
+      var c = counts[r.pokemon_key] || (counts[r.pokemon_key] = { physical: 0, special: 0 });
+      c[r.category] += r.usage_count || 1;
+    });
+    var roles = {};
+    Object.keys(counts).forEach(function (key) {
+      var c = counts[key];
+      if (c.physical === 0 && c.special === 0) return;
+      if (c.physical > c.special * 1.5) roles[key] = "physical";
+      else if (c.special > c.physical * 1.5) roles[key] = "special";
+      else roles[key] = "mixed";
+    });
+    return roles;
+  }
+
   function fillSelect(select, options, allLabel) {
     select.innerHTML = "";
     var allOption = document.createElement("option");
@@ -105,6 +153,57 @@
       tr.innerHTML = rowHtmlFn(row, index);
       tbody.appendChild(tr);
     });
+  }
+
+  // Numeric min/max <input type="number"> pair filter (docs/design-system.md's
+  // "range-filter" component) — used for usage %/win rate/speed/stat
+  // ranges. Empty min/max means unbounded on that side; a null/undefined
+  // value fails the filter as soon as either bound is set.
+  function inRange(value, minEl, maxEl) {
+    var hasMin = minEl && minEl.value !== "";
+    var hasMax = maxEl && maxEl.value !== "";
+    if (!hasMin && !hasMax) return true;
+    if (value === null || value === undefined) return false;
+    if (hasMin && value < parseFloat(minEl.value)) return false;
+    if (hasMax && value > parseFloat(maxEl.value)) return false;
+    return true;
+  }
+
+  // Multi-select type filter, rendered as a row of toggle chips (one per
+  // ALL_TYPES entry). `selected` is a plain {type_name: true} map the
+  // caller owns; an empty map means "no filter, show everything".
+  function renderTypeFilterChips(container, selected, onChange) {
+    if (!container) return;
+    container.innerHTML = "";
+    ALL_TYPES.forEach(function (type) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "toggle-chip";
+      chip.setAttribute("aria-pressed", selected[type] ? "true" : "false");
+      chip.innerHTML = typeIconImg(type, 14) + " " + type;
+      chip.addEventListener("click", function () {
+        if (selected[type]) {
+          delete selected[type];
+        } else {
+          selected[type] = true;
+        }
+        chip.setAttribute("aria-pressed", selected[type] ? "true" : "false");
+        onChange();
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  function hasAnySelectedType(selected) {
+    for (var key in selected) {
+      if (Object.prototype.hasOwnProperty.call(selected, key)) return true;
+    }
+    return false;
+  }
+
+  function passesTypeFilter(selected, type1, type2) {
+    if (!hasAnySelectedType(selected)) return true;
+    return !!(selected[type1] || (type2 && selected[type2]));
   }
 
   // A single select-driven drill-down: fills the select from the distinct
@@ -145,6 +244,44 @@
     );
   }
 
+  function typeIconImg(typeName, sizePx) {
+    var src = typeIcons[typeName];
+    if (!src) return "";
+    var size = sizePx || 18;
+    return (
+      '<img src="' + src + '" alt="' + escapeHtml(typeName) + '" style="width:' + size +
+      "px;height:" + size + 'px;vertical-align:-3px">'
+    );
+  }
+
+  // Renders a Pokémon's type_1/type_2 into `container` as a type-badge row.
+  // large=true switches to the Profile header's --icon-xl dual-type
+  // display (docs/design-system.md's "Larger type badge"); otherwise it's
+  // the compact pill used in the Matchup tab's picker panels.
+  function renderTypeBadgeRow(container, type1, type2, large) {
+    if (!container) return;
+    var types = [type1, type2].filter(Boolean);
+    if (!types.length) {
+      container.innerHTML = "";
+      return;
+    }
+    if (large) {
+      container.className = "type-badge-row type-badge-lg";
+      container.innerHTML = types
+        .map(function (t) {
+          return '<div class="type-pill-lg">' + typeIconImg(t, ICON_SIZES.xl) + "<span>" + escapeHtml(t) + "</span></div>";
+        })
+        .join("");
+    } else {
+      container.className = "type-badge-row";
+      container.innerHTML = types
+        .map(function (t) {
+          return '<span class="type-pill">' + typeIconImg(t, 18) + escapeHtml(t) + "</span>";
+        })
+        .join("");
+    }
+  }
+
   function formatPercent(value) {
     return value === null || value === undefined ? "—" : (value * 100).toFixed(1) + "%";
   }
@@ -177,49 +314,32 @@
     return '<div class="cell-with-icon">' + icon + "<span>" + escapeHtml(itemName) + "</span></div>";
   }
 
-  // ---------- ranked list (replaces Chart.js bar charts) ----------
+  // ---------- 6-wide grid (docs/design-system.md's ".grid-6xn component") ----------
 
-  // Renders a dependency-free "ranked percentage/value row" list into
-  // container (a <ol>/<ul>/<div>). opts:
-  //   keyFn(row)      -> pokemon_key to look up a sprite icon (optional)
-  //   iconFn(row)     -> an icon src directly, overrides keyFn (optional)
-  //   labelFn(row)    -> row label text
-  //   valueFn(row)    -> number driving the bar's relative width
-  //   displayFn(row)  -> text shown at the row's right edge
-  //   maxValue        -> optional override; defaults to the max valueFn
-  //                      among the given rows (bars are relative to each
-  //                      other within the list, not to a fixed 100%)
-  function renderRankedList(container, rows, opts) {
+  // The dashboard's primary visual for any usage/win-rate metric,
+  // replacing the old per-metric ranked-list bars (dashboard "replace
+  // usage/win-rate bar charts with a 6xn grid just like overview" ask).
+  // opts mirror renderRankedList's: keyFn/iconFn, labelFn, displayFn
+  // (bolded headline value), subFn (optional second line — a description,
+  // a secondary stat), showRank (default true).
+  function renderGrid6xn(container, rows, opts) {
     if (!container) return;
     container.innerHTML = "";
     if (!rows.length) {
-      var empty = document.createElement("li");
-      empty.className = "empty-state";
-      empty.textContent = "No data yet.";
-      container.appendChild(empty);
+      container.innerHTML = '<p class="empty-state">No data yet.</p>';
       return;
     }
-    var maxValue = opts.maxValue;
-    if (maxValue === undefined) {
-      maxValue = rows.reduce(function (max, row) {
-        return Math.max(max, opts.valueFn(row) || 0);
-      }, 0);
-    }
     rows.forEach(function (row, i) {
-      var value = opts.valueFn(row) || 0;
-      var pct = maxValue > 0 ? Math.min(100, (value / maxValue) * 100) : 0;
       var iconSrc = opts.iconFn ? opts.iconFn(row) : opts.keyFn ? sprites[opts.keyFn(row)] : null;
-      var li = document.createElement("li");
-      li.className = "ranked-row" + (i === 0 ? " is-leader" : "");
-      li.innerHTML =
-        '<span class="ranked-rank">#' + (i + 1) + "</span>" +
-        (iconSrc ? '<img class="ranked-icon" src="' + iconSrc + '" alt="">' : "") +
-        '<div class="ranked-body">' +
-        '<div class="ranked-label"><span>' + escapeHtml(opts.labelFn(row)) + '</span><span class="ranked-value">' +
-        escapeHtml(opts.displayFn(row)) + "</span></div>" +
-        '<div class="ranked-bar-track"><div class="ranked-bar-fill" style="width:' + pct + '%"></div></div>' +
-        "</div>";
-      container.appendChild(li);
+      var tile = document.createElement("div");
+      tile.className = "grid-6xn-tile" + (i === 0 && opts.showLeader !== false ? " is-leader" : "");
+      tile.innerHTML =
+        (opts.showRank !== false ? '<span class="badge badge-rank">#' + (i + 1) + "</span>" : "") +
+        (iconSrc ? '<img src="' + iconSrc + '" alt="">' : "") +
+        '<div class="grid-6xn-label">' + escapeHtml(opts.labelFn(row)) + "</div>" +
+        '<div class="grid-6xn-value">' + escapeHtml(opts.displayFn(row)) + "</div>" +
+        (opts.subFn && opts.subFn(row) ? '<div class="grid-6xn-sub">' + escapeHtml(opts.subFn(row)) + "</div>" : "");
+      container.appendChild(tile);
     });
   }
 
@@ -287,6 +407,13 @@
 
   // ---------- tab switching ----------
 
+  var tabInitializers = {};
+  var initialized = {};
+
+  function registerTab(tabId, initFn) {
+    tabInitializers[tabId] = initFn;
+  }
+
   function setupTabs(onActivate) {
     var buttons = document.querySelectorAll(".tab-btn");
     var panels = document.querySelectorAll(".tab-panel");
@@ -311,177 +438,157 @@
 
   function setupOverview() {
     var top12 = (DATA.kpis && DATA.kpis.top_12_pokemon) || [];
-    var top30 = (DATA.kpis && DATA.kpis.top_30_pokemon) || [];
-
-    var grid = document.getElementById("overview-top-12");
-    if (grid) {
-      grid.innerHTML = "";
-      if (!top12.length) {
-        grid.innerHTML = '<p class="empty-state">No usage data yet.</p>';
-      }
-      top12.forEach(function (r, i) {
-        var card = document.createElement("div");
-        card.className = "spotlight-card";
-        card.innerHTML =
-          '<span class="badge badge-rank">#' + (i + 1) + "</span>" +
-          (sprites[r.pokemon_key]
-            ? '<img src="' + sprites[r.pokemon_key] + '" alt="">'
-            : "") +
-          '<div class="spotlight-name">' + escapeHtml(r.pokemon_name) + "</div>" +
-          '<div class="spotlight-stats">' + formatPercent(r.usage_share) + " usage · " +
-          formatPercent(r.win_rate) + " win rate</div>";
-        grid.appendChild(card);
-      });
-    }
-
-    var list = document.getElementById("overview-top-30");
-    var toggleBtn = document.getElementById("overview-top-30-toggle");
-    var expanded = false;
-    var maxShare = top30.length ? (top30[0].usage_share || 0) * 100 : 0;
-    function renderTop30() {
-      var rows = expanded ? top30 : top30.slice(0, 10);
-      renderRankedList(list, rows, {
-        keyFn: function (r) {
-          return r.pokemon_key;
-        },
-        labelFn: function (r) {
-          return r.pokemon_name;
-        },
-        valueFn: function (r) {
-          return (r.usage_share || 0) * 100;
-        },
-        displayFn: function (r) {
-          return formatPercent(r.usage_share);
-        },
-        maxValue: maxShare,
-      });
-    }
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", function () {
-        expanded = !expanded;
-        toggleBtn.textContent = expanded ? "Show top 10" : "Show all 30";
-        renderTop30();
-      });
-    }
-    renderTop30();
+    renderGrid6xn(document.getElementById("overview-top-12"), top12, {
+      keyFn: function (r) {
+        return r.pokemon_key;
+      },
+      labelFn: function (r) {
+        return r.pokemon_name;
+      },
+      displayFn: function (r) {
+        return formatPercent(r.usage_share);
+      },
+      subFn: function (r) {
+        return formatPercent(r.win_rate) + " win rate";
+      },
+    });
   }
 
   function setupUsage() {
     var usageRows = marts.pokemon_usage_summary || [];
-    var tierSelect = document.getElementById("usage-tier-filter");
-    var rankedList = document.getElementById("usage-ranked-list");
+    var profileByKey = championsProfileByKey();
+    var roles = roleByKey();
 
-    function drawUsageRanked() {
+    var tierSelect = document.getElementById("usage-tier-filter");
+    var roleSelect = document.getElementById("usage-role-filter");
+    var typeFilterEl = document.getElementById("usage-type-filter");
+    var shareMin = document.getElementById("usage-share-min");
+    var shareMax = document.getElementById("usage-share-max");
+    var speedMin = document.getElementById("usage-speed-min");
+    var speedMax = document.getElementById("usage-speed-max");
+    var selectedTypes = {};
+
+    function filteredRows(tier) {
+      return usageRows.filter(function (r) {
+        if ((r.event_tier || "") !== tier) return false;
+        var profile = profileByKey[r.pokemon_key];
+        if (!passesTypeFilter(selectedTypes, profile && profile.type_1, profile && profile.type_2)) return false;
+        if (roleSelect && roleSelect.value && roles[r.pokemon_key] !== roleSelect.value) return false;
+        if (!inRange(r.usage_share != null ? r.usage_share * 100 : null, shareMin, shareMax)) return false;
+        if (!inRange(profile ? profile.speed : null, speedMin, speedMax)) return false;
+        return true;
+      });
+    }
+
+    var grid = document.getElementById("usage-grid");
+    var usageTable = document.getElementById("usage-leaders-table");
+    var usageTableSortable = usageTable
+      ? makeSortableTable(
+          usageTable,
+          [],
+          function (r) {
+            return (
+              '<td><span class="badge badge-rank">#' + r.usage_rank + "</span></td>" +
+              "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+              "<td>" + formatPercent(r.usage_share) + "</td>"
+            );
+          },
+          {}
+        )
+      : null;
+
+    function drawUsage() {
       var tier = tierSelect ? tierSelect.value : "";
-      var rows = usageRows
-        .filter(function (r) {
-          return (r.event_tier || "") === tier;
-        })
+      var rows = filteredRows(tier)
         .slice()
         .sort(function (a, b) {
           return a.usage_rank - b.usage_rank;
-        })
-        .slice(0, 15);
-      renderRankedList(rankedList, rows, {
+        });
+      renderGrid6xn(grid, rows.slice(0, 18), {
         keyFn: function (r) {
           return r.pokemon_key;
         },
         labelFn: function (r) {
           return r.pokemon_name;
         },
-        valueFn: function (r) {
-          return (r.usage_share || 0) * 100;
-        },
         displayFn: function (r) {
           return formatPercent(r.usage_share);
         },
       });
+      if (usageTableSortable) usageTableSortable.setRows(rows.slice(0, 30));
     }
+
     if (tierSelect) {
       var tiers = distinctSorted(usageRows, "event_tier");
       fillSelect(tierSelect, tiers, "Overall");
-      tierSelect.addEventListener("change", drawUsageRanked);
+      tierSelect.addEventListener("change", drawUsage);
     }
-    drawUsageRanked();
+    renderTypeFilterChips(typeFilterEl, selectedTypes, drawUsage);
+    [roleSelect, shareMin, shareMax, speedMin, speedMax].forEach(function (el) {
+      if (!el) return;
+      el.addEventListener("input", drawUsage);
+      el.addEventListener("change", drawUsage);
+    });
+    drawUsage();
 
-    var usageTable = document.getElementById("usage-leaders-table");
-    if (usageTable) {
-      var leaders = usageRows
+    var winRows = marts.pokemon_win_rate_summary || [];
+    var winGrid = document.getElementById("win-rate-grid");
+    var winTable = document.getElementById("win-rate-table");
+    var minRecordSelect = document.getElementById("win-rate-min-record-count-filter");
+    var winSortable = winTable
+      ? makeSortableTable(
+          winTable,
+          [],
+          function (r, i) {
+            return (
+              '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
+              "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+              "<td>" + formatPercent(r.win_rate) + ' <span class="ranked-value">(n=' + r.record_count + ")</span></td>"
+            );
+          },
+          { defaultKey: "win_rate" }
+        )
+      : null;
+    function updateWinRows() {
+      var floor = minRecordSelect ? parseInt(minRecordSelect.value, 10) : 5;
+      var filtered = winRows
         .filter(function (r) {
-          return !r.event_tier;
+          return r.record_count >= floor;
         })
         .slice()
         .sort(function (a, b) {
-          return a.usage_rank - b.usage_rank;
-        })
-        .slice(0, 30);
-      makeSortableTable(
-        usageTable,
-        leaders,
-        function (r) {
-          return (
-            '<td><span class="badge badge-rank">#' + r.usage_rank + "</span></td>" +
-            "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
-            "<td>" + formatPercent(r.usage_share) + "</td>"
-          );
+          return b.win_rate - a.win_rate;
+        });
+      renderGrid6xn(winGrid, filtered.slice(0, 18), {
+        keyFn: function (r) {
+          return r.pokemon_key;
         },
-        {}
-      );
-    }
-
-    var winRows = marts.pokemon_win_rate_summary || [];
-    var winTable = document.getElementById("win-rate-table");
-    var minRecordSelect = document.getElementById("win-rate-min-record-count-filter");
-    if (winTable) {
-      var winSortable = makeSortableTable(
-        winTable,
-        [],
-        function (r, i) {
-          return (
-            '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
-            "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
-            "<td>" + formatPercent(r.win_rate) + ' <span class="ranked-value">(n=' + r.record_count + ")</span></td>"
-          );
+        labelFn: function (r) {
+          return r.pokemon_name;
         },
-        { defaultKey: "win_rate" }
-      );
-      function updateWinRows() {
-        var floor = minRecordSelect ? parseInt(minRecordSelect.value, 10) : 5;
-        var filtered = winRows
-          .filter(function (r) {
-            return r.record_count >= floor;
-          })
-          .slice()
-          .sort(function (a, b) {
-            return b.win_rate - a.win_rate;
-          })
-          .slice(0, 30);
-        winSortable.setRows(filtered);
-      }
-      if (minRecordSelect) minRecordSelect.addEventListener("change", updateWinRows);
-      updateWinRows();
+        displayFn: function (r) {
+          return formatPercent(r.win_rate);
+        },
+        subFn: function (r) {
+          return "n=" + r.record_count;
+        },
+      });
+      if (winSortable) winSortable.setRows(filtered.slice(0, 30));
     }
+    if (minRecordSelect) minRecordSelect.addEventListener("change", updateWinRows);
+    updateWinRows();
   }
 
-  // Merges what used to be the separate Builds/Moves/Team Cores tabs into
-  // one Pokémon-centric view (dashboard "combine build + moves page per
-  // Pokémon" ask), plus a Profile sub-section (base stats, speed tier,
-  // curated archetype tags) so there's one place to see everything about a
-  // single Pokémon instead of three tabs with independently-selected
-  // Pokémon.
+  // Pokémon Profile: one Pokémon-centric view combining base stats + type,
+  // then three separated Items/Ability/Moves sections (docs/design-system.md's
+  // "Item / Ability / Move separation" — replaces the old single combined
+  // build table), each capped and described, plus Team Cores.
   function setupPokemonProfile() {
     var profileRows = marts.pokemon_champions_profile || [];
-    var buildRows = marts.pokemon_build_usage || [];
+    var itemRows = marts.pokemon_item_usage || [];
+    var abilityRows = marts.pokemon_ability_usage || [];
     var moveRows = marts.pokemon_move_usage || [];
     var coreRows = marts.pokemon_team_core_usage || [];
-    var archetypeRows = marts.pokemon_archetype_usage || [];
-
-    var archetypesByPokemon = {};
-    archetypeRows.forEach(function (r) {
-      (archetypesByPokemon[r.pokemon_key] = archetypesByPokemon[r.pokemon_key] || []).push(
-        r.archetype_name
-      );
-    });
 
     var select = document.getElementById("pokemon-profile-filter");
     if (!select) return;
@@ -498,24 +605,10 @@
     );
 
     var statsEl = document.getElementById("pokemon-profile-stats");
-    var buildTable = document.getElementById("build-table");
-    var moveList = document.getElementById("move-ranked-list");
-    var coreList = document.getElementById("team-core-ranked-list");
-
-    var buildSortable = buildTable
-      ? makeSortableTable(
-          buildTable,
-          [],
-          function (r) {
-            return (
-              "<td>" + itemCell(r.item_name) + "</td>" +
-              "<td>" + (r.ability ? escapeHtml(r.ability) : "—") + "</td>" +
-              "<td>" + formatPercent(r.build_share) + "</td>"
-            );
-          },
-          { defaultKey: "build_share" }
-        )
-      : null;
+    var itemGrid = document.getElementById("profile-item-grid");
+    var abilityGrid = document.getElementById("profile-ability-grid");
+    var moveGrid = document.getElementById("profile-move-grid");
+    var coreGrid = document.getElementById("profile-team-core-grid");
 
     function render(chosenName) {
       var profile = sortedProfiles.filter(function (r) {
@@ -524,36 +617,71 @@
 
       if (statsEl) {
         if (!profile) {
+          statsEl.className = "empty-state";
           statsEl.textContent = "Select a Pokémon to see its profile.";
         } else {
-          var tags = (archetypesByPokemon[profile.pokemon_key] || [])
-            .map(function (name) {
-              return '<span class="badge badge-rank">' + escapeHtml(name) + "</span>";
-            })
-            .join(" ");
+          statsEl.className = "";
           statsEl.innerHTML =
             '<div class="cell-with-icon">' +
             spriteImg(profile.pokemon_key, ICON_SIZES.lg) +
             "<div><strong>" + escapeHtml(profile.pokemon_name) + "</strong> " +
-            speedTierBadge(profile.speed) + "<br>" +
+            speedTierBadge(profile.speed) +
+            '<div class="type-badge-row type-badge-lg" id="profile-type-badge"></div>' +
             "HP " + profile.hp + " · Atk " + profile.attack + " · Def " + profile.defense +
             " · SpA " + profile.sp_attack + " · SpD " + profile.sp_defense +
             " · Spe " + profile.speed + "<br>" +
             formatPercent(profile.usage_share) + " usage · " + formatPercent(profile.win_rate) +
-            " win rate" + (tags ? "<br>" + tags : "") + "</div></div>";
+            " win rate</div></div>";
+          renderTypeBadgeRow(document.getElementById("profile-type-badge"), profile.type_1, profile.type_2, true);
         }
       }
 
-      var builds = chosenName
-        ? buildRows
+      var items = chosenName
+        ? itemRows
             .filter(function (r) {
               return r.pokemon_name === chosenName;
             })
             .sort(function (a, b) {
               return a.usage_rank - b.usage_rank;
             })
+            .slice(0, 5)
         : [];
-      if (buildSortable) buildSortable.setRows(builds);
+      renderGrid6xn(itemGrid, items, {
+        iconFn: function (r) {
+          return itemIcons[r.item_name];
+        },
+        labelFn: function (r) {
+          return r.item_name;
+        },
+        displayFn: function (r) {
+          return formatPercent(r.item_share);
+        },
+        subFn: function (r) {
+          return r.short_effect;
+        },
+      });
+
+      var abilities = chosenName
+        ? abilityRows
+            .filter(function (r) {
+              return r.pokemon_name === chosenName;
+            })
+            .sort(function (a, b) {
+              return a.usage_rank - b.usage_rank;
+            })
+            .slice(0, 5)
+        : [];
+      renderGrid6xn(abilityGrid, abilities, {
+        labelFn: function (r) {
+          return r.ability;
+        },
+        displayFn: function (r) {
+          return formatPercent(r.ability_share);
+        },
+        subFn: function (r) {
+          return r.short_effect;
+        },
+      });
 
       var moves = chosenName
         ? moveRows
@@ -563,19 +691,20 @@
             .sort(function (a, b) {
               return a.usage_rank - b.usage_rank;
             })
+            .slice(0, 15)
         : [];
-      renderRankedList(moveList, moves, {
+      renderGrid6xn(moveGrid, moves, {
         iconFn: function (r) {
-          return typeIcons[moveTypes[r.move_name]];
+          return typeIcons[r.move_type];
         },
         labelFn: function (r) {
           return r.move_name;
         },
-        valueFn: function (r) {
-          return (r.move_share || 0) * 100;
-        },
         displayFn: function (r) {
           return formatPercent(r.move_share);
+        },
+        subFn: function (r) {
+          return r.short_effect || (r.power ? "Power " + r.power : "");
         },
       });
 
@@ -589,15 +718,12 @@
             })
             .slice(0, 15)
         : [];
-      renderRankedList(coreList, cores, {
+      renderGrid6xn(coreGrid, cores, {
         keyFn: function (r) {
           return r.partner_pokemon_key;
         },
         labelFn: function (r) {
           return r.partner_pokemon_name;
-        },
-        valueFn: function (r) {
-          return (r.partner_share || 0) * 100;
         },
         displayFn: function (r) {
           return formatPercent(r.partner_share);
@@ -612,417 +738,117 @@
     render(select.value);
   }
 
-  // Archetype Explorer (dashboard "show competitive archetypes" ask):
-  // curated groupings (dbt/seeds/archetype_pokemon_map.csv), NOT sourced
-  // tournament data — see the disclaimer copy in index.html.jinja.
-  function setupArchetypes() {
-    var summaryRows = marts.archetype_summary || [];
-    var memberRows = marts.pokemon_archetype_usage || [];
-    var grid = document.getElementById("archetype-grid");
-    var heading = document.getElementById("archetype-members-heading");
-    var membersTable = document.getElementById("archetype-members-table");
-    if (!grid) return;
-
-    var membersSortable = membersTable
-      ? makeSortableTable(
-          membersTable,
-          [],
-          function (r) {
-            return (
-              '<td><span class="badge badge-rank">#' + r.member_rank + "</span></td>" +
-              "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
-              "<td>" + formatPercent(r.usage_share) + "</td>" +
-              "<td>" + formatPercent(r.win_rate) + "</td>"
-            );
-          },
-          { defaultKey: "usage_share" }
-        )
-      : null;
-
-    grid.innerHTML = "";
-    if (!summaryRows.length) {
-      grid.innerHTML = '<p class="empty-state">No archetypes curated yet.</p>';
-      return;
-    }
-
-    var cards = [];
-    summaryRows.forEach(function (archetype) {
-      var members = memberRows
-        .filter(function (r) {
-          return r.archetype_key === archetype.archetype_key;
-        })
-        .sort(function (a, b) {
-          return a.member_rank - b.member_rank;
-        });
-      var topMembers = members.slice(0, 3);
-      var card = document.createElement("button");
-      card.type = "button";
-      card.className = "archetype-card";
-      card.setAttribute("aria-pressed", "false");
-      card.innerHTML =
-        "<h3>" + escapeHtml(archetype.archetype_name) + "</h3>" +
-        '<div class="archetype-stats">' + archetype.member_count + " members · " +
-        formatPercent(archetype.combined_usage_share) + " combined usage · " +
-        formatPercent(archetype.avg_win_rate) + " avg win rate</div>" +
-        '<div class="archetype-members">' +
-        topMembers
-          .map(function (r) {
-            return sprites[r.pokemon_key] ? '<img src="' + sprites[r.pokemon_key] + '" alt="">' : "";
-          })
-          .join("") +
-        "</div>";
-      card.addEventListener("click", function () {
-        cards.forEach(function (c) {
-          c.setAttribute("aria-pressed", "false");
-        });
-        card.setAttribute("aria-pressed", "true");
-        if (heading) heading.style.display = "";
-        if (membersTable) membersTable.style.display = "";
-        if (membersSortable) membersSortable.setRows(members);
-      });
-      cards.push(card);
-      grid.appendChild(card);
-    });
-
-    if (cards.length) cards[0].click();
-  }
-
-  // Regulation Comparison (dashboard "assume cumulative" ask): shows both
-  // the independent and cumulative legal-pool size per regulation, plus a
-  // delta vs. the previous regulation, with the no-removal-signal caveat
-  // as visible copy in the template (not just a code comment).
-  function setupRegulations() {
-    var rows = marts.legality_summary_by_regulation || [];
-    var latest = DATA.kpis && DATA.kpis.latest_snapshot_date;
-    var filtered = rows
-      .filter(function (r) {
-        return r.snapshot_date === latest;
-      })
-      .sort(function (a, b) {
-        return a.regulation_code < b.regulation_code ? -1 : a.regulation_code > b.regulation_code ? 1 : 0;
-      });
-    var tbody = document.querySelector("#regulation-comparison-table tbody");
-    if (!tbody) return;
-    renderRows(tbody, filtered, function (r, i) {
-      var prev = filtered[i - 1];
-      var delta = prev ? r.cumulative_legal_pokemon_count - prev.cumulative_legal_pokemon_count : null;
-      return (
-        "<td>" + escapeHtml(r.regulation_code) + "</td>" +
-        "<td>" + r.legal_pokemon_count + "</td>" +
-        "<td>" + r.cumulative_legal_pokemon_count + "</td>" +
-        "<td>" + (delta === null ? "—" : (delta >= 0 ? "+" : "") + delta) + "</td>"
-      );
-    });
-  }
-
   function setupSpeedTiers() {
     var rows = (marts.pokemon_champions_profile || []).slice().sort(function (a, b) {
       return b.speed - a.speed;
     });
-    var top = rows.slice(0, 20);
-
-    renderRankedList(document.getElementById("speed-ranked-list"), top, {
-      keyFn: function (r) {
-        return r.pokemon_key;
-      },
-      labelFn: function (r) {
-        return r.pokemon_name;
-      },
-      valueFn: function (r) {
-        return r.speed;
-      },
-      displayFn: function (r) {
-        return String(r.speed);
-      },
-    });
-
+    var minEl = document.getElementById("speed-tiers-min");
+    var maxEl = document.getElementById("speed-tiers-max");
+    var typeFilterEl = document.getElementById("speed-tiers-type-filter");
+    var selectedTypes = {};
+    var grid = document.getElementById("speed-grid");
     var table = document.getElementById("speed-tiers-table");
-    if (table) {
-      makeSortableTable(
-        table,
-        rows,
-        function (r, i) {
-          return (
-            '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
-            "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
-            "<td>" + r.speed + "</td>" +
-            "<td>" + speedTierBadge(r.speed) + "</td>" +
-            "<td>" + formatPercent(r.usage_share) + "</td>" +
-            "<td>" + formatPercent(r.win_rate) + "</td>"
-          );
+
+    var tableSortable = table
+      ? makeSortableTable(
+          table,
+          [],
+          function (r, i) {
+            return (
+              '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
+              "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+              "<td>" + r.speed + "</td>" +
+              "<td>" + speedTierBadge(r.speed) + "</td>" +
+              "<td>" + formatPercent(r.usage_share) + "</td>" +
+              "<td>" + formatPercent(r.win_rate) + "</td>"
+            );
+          },
+          { defaultKey: "speed" }
+        )
+      : null;
+
+    function filtered() {
+      return rows.filter(function (r) {
+        if (!passesTypeFilter(selectedTypes, r.type_1, r.type_2)) return false;
+        if (!inRange(r.speed, minEl, maxEl)) return false;
+        return true;
+      });
+    }
+
+    function draw() {
+      var f = filtered();
+      renderGrid6xn(grid, f.slice(0, 18), {
+        keyFn: function (r) {
+          return r.pokemon_key;
         },
-        { defaultKey: "speed" }
-      );
+        labelFn: function (r) {
+          return r.pokemon_name;
+        },
+        displayFn: function (r) {
+          return String(r.speed);
+        },
+        subFn: function (r) {
+          return speedTier(r.speed).label;
+        },
+      });
+      if (tableSortable) tableSortable.setRows(f);
     }
-  }
 
-  // Pro Team Gallery (dashboard "team builder + previous competitive
-  // screenshot" ask, part b): pre-rendered real-team cards, curated and
-  // built ahead of time via `render-card` (see docs/dashboard.md), not
-  // generated in the browser. Visually and functionally distinct from the
-  // roster planner above it in the same tab — never itself called "Team
-  // Builder" to avoid confusion with that existing feature.
-  function renderProTeamGallery(addToTeamFn) {
-    var container = document.getElementById("pro-team-gallery");
-    if (!container) return;
-    var teams = DATA.reference_teams || [];
-    container.innerHTML = "";
-    if (!teams.length) {
-      container.innerHTML = '<p class="empty-state">No reference teams curated yet.</p>';
-      return;
-    }
-    teams.forEach(function (team) {
-      var card = document.createElement("div");
-      card.className = "gallery-card";
-      var img = team.card_image
-        ? '<img class="gallery-card-image" src="' + team.card_image + '" alt="">'
-        : "";
-      var keys = team.pokemon_keys || [];
-      card.innerHTML =
-        img +
-        '<div class="gallery-card-body">' +
-        '<div class="gallery-card-player">' + escapeHtml(team.player_name || "Unknown player") +
-        (team.country ? " (" + escapeHtml(team.country) + ")" : "") + "</div>" +
-        '<div class="gallery-card-meta">' + escapeHtml(team.event_name || "") +
-        (team.placement ? " · #" + team.placement : "") +
-        (team.archetype_key ? " · " + escapeHtml(team.archetype_key) : "") + "</div>" +
-        '<button class="btn btn-sm" type="button"' + (keys.length ? "" : " disabled") +
-        ">Load into my builder</button></div>";
-      var btn = card.querySelector("button");
-      if (btn && keys.length) {
-        btn.addEventListener("click", function () {
-          keys.forEach(function (key) {
-            addToTeamFn(key);
-          });
-        });
-      }
-      container.appendChild(card);
+    renderTypeFilterChips(typeFilterEl, selectedTypes, draw);
+    [minEl, maxEl].forEach(function (el) {
+      if (!el) return;
+      el.addEventListener("input", draw);
     });
+    draw();
   }
 
-  // Fully client-side (no backend): lets a visitor assemble a roster of up
-  // to 6 from the current legal pool (pokemon_champions_profile), ordered
-  // by usage/win-rate/speed per docs/design-system.md's ordering
-  // convention, and see their picks' speed order — reusing the same
-  // speed-tier bucketing as the Speed Tiers tab. Persisted to
-  // localStorage only; never sent anywhere. The Pro Team Gallery below it
-  // is a separate, read-only reference feature (see renderProTeamGallery).
-  function setupTeamBuilder() {
-    var rows = marts.pokemon_champions_profile || [];
-    var byKey = {};
-    rows.forEach(function (r) {
-      byKey[r.pokemon_key] = r;
-    });
+  registerTab("overview", setupOverview);
+  registerTab("usage", setupUsage);
+  registerTab("pokemon-profile", setupPokemonProfile);
+  registerTab("speed-tiers", setupSpeedTiers);
 
-    var STORAGE_KEY = "pokemonChampionsTeamBuilder";
-    var MAX_TEAM_SIZE = 6;
-    var team = [];
-    try {
-      var saved = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
-      team = saved
-        .filter(function (key) {
-          return byKey[key];
-        })
-        .slice(0, MAX_TEAM_SIZE);
-    } catch (e) {
-      team = [];
-    }
-
-    var searchInput = document.getElementById("team-builder-search");
-    var sortSelect = document.getElementById("team-builder-sort");
-    var availableList = document.getElementById("team-builder-available");
-    var slotsEl = document.getElementById("team-builder-slots");
-    var countEl = document.getElementById("team-builder-count");
-    var speedOrderEl = document.getElementById("team-builder-speed-order");
-    var summaryEl = document.getElementById("team-builder-summary");
-    var clearBtn = document.getElementById("team-builder-clear");
-
-    function persist() {
-      try {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(team));
-      } catch (e) {
-        // localStorage unavailable (private browsing, etc.) — the team
-        // just won't survive a reload; not fatal.
-      }
-    }
-
-    function addToTeam(key) {
-      if (team.length >= MAX_TEAM_SIZE || team.indexOf(key) !== -1 || !byKey[key]) return;
-      team.push(key);
-      persist();
-      renderAll();
-    }
-
-    function removeFromTeam(key) {
-      team = team.filter(function (k) {
-        return k !== key;
-      });
-      persist();
-      renderAll();
-    }
-
-    function renderAvailable() {
-      if (!availableList) return;
-      var query = ((searchInput && searchInput.value) || "").trim().toLowerCase();
-      var sortBy = sortSelect ? sortSelect.value : "usage";
-      var candidates = rows.filter(function (r) {
-        return team.indexOf(r.pokemon_key) === -1 && r.pokemon_name.toLowerCase().indexOf(query) !== -1;
-      });
-      candidates.sort(function (a, b) {
-        if (sortBy === "win_rate") return (b.win_rate || 0) - (a.win_rate || 0);
-        if (sortBy === "speed") return (b.speed || 0) - (a.speed || 0);
-        return (b.usage_count || 0) - (a.usage_count || 0);
-      });
-      var full = team.length >= MAX_TEAM_SIZE;
-      availableList.innerHTML = "";
-      candidates.slice(0, 50).forEach(function (r) {
-        var li = document.createElement("li");
-        li.className = "roster-item";
-        li.innerHTML =
-          spriteImg(r.pokemon_key, ICON_SIZES.md) +
-          '<div class="roster-info"><div class="roster-name">' + escapeHtml(r.pokemon_name) + "</div>" +
-          '<div class="roster-sub">' + formatPercent(r.usage_share) + " usage · " +
-          formatPercent(r.win_rate) + " win rate · " + (r.speed != null ? r.speed : "—") + " speed</div></div>" +
-          '<button class="btn btn-sm" type="button"' + (full ? " disabled" : "") + ">Add</button>";
-        li.querySelector("button").addEventListener("click", function () {
-          addToTeam(r.pokemon_key);
-        });
-        availableList.appendChild(li);
-      });
-      if (!candidates.length) {
-        var empty = document.createElement("li");
-        empty.className = "roster-item";
-        empty.textContent = "No Pokémon match your search.";
-        availableList.appendChild(empty);
-      }
-    }
-
-    // A named helper (rather than inline logic in renderSlots' for loop)
-    // so each slot's remove handler closes over its own `key` — a `var`
-    // declared inside a for-loop body is function-scoped, not
-    // block-scoped, so handlers built directly in the loop would all end
-    // up capturing the loop's final value instead of their own slot's.
-    function buildSlotElement(key) {
-      var slot = document.createElement("div");
-      if (key && byKey[key]) {
-        var r = byKey[key];
-        slot.className = "team-slot";
-        slot.innerHTML =
-          (sprites[key] ? '<img src="' + sprites[key] + '" alt="">' : "") +
-          '<div class="slot-name">' + escapeHtml(r.pokemon_name) + "</div>" +
-          '<button class="btn-remove" type="button" aria-label="Remove ' + escapeHtml(r.pokemon_name) + '">Remove</button>';
-        slot.querySelector("button").addEventListener("click", function () {
-          removeFromTeam(key);
-        });
-      } else {
-        slot.className = "team-slot empty";
-        slot.textContent = "Empty slot";
-      }
-      return slot;
-    }
-
-    function renderSlots() {
-      if (!slotsEl) return;
-      slotsEl.innerHTML = "";
-      for (var i = 0; i < MAX_TEAM_SIZE; i++) {
-        slotsEl.appendChild(buildSlotElement(team[i]));
-      }
-      if (countEl) countEl.textContent = String(team.length);
-      if (clearBtn) clearBtn.disabled = team.length === 0;
-    }
-
-    function renderSpeedOrder() {
-      if (!speedOrderEl) return;
-      var members = team
-        .map(function (key) {
-          return byKey[key];
-        })
-        .filter(Boolean)
-        .sort(function (a, b) {
-          return (b.speed || 0) - (a.speed || 0);
-        });
-      speedOrderEl.innerHTML = "";
-      if (!members.length) {
-        var li = document.createElement("li");
-        li.textContent = "Add Pokémon to your team to see their speed order.";
-        speedOrderEl.appendChild(li);
-        return;
-      }
-      members.forEach(function (r) {
-        var row = document.createElement("li");
-        row.innerHTML =
-          spriteImg(r.pokemon_key, ICON_SIZES.sm) +
-          "<span>" + escapeHtml(r.pokemon_name) + "</span>" +
-          speedTierBadge(r.speed) +
-          '<span class="speed-value">' + r.speed + "</span>";
-        speedOrderEl.appendChild(row);
-      });
-    }
-
-    function renderSummary() {
-      if (!summaryEl) return;
-      var members = team
-        .map(function (key) {
-          return byKey[key];
-        })
-        .filter(Boolean);
-      function avg(field) {
-        var values = members
-          .map(function (r) {
-            return r[field];
-          })
-          .filter(function (v) {
-            return v !== null && v !== undefined;
-          });
-        if (!values.length) return null;
-        return (
-          values.reduce(function (sum, v) {
-            return sum + v;
-          }, 0) / values.length
-        );
-      }
-      var avgSpeed = avg("speed");
-      summaryEl.innerHTML =
-        '<div class="stat"><strong>' + (avgSpeed !== null ? Math.round(avgSpeed) : "—") + "</strong>Avg. speed</div>" +
-        '<div class="stat"><strong>' + formatPercent(avg("usage_share")) + "</strong>Avg. usage share</div>" +
-        '<div class="stat"><strong>' + formatPercent(avg("win_rate")) + "</strong>Avg. win rate</div>";
-    }
-
-    function renderAll() {
-      renderAvailable();
-      renderSlots();
-      renderSpeedOrder();
-      renderSummary();
-    }
-
-    if (searchInput) searchInput.addEventListener("input", renderAvailable);
-    if (sortSelect) sortSelect.addEventListener("change", renderAvailable);
-    if (clearBtn) {
-      clearBtn.addEventListener("click", function () {
-        team = [];
-        persist();
-        renderAll();
-      });
-    }
-
-    renderAll();
-    renderProTeamGallery(addToTeam);
-  }
-
-  var tabInitializers = {
-    overview: setupOverview,
-    usage: setupUsage,
-    "pokemon-profile": setupPokemonProfile,
-    archetypes: setupArchetypes,
-    regulations: setupRegulations,
-    "speed-tiers": setupSpeedTiers,
-    "team-builder": setupTeamBuilder,
-  };
-  var initialized = {};
   setupTabs(function (tabId) {
     if (!initialized[tabId] && tabInitializers[tabId]) {
       initialized[tabId] = true;
       tabInitializers[tabId]();
     }
   });
+
+  // Shared namespace for matchup.js/teams.js (loaded right after this
+  // file) — avoids duplicating DATA access or any of the helpers above.
+  window.DashboardApp = {
+    DATA: DATA,
+    marts: marts,
+    sprites: sprites,
+    typeIcons: typeIcons,
+    itemIcons: itemIcons,
+    pokemonNames: pokemonNames,
+    ICON_SIZES: ICON_SIZES,
+    ALL_TYPES: ALL_TYPES,
+    escapeHtml: escapeHtml,
+    distinctSorted: distinctSorted,
+    distinctSortedByMetric: distinctSortedByMetric,
+    usageShareByKey: usageShareByKey,
+    championsProfileByKey: championsProfileByKey,
+    roleByKey: roleByKey,
+    fillSelect: fillSelect,
+    renderRows: renderRows,
+    inRange: inRange,
+    renderTypeFilterChips: renderTypeFilterChips,
+    hasAnySelectedType: hasAnySelectedType,
+    passesTypeFilter: passesTypeFilter,
+    setupDrilldown: setupDrilldown,
+    spriteImg: spriteImg,
+    pokemonCell: pokemonCell,
+    itemCell: itemCell,
+    typeIconImg: typeIconImg,
+    renderTypeBadgeRow: renderTypeBadgeRow,
+    formatPercent: formatPercent,
+    SPEED_TIERS: SPEED_TIERS,
+    speedTier: speedTier,
+    speedTierBadge: speedTierBadge,
+    renderGrid6xn: renderGrid6xn,
+    makeSortableTable: makeSortableTable,
+    registerTab: registerTab,
+  };
 })();

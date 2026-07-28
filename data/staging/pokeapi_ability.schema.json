@@ -1,0 +1,20 @@
+{
+  "source_name": "PokéAPI",
+  "source_url": "https://github.com/PokeAPI/pokeapi",
+  "refresh_cadence": "weekly",
+  "records_captured": [
+    "Ability effect-text rows, scoped to ability names actually reported by MunchStats tournament rosters"
+  ],
+  "fields": [
+    {"name": "ability_name", "type": "string", "required": true, "description": "Ability display name as reported in tournament roster data (Title Case, e.g. \"Intimidate\")"},
+    {"name": "short_effect", "type": "string", "required": false, "description": "PokéAPI's English short effect description"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéAPI"},
+    {"name": "source_url", "type": "string", "required": true, "description": "API endpoint the record was extracted from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéAPI resource ID"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "Ability names are matched to PokéAPI's slug via a lowercase/hyphenate transform (pipelines/extract/pokeapi.py's _slugify); a name PokéAPI doesn't slug the same way would fail to resolve and simply be skipped rather than mis-mapped."
+  ]
+}

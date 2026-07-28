@@ -8,7 +8,12 @@
 -- move_share is usage_count's fraction of that Pokémon's own total move
 -- rows (dashboard "percentages, not raw counts" ask), the same
 -- share-of-own-total pattern pokemon_usage_summary.usage_share and
--- pokemon_build_usage.build_share use.
+-- pokemon_item_usage.item_share use.
+--
+-- move_type/power/accuracy/category/priority/short_effect are joined from
+-- move_detail (PokéAPI move detail) for the Pokémon Profile's Moves
+-- section and the Matchup tab's damage calculator; all nullable when that
+-- lookup didn't resolve.
 with counted as (
   select
     member.pokemon_key,
@@ -23,16 +28,24 @@ with counted as (
   group by member.pokemon_key, trim(move.move_name)
 )
 select
-  pokemon_key,
-  move_name,
-  usage_count,
+  counted.pokemon_key,
+  counted.move_name,
+  move_detail.move_type,
+  move_detail.power,
+  move_detail.accuracy,
+  move_detail.category,
+  move_detail.priority,
+  move_detail.short_effect,
+  counted.usage_count,
   round(
-    usage_count::double / sum(usage_count) over (partition by pokemon_key),
+    counted.usage_count::double / sum(counted.usage_count) over (partition by counted.pokemon_key),
     4
   ) as move_share,
   row_number() over (
-    partition by pokemon_key
-    order by usage_count desc
+    partition by counted.pokemon_key
+    order by counted.usage_count desc
   ) as usage_rank
 from counted
-order by pokemon_key, usage_count desc
+left join {{ ref('move_detail') }} move_detail
+  on move_detail.move_name = counted.move_name
+order by counted.pokemon_key, counted.usage_count desc

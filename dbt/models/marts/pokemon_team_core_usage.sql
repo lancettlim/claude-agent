@@ -7,7 +7,7 @@
 -- partner_share is co_occurrence_count's fraction of that Pokémon's own
 -- total co-occurrence count across all partners (dashboard "percentages,
 -- not raw counts" ask), the same share-of-own-total pattern
--- pokemon_usage_summary.usage_share/pokemon_build_usage.build_share/
+-- pokemon_usage_summary.usage_share/pokemon_item_usage.item_share/
 -- pokemon_move_usage.move_share use.
 with legal_members as (
   select member.team_member_id, member.team_id, member.pokemon_key

@@ -97,6 +97,7 @@ def test_build_payload_joins_pokemon_names_and_computes_kpis(tmp_path):
     ]
     assert payload["kpis"]["distinct_pokemon_used"] == 1
     assert payload["kpis"]["top_used_pokemon"]["pokemon_name"] == "Pikachu"
+    assert payload["pokemon_names"] == {"pikachu": "Pikachu"}
     assert "generated_at_utc" in payload
 
 
@@ -204,58 +205,132 @@ def test_load_mart_coerces_legality_cumulative_field(tmp_path):
     ]
 
 
-def test_load_mart_coerces_archetype_marts(tmp_path):
+def test_load_mart_coerces_item_and_ability_usage_fields(tmp_path):
     _write_csv(
-        tmp_path / "pokemon_archetype_usage.csv",
+        tmp_path / "pokemon_item_usage.csv",
         [
             {
-                "archetype_key": "rain",
-                "archetype_name": "Rain",
-                "pokemon_key": "pelipper",
-                "usage_share": "0.05",
-                "win_rate": "0.5",
-                "record_count": "100",
-                "member_rank": "1",
+                "pokemon_key": "pikachu",
+                "item_name": "Light Ball",
+                "short_effect": "Doubles Attack and Special Attack.",
+                "usage_count": "10",
+                "item_share": "0.8",
+                "usage_rank": "1",
             }
         ],
     )
     _write_csv(
-        tmp_path / "archetype_summary.csv",
+        tmp_path / "pokemon_ability_usage.csv",
         [
             {
-                "archetype_key": "rain",
-                "archetype_name": "Rain",
-                "member_count": "6",
-                "combined_usage_share": "0.12",
-                "avg_win_rate": "0.48",
-                "top_member_pokemon_key": "pelipper",
+                "pokemon_key": "pikachu",
+                "ability": "Static",
+                "short_effect": "May paralyze on contact.",
+                "usage_count": "10",
+                "ability_share": "1.0",
+                "usage_rank": "1",
             }
         ],
     )
-    assert data.load_mart(tmp_path, "pokemon_archetype_usage") == [
+    assert data.load_mart(tmp_path, "pokemon_item_usage") == [
         {
-            "archetype_key": "rain",
-            "archetype_name": "Rain",
-            "pokemon_key": "pelipper",
-            "usage_share": 0.05,
-            "win_rate": 0.5,
-            "record_count": 100,
-            "member_rank": 1,
+            "pokemon_key": "pikachu",
+            "item_name": "Light Ball",
+            "short_effect": "Doubles Attack and Special Attack.",
+            "usage_count": 10,
+            "item_share": 0.8,
+            "usage_rank": 1,
         }
     ]
-    assert data.load_mart(tmp_path, "archetype_summary") == [
+    assert data.load_mart(tmp_path, "pokemon_ability_usage") == [
         {
-            "archetype_key": "rain",
-            "archetype_name": "Rain",
-            "member_count": 6,
-            "combined_usage_share": 0.12,
-            "avg_win_rate": 0.48,
-            "top_member_pokemon_key": "pelipper",
+            "pokemon_key": "pikachu",
+            "ability": "Static",
+            "short_effect": "May paralyze on contact.",
+            "usage_count": 10,
+            "ability_share": 1.0,
+            "usage_rank": 1,
         }
     ]
 
 
-def test_compute_kpis_top_12_and_top_30_and_cumulative_legal_pool():
+def test_load_mart_coerces_move_usage_detail_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_move_usage.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "move_name": "Thunderbolt",
+                "move_type": "electric",
+                "power": "90",
+                "accuracy": "100",
+                "category": "special",
+                "priority": "0",
+                "short_effect": "Has a 10% chance to paralyze.",
+                "usage_count": "10",
+                "move_share": "0.8",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_move_usage")
+    assert rows == [
+        {
+            "pokemon_key": "pikachu",
+            "move_name": "Thunderbolt",
+            "move_type": "electric",
+            "power": 90,
+            "accuracy": 100,
+            "category": "special",
+            "priority": 0,
+            "short_effect": "Has a 10% chance to paralyze.",
+            "usage_count": 10,
+            "move_share": 0.8,
+            "usage_rank": 1,
+        }
+    ]
+
+
+def test_load_mart_coerces_top_tournament_teams_fields(tmp_path):
+    _write_csv(
+        tmp_path / "top_tournament_teams.csv",
+        [
+            {
+                "team_id": "team-1",
+                "event_name": "Regionals",
+                "event_tier": "regional",
+                "event_date": "2026-01-01",
+                "player_name": "Ash",
+                "player_country": "JP",
+                "placement": "1",
+                "record_wins": "7",
+                "record_losses": "1",
+                "win_rate": "0.875",
+                "pokemon_keys": "pikachu|raichu",
+                "team_rank": "1",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "top_tournament_teams")
+    assert rows == [
+        {
+            "team_id": "team-1",
+            "event_name": "Regionals",
+            "event_tier": "regional",
+            "event_date": "2026-01-01",
+            "player_name": "Ash",
+            "player_country": "JP",
+            "placement": 1,
+            "record_wins": 7,
+            "record_losses": 1,
+            "win_rate": 0.875,
+            "pokemon_keys": "pikachu|raichu",
+            "team_rank": 1,
+        }
+    ]
+
+
+def test_compute_kpis_top_12_and_cumulative_legal_pool():
     usage_rows = [
         {"pokemon_key": f"mon-{i}", "event_tier": "", "usage_rank": i, "usage_count": 100 - i}
         for i in range(1, 41)
@@ -281,8 +356,6 @@ def test_compute_kpis_top_12_and_top_30_and_cumulative_legal_pool():
     kpis = data.compute_kpis(marts)
 
     assert [r["pokemon_key"] for r in kpis["top_12_pokemon"]] == [f"mon-{i}" for i in range(1, 13)]
-    assert len(kpis["top_30_pokemon"]) == 30
-    assert kpis["top_30_pokemon"][0]["pokemon_key"] == "mon-1"
     assert kpis["legal_pool_by_regulation"] == [
         {
             "regulation_code": "m-a",

@@ -13,9 +13,10 @@ model should be used for Phase 1?") is resolved as: a static
 HTML/CSS/vanilla-JS page — Jinja2-rendered, no charting library, no
 backend, no build tooling (no npm, no bundler). An earlier version of this
 page used Chart.js (CDN-loaded) for its bar charts; the broadcast-redesign
-pass replaced every chart with a dependency-free ranked-list component
-(`docs/design-system.md`'s "Ranked list"), so there is no longer a
-charting-library dependency at all.
+pass replaced every chart with a dependency-free ranked-list component,
+and the later competitive-UX redesign pass replaced *that* with a
+dependency-free 6-wide grid (`docs/design-system.md`'s "6-wide grid"),
+so there is no longer a charting-library dependency at all.
 
 This was chosen because GitHub Pages only serves static files (no server),
 which rules out a Python server-based dashboard (Streamlit, Dash, Flask)
@@ -33,22 +34,32 @@ pipelines/dashboard/data.py       reads data/marts/*.csv, joins pokemon
 pipelines/dashboard/sprites.py    copies Bulbagarden species sprites
                                    (keyed by pokemon_key) into output/images/
 pipelines/dashboard/build.py      calls data.py + sprites.py, resolves
-                                   move-type and item icons, copies
+                                   type and item icons, copies
                                    pre-rendered Pro Team Gallery cards,
                                    renders templates/index.html.jinja with
                                    the payload baked in as inline JSON, and
-                                   copies static/app.js alongside it
+                                   copies static/app.js + matchup.js +
+                                   teams.js alongside it
 pipelines/dashboard/templates/    the tabbed HTML/CSS template
-pipelines/dashboard/static/       app.js — vanilla JS reading the baked-in
-                                   data to wire tabs, filters, tables, and
-                                   ranked lists
-pipelines/dashboard/static/icons/ 18 committed move-type icon PNGs
+pipelines/dashboard/static/       app.js (tab framework, .grid-6xn,
+                                   Overview/Usage/Pokémon Profile/Speed
+                                   Tiers, shared helpers exported on
+                                   window.DashboardApp), matchup.js
+                                   (Matchup tab), teams.js (Team Builder +
+                                   Top Teams tabs) — see
+                                   docs/design-system.md's tab-registration
+                                   note for how the three files share state
+pipelines/dashboard/static/icons/ 18 committed move-type icon PNGs, also
+                                   reused for the Pokémon-type badge/
+                                   Matchup tab's type-effectiveness grid
 data/reference_teams/             curated Pro Team Gallery specs + pre-
                                    rendered card PNGs (committed, see
                                    "Pro Team Gallery" below)
         ↓
 docs/dashboard/index.html         generated output — committed to git
 docs/dashboard/app.js
+docs/dashboard/matchup.js
+docs/dashboard/teams.js
 docs/dashboard/images/            sprites + type/item icons + gallery
                                    cards — committed to git
 ```
@@ -87,82 +98,100 @@ The dashboard degrades gracefully in several ways:
 ## Tabs
 
 The page is a single scrolling KPI row plus seven tabs (client-side,
-vanilla JS — no routing library, no page reload):
+vanilla JS — no routing library, no page reload). The competitive-UX
+redesign pass removed Archetypes and Regulations, added Matchup and Top
+Teams, and restructured every remaining tab around
+`docs/design-system.md`'s "3-tier tab layout convention"
+(filters → `.grid-6xn` → optional detail table):
 
-- **Overview** — the KPI cards, a "Top 12" spotlight card grid, and a
-  "Top 30" ranked list (first 10 shown, "Show all 30" to expand), all
-  ranked by `usage_share`
-- **Usage** — a per-tournament-tier ranked list, a Usage leaders table
-  (rank, Pokémon, `usage_share` as % of meta — sortable columns), and a
-  Win rate leaders table (with a minimum-recorded-matches filter)
+- **Overview** — the KPI cards plus a "Top 12" `.grid-6xn`, ranked by
+  `usage_share`. (The old "Top 30" ranked list was removed — the Usage tab
+  is the full leaderboard now.)
+- **Usage** — tier/type/role/usage-%/speed filters, a `.grid-6xn` of
+  usage-share leaders, a full Usage leaders table, then the same
+  grid+table pattern again for Win rate leaders (with a minimum-recorded-
+  matches filter).
 - **Pokémon Profile** — a single Pokémon picker (sorted by usage
-  relevance, not alphabetically) driving three sub-sections: Profile
-  (base stats, speed-tier badge, curated archetype tags), Build & Moveset
-  (item/ability table + move ranked list, both by their `_share` of this
-  Pokémon's own recorded builds/moves), and Team Cores (ranked list of
-  most-frequent partners). Replaces the earlier separate Builds/Moves/
-  Team Cores tabs, which had three independent, unsynced Pokémon pickers.
-- **Archetypes** — the Archetype Explorer: a card grid of curated
-  competitive archetypes (`docs/design-system.md`'s "Archetype card"),
-  each with a disclaimer that membership is editorial curation, not
-  sourced tournament data; selecting a card filters a member table below.
-- **Regulations** — the Regulation Comparison: cumulative legal-pool size
-  per regulation (see "Cumulative legal pool" below) plus a delta vs. the
-  previous regulation.
+  relevance, not alphabetically) driving: a profile header (base stats,
+  speed-tier badge, and now a type badge), then three separate `.grid-6xn`
+  sections — **Items** (top 5), **Ability** (top 5), **Moves** (top 15) —
+  each tile showing a PokéAPI `short_effect` description, replacing the
+  old single combined item×ability build table. **Team Cores** (most-
+  frequent partners) keeps its own `.grid-6xn` section below those.
 - **Speed Tiers** — every currently-legal Pokémon's Champions-format base
-  Speed stat, fastest first, with a ranked list (top 20) and a full table
-  bucketed into Blazing/Fast/Average/Slow badges (see
-  `docs/design-system.md`'s "Speed-tier badge")
-- **Team Builder** — a fully client-side roster builder: search/sort the
-  legal pool, add up to 6 Pokémon, see their speed order and
-  usage/win-rate/speed averages (see `docs/design-system.md`'s "Team
-  Builder"); the team persists to `localStorage` only, never sent
-  anywhere. Below it, the **Pro Team Gallery** (see below) — a separate,
-  read-only reference feature.
+  Speed stat, fastest first, with type/speed-range filters, a `.grid-6xn`,
+  and a full sortable table bucketed into Blazing/Fast/Average/Slow badges
+  (see `docs/design-system.md`'s "Speed-tier badge")
+- **Matchup** *(new)* — pick an attacker and defender Pokémon: a type-
+  effectiveness grid, a stats/setup/weather damage calculator with a
+  curated item/ability toggle list, and a co-usage `.grid-6xn` (a
+  teammate-pairing proxy, explicitly not a real matchup-outcome signal).
+  See `docs/design-system.md`'s "Matchup" section for the full scope note
+  and what mechanics are/aren't modeled.
+- **Team Builder** — a fully client-side roster builder: search/sort/
+  type-filter the legal pool, add up to 6 Pokémon, see each slot's stats/
+  top ability/top-4-move picker, their speed order, usage/win-rate/speed
+  averages, and an "Export as pokepaste text" button (see
+  `docs/design-system.md`'s "Team Builder"); the team persists to
+  `localStorage` only, never sent anywhere.
+- **Top Teams** *(new)* — a pokepaste (Showdown-export-text) paste-in box
+  that loads a team into Team Builder, a `.grid-6xn` leaderboard fed by the
+  new `top_tournament_teams` mart (real MunchStats team data, ranked by
+  win_rate), and the **Pro Team Gallery** (see below), moved here from
+  Team Builder.
 
-Usage leaders, Speed Tiers, Pokémon Profile, and Team Builder's picker all
-pull from `data/marts/pokemon_champions_profile.csv` — a mart (one row per
-currently-legal Pokémon, joining `pokemon_stat_champions` with
-`pokemon_usage_summary` and `pokemon_win_rate_summary`) purpose-built so
-these views don't have to join multiple marts client-side.
+Usage leaders, Speed Tiers, Pokémon Profile, Matchup, and Team Builder's
+picker all pull from `data/marts/pokemon_champions_profile.csv` — a mart
+(one row per currently-legal Pokémon, joining `pokemon_stat_champions`
+with `pokemon` for type, `pokemon_usage_summary`, and
+`pokemon_win_rate_summary`) purpose-built so these views don't have to
+join multiple marts client-side.
 
-Each tab's setup function runs lazily on that tab's first activation
-rather than eagerly on page load (see `app.js`'s `tabInitializers`) — this
-predates and is unrelated to the earlier Chart.js-canvas-sizing rationale,
-since there's no canvas involved anymore.
+Each tab's setup function still runs lazily on that tab's first activation
+(`App.registerTab(tabId, fn)` in `app.js`, called from all three JS files)
+rather than eagerly on page load — see `docs/design-system.md`'s note on
+how Team Builder and Top Teams coordinate shared team state despite that
+laziness (`ensureTeamBuilder()`).
 
 ## Cumulative legal pool
 
 `legality_summary_by_regulation.cumulative_legal_pokemon_count` (used by
-the Regulations tab and the "Legal Pool" KPI card) is a **naive union**:
-regulation B's cumulative count includes every Pokémon legal in regulation
-A too, assuming regulation codes sort lexicographically in release order.
-**Caveat, shown as visible UI copy on the Regulations tab, not just a code
-comment**: PokéBase (the sole source of `legality_snapshot`) never
-publishes a removal signal — a Pokémon's absence from a later regulation's
-snapshot isn't distinguishable from "not yet observed" vs. "actually
-banned." This means the cumulative count can only grow; if a Pokémon were
-genuinely banned in a later regulation, this count would keep including it
-anyway. Treat it as an upper bound, not a confirmed current pool.
+the "Legal Pool" KPI card — the dedicated Regulations tab that also showed
+this was removed in the competitive-UX redesign pass, see "Removed
+sections" below) is a **naive union**: regulation B's cumulative count
+includes every Pokémon legal in regulation A too, assuming regulation
+codes sort lexicographically in release order. PokéBase (the sole source
+of `legality_snapshot`) never publishes a removal signal — a Pokémon's
+absence from a later regulation's snapshot isn't distinguishable from "not
+yet observed" vs. "actually banned." This means the cumulative count can
+only grow; if a Pokémon were genuinely banned in a later regulation, this
+count would keep including it anyway. Treat it as an upper bound, not a
+confirmed current pool.
 
-## Archetype Explorer
+## Archetype Explorer (removed)
 
-`pokemon_archetype_usage`/`archetype_summary` are built from
-`dbt/seeds/archetype_pokemon_map.csv` — a **curated, editorial** seed
-(named competitive strategies like "Rain," "Trick Room," "Sun" mapped to
-their member Pokémon), not derived from any extractor. This is an explicit
+The Archetype Explorer tab was removed in the competitive-UX redesign
+pass (see "Removed sections" below) — this section is kept for history.
+`pokemon_archetype_usage`/`archetype_summary` (still dbt-built, just no
+longer loaded by the dashboard) were built from `dbt/seeds/
+archetype_pokemon_map.csv` — a **curated, editorial** seed (named
+competitive strategies like "Rain," "Trick Room," "Sun" mapped to their
+member Pokémon), not derived from any extractor. This was an explicit
 exception to this repo's "provenance is mandatory" convention, made
 because no in-scope source publishes team-composition/archetype labels at
-all. The dashboard always presents this with disclaimer copy making the
-distinction clear, and the seed needs manual upkeep as the real metagame
-shifts — see `dbt/seeds/schema.yml`'s entry for the seed's editable format.
+all — see `dbt/seeds/schema.yml`'s entry for the seed's editable format if
+a future pass wants to reintroduce archetype context elsewhere (e.g. as a
+Team Builder tag).
 
 ## Pro Team Gallery
 
 A grid of real tournament teams, rendered as broadcast-style cards via
 `pipelines/render/` (the same tool `render-card` uses standalone) and
-shown for reference/inspiration inside the Team Builder tab — distinct
-from, and not part of, the roster-planner feature above it.
+shown for reference/inspiration in the **Top Teams** tab (moved here from
+Team Builder in the competitive-UX redesign pass, alongside the real
+`top_tournament_teams` leaderboard and the pokepaste importer — see
+"Tabs" above) — distinct from, and not part of, Team Builder's own
+roster-planner feature.
 
 Cards are **pre-rendered ahead of time**, not generated at dashboard-build
 time or in the browser: there's no Playwright dependency in
@@ -213,11 +242,15 @@ Three distinct assets, three distinct strategies:
   dependency — types never change.
 - **Item icons** (open-ended, data-dependent): resolved via
   `pipelines/render/assets.py`'s `ensure_item_icon()` (PokéAPI community
-  sprites) for every distinct `item_name` in `pokemon_build_usage`. This is
+  sprites) for every distinct `item_name` in `pokemon_item_usage`. This is
   the one part of a dashboard build that needs network access. Pass
   `--no-fetch-icons` to `build-dashboard` (or `fetch_icons=False` to
   `pipelines.dashboard.build.build`) for an offline build — item names
   render text-only in that case.
+- **Pokémon type icons**: the Pokémon Profile type badge and the Matchup
+  tab's type-effectiveness grid reuse the same 18 committed move-type
+  icons above (types and move-types share one 18-value namespace) — no
+  new icon assets were needed to add Pokémon type display.
 
 ## Team-core drill-down
 
@@ -281,12 +314,17 @@ would otherwise 404, since nothing else lives at `docs/`'s top level.
 
 As of this writing:
 - **Regulation filtering**: `regulation_code` values (`m-a`, `m-b`) are
-  populated (via PokéBase), so the current KPI card's and Regulations
-  tab's `legality_summary_by_regulation` data is real and non-degenerate.
+  populated (via PokéBase), so the "Legal Pool" KPI card's
+  `legality_summary_by_regulation` data is real and non-degenerate, even
+  though there's no longer a dedicated tab surfacing per-regulation detail.
 - **Cumulative legal pool**: see "Cumulative legal pool" above — can only
   grow, never confirmed to reflect a real later-regulation ban.
-- **Archetype Explorer**: see "Archetype Explorer" above — curated
-  editorial data, not sourced tournament data.
+- **Archetype Explorer**: removed — see "Archetype Explorer (removed)"
+  above. Was always curated editorial data, not sourced tournament data.
+- **Matchup tab**: type effectiveness and the damage calculator's type/
+  move-power inputs are real PokéAPI data; the co-usage panel is an
+  explicitly-labeled teammate-pairing proxy, not real battle-outcome data
+  (see `docs/design-system.md`'s "Matchup tab scope").
 - **Date-range/trend views**: still not buildable — only one
   `snapshot_date` exists in the data so far (see "Removed sections"
   below).
@@ -313,9 +351,24 @@ a PRD-named drill-down (team core) and refinement-pass backlog items
 (mobile layout, richer imagery) that had real, non-degenerate data
 available, unlike the two removed sections.
 
-The new **Regulations** tab is a different thing from the removed
-legal-pool-trend section, worth distinguishing: legal-pool trend would
-compare the *same* regulation across multiple `snapshot_date`s (still
-degenerate — only one snapshot exists), while Regulation Comparison
-compares *different regulations* within one snapshot (real, non-degenerate
-data, since `m-a`/`m-b` are both populated today).
+The (also since-removed) **Regulations** tab was a different thing from
+the removed legal-pool-trend section, worth distinguishing historically:
+legal-pool trend would have compared the *same* regulation across
+multiple `snapshot_date`s (still degenerate — only one snapshot exists),
+while Regulation Comparison compared *different regulations* within one
+snapshot (real, non-degenerate data, since `m-a`/`m-b` are both populated
+today) — it just wasn't kept, unlike the permanently-empty sections above.
+
+## Removed tabs (competitive-UX redesign pass)
+
+Unlike the stat-change-leaderboard/legal-pool-trend removal above (cut
+because the underlying data was permanently degenerate), the **Archetypes**
+and **Regulations** tabs were removed by explicit request even though
+their data was real and non-degenerate — a scope/UX decision, not a
+data-availability one. `legality_summary_by_regulation` still loads (it
+feeds the "Legal Pool" KPI card); `pokemon_archetype_usage`/
+`archetype_summary` and the `archetype_pokemon_map` seed are untouched at
+the data/dbt layer, just no longer read by `pipelines/dashboard/data.py`.
+See `docs/design-system.md`'s "Removed tabs and components" for the full
+rationale, and `docs/todo.md`'s M6 backlog for the redesign pass this was
+part of.

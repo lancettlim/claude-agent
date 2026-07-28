@@ -14,6 +14,8 @@ select
   pokemon_id,
   pokemon_name,
   form_name,
+  type_1,
+  type_2,
   source_name,
   source_url,
   source_record_id,

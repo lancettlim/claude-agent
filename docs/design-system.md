@@ -4,8 +4,9 @@ This is the design system for `pipelines/dashboard/` — the static
 analytics dashboard described in `docs/dashboard.md`. It documents the
 design tokens, component patterns, and Pokémon-representation/data
 conventions the dashboard's HTML/CSS/JS (`templates/index.html.jinja`,
-`static/app.js`) implement, so future additions stay visually and
-behaviorally consistent instead of drifting per-tab. Where docs/dashboard.md
+`static/app.js` + `static/matchup.js` + `static/teams.js`) implement, so
+future additions stay visually and behaviorally consistent instead of
+drifting per-tab. Where docs/dashboard.md
 covers *architecture* (how the site is built and published), this document
 covers *design*: what things look like, how Pokémon data is named and
 ordered, and what a new component should reuse rather than reinvent.
@@ -30,10 +31,10 @@ color, spacing, or radius value that already has a token — add one instead.
 | `--bg` | `#f4f6fb` | Page background |
 | `--surface` | `#fff` | Card/section background |
 | `--positive` / `--positive-bg` | `#1f8a4c` / `#e8f7ee` | Reserved for future positive-delta indicators (e.g. a stat gainer, once `stat_change_leaderboard` has real deltas — see "Removed sections" in `docs/dashboard.md`) |
-| `--warning` / `--warning-bg` | `#a8710a` / `#fbf1e0` | Reserved for caution states |
-| `--danger` / `--danger-bg` | `#b23434` / `#fbe9e9` | Destructive actions (Team Builder's remove button), Blazing speed tier |
+| `--warning` / `--warning-bg` | `#a8710a` / `#fbf1e0` | Caution states; the Matchup tab's "not very effective" (0.5×) type-effectiveness tile |
+| `--danger` / `--danger-bg` | `#b23434` / `#fbe9e9` | Destructive actions (Team Builder's remove button), Blazing speed tier, the Matchup tab's "4× weak" type-effectiveness tile |
 | `--panel-dark` | `#12131a` | Broadcast color-block section/page header background (see "Broadcast color-block header" below) |
-| `--accent-red` / `--accent-red-bg` | `#e3323c` / `#fce7e8` | Broadcast accent: active tab, ranked-list leader bar, Archetype Explorer's selected card |
+| `--accent-red` / `--accent-red-bg` | `#e3323c` / `#fce7e8` | Broadcast accent: active tab, `.grid-6xn` leader tile |
 | `--accent-gold` | `#f4b942` | Broadcast accent: reserved for #1-rank/MVP highlighting |
 
 Speed-tier colors (`--speed-blazing`, `--speed-fast`, `--speed-average`,
@@ -43,20 +44,23 @@ bucketing thresholds.
 
 ### Icon size scale
 
-Three tokens replace what used to be four ad-hoc pixel values scattered
-across the stylesheet/JS (40px KPI sprite, 32px roster picker, 24px table
-cell, 22px chart axis):
+Four tokens (three plus one deliberate exception) replace what used to be
+four ad-hoc pixel values scattered across the stylesheet/JS (40px KPI
+sprite, 32px roster picker, 24px table cell, 22px chart axis):
 
 | Token | Value | Use |
 |---|---|---|
-| `--icon-sm` | 32px | Table/list cells, ranked-list rows, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
-| `--icon-md` | 48px | Roster picker rows, Archetype Explorer member chips (`ICON_SIZES.md`) |
-| `--icon-lg` | 72px | KPI hero sprite, team slot, Pokémon Profile hero, Overview spotlight card (`ICON_SIZES.lg`) |
+| `--icon-sm` | 32px | Table/list cells, `.grid-6xn` tiles, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
+| `--icon-md` | 48px | Roster picker rows, `.grid-6xn` tiles (`ICON_SIZES.md`) |
+| `--icon-lg` | 72px | KPI hero sprite, team slot, Pokémon Profile hero (`ICON_SIZES.lg`) |
+| `--icon-xl` | 96px | Pokémon Profile's dual-type badge only (`ICON_SIZES.xl`) — see "Type badge" below |
 
-**Every sprite/item/type image must use one of these three tokens** (or
-the matching `ICON_SIZES` constant in JS) — no other pixel value. This is
-a floor, not a ceiling: 32px is the smallest icon size anywhere in the
-dashboard now, up from the previous 22–24px minimum.
+**Every sprite/item/type image must use one of these tokens** (or the
+matching `ICON_SIZES` constant in JS) — no other pixel value. `--icon-xl`
+is a deliberate single-purpose exception, not a general-use size: it
+exists because the Profile header's type display is new, hero-level
+information (docs' "add descriptions and larger type" ask), not because
+the sm/md/lg floor moved. Everywhere else still uses sm/md/lg.
 
 ### Spacing
 
@@ -84,14 +88,47 @@ webfont, keeping the page dependency-free.
 - **`.kpi-row`** — responsive grid of `.kpi-card`s (`auto-fit,
   minmax(200px, 1fr)`), always the first thing under the header.
 - **`.tabs` / `.tab-btn` / `.tab-panel`** — client-side tab navigation
-  (`app.js`'s `setupTabs`). Every dashboard view beyond the KPI row lives in
-  a tab, not a scrolling section — this was a deliberate M6 redesign
-  decision (see `docs/todo.md`'s "Dashboard full redesign" entry) to keep
-  the page scannable as views are added. Current tabs: Overview, Usage,
-  Pokémon Profile, Archetypes, Regulations, Speed Tiers, Team Builder.
+  (`app.js`'s `setupTabs`/`registerTab`). Every dashboard view beyond the
+  KPI row lives in a tab, not a scrolling section — this was a deliberate
+  M6 redesign decision (see `docs/todo.md`'s "Dashboard full redesign"
+  entry) to keep the page scannable as views are added. Current tabs:
+  Overview, Usage, Pokémon Profile, Speed Tiers, Matchup, Team Builder, Top
+  Teams. Archetypes and Regulations were removed in the competitive-UX
+  redesign pass (see "Removed tabs" below); Matchup and Top Teams are new.
+  Each tab's setup function is registered via `App.registerTab(tabId, fn)`
+  and still runs lazily, on first activation — `app.js` owns the
+  Overview/Usage/Pokémon Profile/Speed Tiers tabs directly, while
+  `matchup.js` and `teams.js` (loaded right after `app.js`, sharing its
+  helpers/data via `window.DashboardApp`) register Matchup and Team
+  Builder/Top Teams respectively. Splitting the JS this way keeps any one
+  file from growing unbounded as tabs are added.
 - **`section` (`.tab-panel`)** — a bordered white card per tab, `h2` title
   rendered as a broadcast color-block header, optional `.controls` filter
-  row, then ranked-list and/or table content.
+  row, then content following the "3-tier tab layout convention" below.
+
+### 3-tier tab layout convention
+
+Every tab panel (beyond the page-level KPI row, which is its own thing)
+follows the same three tiers, top to bottom:
+
+1. **Filters/mini-stats** — the `.controls` row: tier/type/role/range
+   filters, a Pokémon picker, whatever inputs that tab needs. Not every
+   tab needs this tier (Overview has none).
+2. **`.grid-6xn`** — the primary visual, a 6-wide grid of ranked tiles.
+   This is the tier that actually answers "what's the headline data here"
+   at a glance.
+3. **Detail table** *(optional)* — a full sortable `<table>` for raw
+   drill-down beyond what the grid's top ~18 rows show. Only present where
+   it adds something the grid doesn't: Usage keeps both a Usage-leaders and
+   a Win-rate-leaders table; Overview has no table tier at all, since its
+   job is the headline Top 12, not a full leaderboard (that's what the
+   Usage tab is for) — this is also why Overview's old Top 30 ranked list
+   was removed rather than converted to a grid.
+
+Not every tab needs all three tiers — Pokémon Profile, Matchup, and Team
+Builder are Pokémon/team-drill-down views built around a picker rather
+than a leaderboard, so they use tier 2 (grids) repeatedly without a tier-3
+table.
 
 ## Component catalog
 
@@ -108,7 +145,7 @@ denser and doesn't compete visually with the page-level KPIs.
 ### Leaderboard table
 
 The recurring pattern for "top N Pokémon by some metric" (Usage leaders,
-Win rate leaders, Speed Tiers, Archetype Explorer's member table): a
+Win rate leaders, Speed Tiers): a
 `<table>` inside `.table-scroll`, first column a `.badge.badge-rank`
 (`#1`, `#2`, …), second column a `pokemonCell()`-rendered sprite+name,
 remaining columns the metric(s). Columns with `<th class="sortable"
@@ -140,23 +177,36 @@ to render a Pokémon in a table cell: an `--icon-sm` (32px) sprite (from the
 Team Builder's roster list and team slots do) rather than rendering a bare
 name** — see "Representing Pokémon" below.
 
-### Ranked list (replaces bar charts)
+### 6-wide grid (`.grid-6xn`)
 
-`renderRankedList(container, rows, opts)` (in `app.js`) is the dashboard's
-**only** data-visualization component — Chart.js and its CDN dependency
-were removed entirely as part of the broadcast redesign (dashboard
-"remove bar charts... focus on percentages" ask), a net simplification
-since there's no longer a "chart library didn't load" degradation path to
-handle. It renders a dependency-free `.ranked-row` list: rank number,
-optional icon (`keyFn` → sprite lookup, or `iconFn` for a direct icon src
-like a move-type icon), label, a `.ranked-bar-fill` bar whose width is
-relative to the *largest* value among the rows being shown (not a fixed
-0–100% scale — this is a ranked comparison, not an absolute gauge), and a
-right-aligned value (`displayFn`). The #1 row gets `.is-leader`
-(`--accent-red` fill instead of `--blue`). Used by: Overview's Top 12/30,
-Usage's per-tier ranked list, Pokémon Profile's move/team-core lists, and
-Speed Tiers' top-20 list. Any new "top N by metric" visual should use this
-instead of introducing a new charting approach.
+`renderGrid6xn(container, rows, opts)` (in `app.js`) is the dashboard's
+**only** data-visualization component, and the one every usage/win-rate
+metric renders through — it replaced both Chart.js (removed in the
+original broadcast redesign) and the ranked-list bar component that
+redesign introduced (dashboard "replace usage/win-rate bar charts with a
+6-wide grid just like Overview" ask; Overview's old Top-12 spotlight grid
+became the template every other view now follows). Each `.grid-6xn-tile`
+shows: an optional rank badge (`.badge-rank`, normal document flow and
+left-aligned via `align-self: flex-start` — **not** absolutely positioned,
+which would overlap the label whenever a tile has no icon), an optional
+icon (`keyFn` → sprite lookup, or `iconFn` for a direct icon src like a
+move-type or item icon), a label, a **bolded** headline value
+(`.grid-6xn-value`, `font-weight: 800` — the "bold the percentage" ask),
+and an optional `subFn` second line (a description, a sample-size note, a
+secondary stat). The #1 tile gets `.is-leader` (`--accent-red` border/
+text). Fixed 6 columns on desktop (`repeat(6, 1fr)`, not auto-fill/
+auto-fit), collapsing to 3 at 720px and 2 at 480px.
+
+Used by: Overview's Top 12, Usage's usage-share and win-rate grids,
+Pokémon Profile's Items/Ability/Moves/Team-Cores sections, Speed Tiers,
+Matchup's co-usage panel, and Top Teams' leaderboard. Any new "top N by
+metric" visual should use this — there is no other charting/ranking
+component in the dashboard, and the old ranked-list component (`.ranked-
+row`, `renderRankedList`) was deleted outright once nothing referenced it
+anymore rather than kept "just in case." (`.ranked-value`, a small muted
+inline-annotation style, survives on its own — the Win rate leaders
+table's `(n=X)` sample-size note still uses it — but it's unrelated to the
+deleted ranked-list row component now.)
 
 ### Broadcast color-block header
 
@@ -186,10 +236,11 @@ legal-pool-trend sections would use if/when they're reintroduced).
 ### Buttons
 
 `.btn` — bordered, `--radius-sm`, hover fills `--light-blue`. `.btn-primary`
-is the solid-blue variant (not currently used, reserved for a future
-primary action). `.btn-remove` is a borderless text-only danger-colored
-button (Team Builder's per-slot remove). `.btn-sm` is a compact size
-modifier (Team Builder's "Add"/"Clear team" buttons).
+is the solid-blue variant, used for a page's one clearly-primary action
+(Top Teams' "Load into Team Builder" pokepaste-import button). `.btn-remove`
+is a borderless text-only danger-colored button (Team Builder's per-slot
+remove). `.btn-sm` is a compact size modifier (Team Builder's "Add"/
+"Clear team"/"Export as pokepaste text" buttons).
 
 ### Speed-tier badge
 
@@ -218,30 +269,52 @@ tier list.
 Two small, Team-Builder-specific patterns:
 - `.team-slot` — a bordered card (filled, `--icon-lg` sprite) or dashed
   placeholder (`.empty`) representing one of the team's 6 roster
-  positions.
+  positions. A filled slot's `.slot-detail` lines show its base stats and
+  top recorded ability, plus a `<select>` of its top 4 recorded moves —
+  see "Team Builder" below for where that data comes from.
 - `.roster-item` — a horizontal row (`--icon-md` sprite, name,
   usage/win-rate/speed sub-text, Add button) in the scrollable "Legal
-  pool" picker list.
+  pool" picker list, filterable by the type-filter chip row above it.
 
-### Spotlight card (Overview "Top 12")
+### Item / Ability / Move separation (Pokémon Profile)
 
-`.spotlight-card`: a bordered card with a rank badge, `--icon-lg` sprite,
-name, and a one-line usage%/win-rate% sub-stat, laid out in
-`.spotlight-grid` (`auto-fill, minmax(140px, 1fr)`). Denser than a KPI
-card, meant for a grid of many at once rather than 3–4 headline stats.
+The Pokémon Profile tab shows three separate `.grid-6xn` sections instead
+of one combined item×ability build table: **Items** (top 5,
+`pokemon_item_usage`), **Ability** (top 5, `pokemon_ability_usage`), and
+**Moves** (top 15, `pokemon_move_usage`) — each capped independently
+rather than sharing one table's row budget, and each tile's `subFn` shows
+that item/ability/move's `short_effect` description text (PokéAPI, joined
+in dbt — see `docs/dataset-spec.md`'s `item_detail`/`ability_detail`/
+`move_detail` entities). Move tiles additionally use the move's own type
+(`move_type`, real per-move data now, not a name-matched lookup — see
+"Removed: the move-types seed lookup" below) as their icon. Team Cores
+keeps its own `.grid-6xn` section below these three, unchanged in spirit
+from before the split.
 
-### Archetype card
+**Removed: the move-types seed lookup.** Before this pass, a move's type
+icon came from `dbt/seeds/pokeapi_move_types.csv` (a static name-matched
+lookup, still used by `pipelines/render/`'s team-card renderer) via
+`build.py`'s `_move_types_for()`/`payload["move_types"]`. Now that
+`pokemon_move_usage` carries real `move_type` from `move_detail`
+(PokéAPI, joined in dbt) for every move it lists, that duplicate lookup
+path was deleted from the dashboard build entirely — `app.js` reads
+`row.move_type` straight off the mart row.
 
-`.archetype-card`: a clickable card (`<button>`, `aria-pressed` toggled)
-showing an archetype's name, member count, combined usage share, average
-win rate, and up to 3 member sprites (`--icon-md`). Selecting a card
-filters the member table below it (see "Leaderboard table"). Exactly one
-card is selected at a time; the highest-combined-usage archetype is
-selected by default on tab load. **Always paired with the disclaimer
-copy** in `index.html.jinja` making clear archetype membership is curated
-editorial judgment (`dbt/seeds/archetype_pokemon_map.csv`), not sourced
-tournament data — never present an archetype grouping as an extracted
-signal.
+### Type badge
+
+Pokémon type display (`pokemon.type_1`/`type_2`, sourced from PokéAPI —
+previously nonexistent in this pipeline; see `docs/dataset-spec.md`'s
+`pokemon` entity). `renderTypeBadgeRow(container, type1, type2, large)` in
+`app.js` renders one of two variants, both reusing the 18 committed
+move-type icons in `static/icons/types/` (the same icon set move types
+already used — no new asset work):
+- **Compact** (`large=false`): `.type-pill`, a small dark pill with an
+  18px type icon + type name. Used in the Matchup tab's attacker/defender
+  panels.
+- **Large** (`large=true`): `.type-badge-lg .type-pill-lg`, a stacked
+  `--icon-xl` (96px) icon over a bold pill label. Used once, in the
+  Pokémon Profile header — the one place in the dashboard that uses
+  `--icon-xl` (see "Icon size scale" above).
 
 ### Gallery card (Pro Team Gallery)
 
@@ -249,18 +322,39 @@ signal.
 (`pipelines/render/`, see `docs/dashboard.md`'s "Pro Team Gallery"
 section) plus a caption (player name, country, event, placement,
 archetype tag) and a "Load into my builder" button that copies the
-gallery team's Pokémon into the Team Builder roster above it. Laid out in
-`.gallery-grid` (`auto-fill, minmax(220px, 1fr)`), inside the Team
-Builder tab but visually and functionally distinct from the roster
-planner above it — this is a separate, read-only reference feature and
-is never itself labeled "Team Builder."
+gallery team's Pokémon into Team Builder. Laid out in `.gallery-grid`
+(`auto-fill, minmax(220px, 1fr)`). Moved to the **Top Teams** tab in the
+competitive-UX redesign (previously lived inside the Team Builder tab) —
+grouped there with the real `top_tournament_teams` leaderboard and the
+pokepaste import box, since all three are "look at/import teams" features,
+distinct from the roster-assembly tool Team Builder itself is. Still
+visually and functionally distinct from Team Builder's own roster planner
+and never itself called "Team Builder" — "Load into my builder" calls the
+same `addToTeam`/`ensureTeamBuilder()` pipeline the pokepaste importer
+uses (see "Team Builder" below).
+
+### Removed tabs and components
+
+The Archetype Explorer and Regulation Comparison tabs (and their
+`.archetype-card`/`.archetype-grid` and regulation-comparison-table
+markup) were removed outright in the competitive-UX redesign pass, per
+explicit request — Archetypes were always curated editorial judgment
+rather than sourced data (a documented exception to this repo's
+"provenance is mandatory" convention), and Regulation Comparison's
+cumulative-legal-pool caveat made it a lower-value tab than the rest.
+`legality_summary_by_regulation` is still loaded (it feeds the page-level
+"Legal Pool" KPI card), but has no dedicated tab anymore. `pokemon_
+archetype_usage`/`archetype_summary` and the `archetype_pokemon_map` seed
+are untouched at the data layer — only the dashboard's consumption of them
+was removed — in case a future pass wants to reintroduce archetype context
+elsewhere (e.g. as a Team Builder tag) without re-deriving the mapping.
 
 ## Representing Pokémon
 
 Every dashboard view that names a specific Pokémon must show its sprite
-alongside its name wherever there's room for one (table row, chart axis,
+alongside its name wherever there's room for one (table row, grid tile,
 tooltip, team slot, roster picker row) — see "Sprite / icon cell" and
-"Chart" above. A name-only Pokémon reference should only appear where
+"6-wide grid" above. A name-only Pokémon reference should only appear where
 space genuinely doesn't allow an image (e.g. a `<select>` option's text).
 Sprites come from Bulbagarden Archives via `pokemon_asset.csv`
 (`docs/dashboard.md`'s "Icon sources"); a Pokémon with no resolvable sprite
@@ -327,14 +421,17 @@ applies to a tier name.
 
 The dashboard shows **percentages/shares, not raw counts**, wherever a
 share metric exists (dashboard "focus on percentages" ask):
-`pokemon_usage_summary.usage_share`, `pokemon_build_usage.build_share`,
-`pokemon_move_usage.move_share`, `pokemon_team_core_usage.partner_share`,
-`archetype_summary.combined_usage_share`/`avg_win_rate` — all computed in
-dbt (a `sum(x) over (partition by ...)` window function per mart), not
-client-side, so shares stay internally consistent. Raw `usage_count`,
-`total_wins`/`total_losses`, and `co_occurrence_count` are no longer
-displayed anywhere in the UI (they still exist in the underlying CSVs for
-ranking/testing purposes).
+`pokemon_usage_summary.usage_share`, `pokemon_item_usage.item_share`,
+`pokemon_ability_usage.ability_share`, `pokemon_move_usage.move_share`,
+`pokemon_team_core_usage.partner_share` — all computed in dbt (a `sum(x)
+over (partition by ...)` window function per mart), not client-side, so
+shares stay internally consistent. `pokemon_item_usage`/
+`pokemon_ability_usage` replaced the old combined `pokemon_build_usage`
+mart (see "Item / Ability / Move separation" below) — same share-of-own-
+total pattern, just split by dimension instead of one item×ability pair.
+Raw `usage_count`, `total_wins`/`total_losses`, and `co_occurrence_count`
+are no longer displayed anywhere in the UI (they still exist in the
+underlying CSVs for ranking/testing purposes).
 
 The one deliberate exception is **win rate's sample size**: hiding
 `record_count` entirely risked a 100% win rate on a single recorded match
@@ -348,32 +445,59 @@ and are unaffected by this convention — they're numbers with no
 
 ### Filters beyond Pokémon/tier
 
-Beyond the pre-existing tournament-tier filter (Usage tab), two more
-filters were added: a **minimum recorded matches** threshold (Win rate
-leaders table, `#win-rate-min-record-count-filter`, options 5/10/20/50 —
-the same `RECORD_COUNT_FLOOR` idea `compute_kpis()`'s KPI card already
-used, now user-adjustable) and the archetype/regulation dimensions
-exposed as their own tabs (Archetype Explorer, Regulation Comparison)
-rather than as `<select>` filters on existing tabs, since neither
-dimension applies to the marts those existing tabs are built from.
+Beyond the tournament-tier filter (Usage tab) and the **minimum recorded
+matches** threshold (Win rate leaders table,
+`#win-rate-min-record-count-filter`, options 5/10/20/50 — the same
+`RECORD_COUNT_FLOOR` idea `compute_kpis()`'s KPI card already used, now
+user-adjustable), the competitive-UX redesign pass added:
+
+- **Type filter** (`.type-filter-row` + `renderTypeFilterChips()` in
+  `app.js`): a row of 18 toggle chips, one per type, multi-select (a
+  Pokémon matches if *either* of its types is selected — `App.
+  passesTypeFilter()`). An empty selection means no filter. Present on
+  Usage, Speed Tiers, and Team Builder's roster picker. Only possible
+  because this pass added real Pokémon type data (`pokemon.type_1`/
+  `type_2`) — see "Type badge" above.
+- **Role filter** (Usage tab, `#usage-role-filter`): Physical / Special /
+  Mixed, derived client-side from `App.roleByKey()` — a UX bucketing over
+  each Pokémon's own recorded moveset's damage-category split
+  (`pokemon_move_usage.category`, weighted by `usage_count`; status-only
+  moves don't count toward either side), the same "derived bucketing, not
+  a sourced attribute" treatment as `SPEED_TIERS`.
+- **Range filters** (`.range-filter`, paired `<input type="number">` +
+  `App.inRange(value, minEl, maxEl)`): usage % and Speed on Usage; Speed on
+  Speed Tiers. An empty min or max on either side means unbounded on that
+  side.
+
+The Archetype/Regulation-as-tabs pattern this section used to describe no
+longer applies — both tabs were removed (see "Removed tabs and
+components" above).
 
 ## Team Builder
 
 A fully client-side (no backend, nothing uploaded) roster-assembly tool
-(`setupTeamBuilder()` in `app.js`), built on the new
-`pokemon_champions_profile` mart (one row per currently-legal Pokémon with
-Champions-format stats plus usage/win-rate). A visitor searches/sorts the
-legal pool, adds up to 6 to a team, and sees:
+(`setupTeamBuilder()` in `static/teams.js`, moved out of `app.js` in the
+competitive-UX redesign pass alongside Top Teams — both need the same
+`addToTeam` pipeline, see "Cross-tab team state" below), built on
+`pokemon_champions_profile` (one row per currently-legal Pokémon with
+Champions-format stats, type, and usage/win-rate). A visitor searches/
+sorts/type-filters the legal pool, adds up to 6 to a team, and sees:
 
 - their picks as filled **team slots** (empty slots shown as dashed
-  placeholders).
+  placeholders). Each filled slot now also shows a compact stats readout
+  (HP/Atk/Def/SpA/SpD/Spe), the Pokémon's top recorded ability
+  (`pokemon_ability_usage`), and a `<select>` of its top 4 recorded moves
+  (`pokemon_move_usage`) — the "Team Builder also include stats, move,
+  ability" ask.
 - a **speed order** list — their own picks, fastest-first, each tagged
-  with its Speed-tier badge (see above) — this is the practical payoff of
-  having both Team Builder and Speed Tiers pull from the same
+  with its Speed-tier badge (see above) — the practical payoff of Team
+  Builder and Speed Tiers pulling from the same
   `pokemon_champions_profile` mart: a team's speed order is just that
   mart filtered to the selected keys.
 - a **summary row** (`.stat-summary-row`) of the team's average
   speed/usage share/win rate.
+- an **"Export as pokepaste text"** button (`#team-builder-export`) —
+  see "Pokepaste import/export" below.
 
 The team selection persists to `localStorage` (key
 `pokemonChampionsTeamBuilder`) purely so a reload doesn't lose it — it is
@@ -381,21 +505,139 @@ never sent to a server or embedded in the published HTML; this stays true
 to the dashboard's "static site, no backend" architecture
 (`docs/dashboard.md`'s "Stack decision").
 
-Below the roster planner, the same tab also hosts the **Pro Team
-Gallery** (see "Gallery card" above and `docs/dashboard.md`'s "Pro Team
-Gallery" section) — a read-only reference feature, unrelated to and
-visually distinct from the roster planner, never itself called "Team
-Builder."
+### Cross-tab team state
+
+Team Builder's team array, `addToTeam`/`removeFromTeam`/`loadTeam`, and
+all of its rendering live inside `setupTeamBuilder()`'s closure — but two
+other places need to push Pokémon into that same team: the Pro Team
+Gallery's "Load into my builder" button and Top Teams' pokepaste importer
+(both now live in the **Top Teams** tab, not Team Builder — see below).
+Since tabs initialize lazily on first activation, a visitor could open Top
+Teams and paste a team before ever opening Team Builder, at which point
+`setupTeamBuilder()` wouldn't have run yet. `ensureTeamBuilder()` (module-
+scoped in `teams.js`, not exported on `DashboardApp`, since only
+`teams.js`'s own two tabs need it) handles this: it lazily calls
+`setupTeamBuilder()` on first use from *either* tab and caches the
+returned `{ addToTeam, loadTeam }` handle, so team state is correct
+regardless of which of the two tabs a visitor opens first.
+
+## Top Teams
+
+A new tab (dashboard "include top teams" ask) with three sections:
+
+1. **Top Teams leaderboard** — `.grid-6xn` fed by the new
+   `top_tournament_teams` mart (real MunchStats data: one row per
+   `tournament_team` with a reported win/loss record, ranked by win_rate,
+   with its full roster). Distinct from the Pro Team Gallery below it:
+   this is sourced tournament data, not curated/hand-authored.
+2. **Pro Team Gallery** (see "Gallery card" above) — moved here from Team
+   Builder.
+3. **Pokepaste import** (`.pokepaste-box`, `#pokepaste-input`/
+   `#pokepaste-load`/`#pokepaste-status`) — see "Pokepaste import/export"
+   below.
+
+### Pokepaste import/export
+
+"Do it like vgcpastes/pokepaste": since this is a static site with no
+backend, there's no way to fetch an arbitrary URL client-side (CORS), so
+"paste a link" means paste the plain-text **Showdown export format** —
+the same text a visitor would paste into pokepast.es itself to create a
+paste, not a URL.
+
+- **Import** (`parsePokepaste(text)` in `teams.js`): splits the pasted
+  text on blank lines into per-Pokémon blocks, reads each block's first
+  line (`Species [(Nickname)] [@ Item]`, tolerating a `(M)`/`(F)` gender
+  marker), and resolves the species name to a `pokemon_key` by
+  normalizing both sides (strip spaces/hyphens/periods, lowercase) and
+  matching against `DATA.pokemon_names`' PascalCase values — e.g. "Landorus-
+  Therian" and "LandorusTherian" both normalize to "landorustherian".
+  Unresolved names are reported (not silently dropped) in
+  `#pokepaste-status`, alongside how many Pokémon loaded.
+- **Export** (`exportTeamAsPokepaste(teamKeys)` in `teams.js`): the
+  reverse direction, for Team Builder's export button. Since the
+  dashboard's own PascalCase display names (`LandorusTherian`) aren't
+  real Showdown syntax, export re-derives a hyphenated Title Case name
+  from `pokemon_key` instead (`keyToShowdownName()`: `landorus-therian` ->
+  `Landorus-Therian`) — closer to real pokepaste convention, and a
+  deliberately different transform from the dashboard's own display-name
+  convention (see "Pokémon name formatting: PascalCase" above, which is
+  unchanged for every other view). Each exported Pokémon uses its top
+  recorded item/ability/moves (same marts as the Profile tab and Team
+  Builder's slot detail), not an EV spread or nature — MunchStats' nature
+  coverage is only ~17% (see `docs/dashboard.md`'s "Pro Team Gallery"
+  section), so it's omitted rather than guessed.
+
+Neither direction is guaranteed to produce syntax that round-trips through
+Pokémon Showdown itself byte-for-byte — this is a "pokepaste-style"
+convenience for moving a team in and out of this dashboard's own Team
+Builder, not a full Showdown-format implementation.
+
+## Matchup
+
+A new tab (dashboard "add matchup tab like Smogon" ask,
+`static/matchup.js`) with three sections, all keyed off an
+attacker/defender Pokémon pair (`<select>`s populated from
+`pokemon_champions_profile`, ranked by usage per the ordering convention):
+
+1. **Type effectiveness** (`.type-effect-grid`): all 18 attacking types'
+   multiplier against the defender's type(s), color-coded tiles
+   (`type-effect-4x/2x/1x/half/quarter/0x`).
+2. **Damage calculator**: attacker/defender stat-stage sliders (-6..+6,
+   Atk/SpA and Def/SpD), a weather `<select>`, and a curated row of
+   item/ability toggle chips (`.toggle-chip`, reused from nowhere else —
+   this is the first multi-select toggle-chip UI in the dashboard). Result
+   shown in `.damage-result`, bolded per the "bold the percentage"
+   convention.
+3. **Co-usage** (`.grid-6xn`, `pokemon_team_core_usage` filtered to the
+   defender): who the defender is most often teamed with in real
+   tournament rosters — an explicitly-labeled **proxy**, not a real
+   matchup-outcome signal (see the in-tab disclaimer copy and the scope
+   note below).
+
+### Matchup tab scope (read before extending)
+
+The 18×18 type chart, weather-boost multipliers (rain/sun boost/halve
+same-type moves; sandstorm boosts Rock's Sp. Def, snow boosts Ice's Def,
+both by 1.5×), the stat-stage multiplier formula, and the curated item/
+ability toggle list are **hardcoded game-mechanics constants** in
+`matchup.js`, not dbt/staging data — they're universal Pokémon mechanics,
+not per-record facts needing provenance, the same treatment `app.js`'s
+`SPEED_TIERS` bucketing already gets. Pokémon *type* and move *power/
+accuracy/category* **are** real sourced data (`pokemon.type_1`/`type_2`,
+`move_detail` — PokéAPI, see `docs/dataset-spec.md`), which is what makes
+a real (if simplified) calculator possible at all — see the "Still a real
+gap" note in `dbt/models/marts/schema.yml` for why this was previously
+listed as not-buildable.
+
+Documented simplifications, not silent approximations:
+- Stats are computed at **level 50, IV 31, EV 252** on whichever
+  offensive/defensive stat the chosen move uses (`statAtLevel50()`/
+  `hpAtLevel50()` in `matchup.js`) — a "maximally invested" baseline on
+  both sides, not each Pokémon's actual real-tournament EV spread/nature
+  (MunchStats' nature coverage is only ~17%, and EVs aren't reported at
+  all).
+- Only the curated `TOGGLES` list (Choice Band/Specs, Life Orb, Expert
+  Belt, Huge Power/Pure Power, Adaptability, Technician, Intimidate) is
+  modeled; no other item or ability affects the calculation.
+- Status conditions (e.g. burn), critical hits, multi-hit moves, and
+  terrain are **not** modeled at all.
+- Damage calc only offers moves the attacker actually has recorded usage
+  for (`pokemon_move_usage`) — there's no full per-species movepool data
+  in this pipeline, only what's been seen in real tournament rosters.
+
+If a future pass wants deeper mechanics fidelity, extend `TOGGLES` and
+`computeDamage()` in `matchup.js` rather than adding new dbt models —
+none of this is data-layer work.
 
 ## Responsive behavior
 
 Breakpoints match `docs/dashboard.md`'s existing convention: 720px (KPI
-grid drops to 2 columns, chart height shrinks, Team Builder's two-column
-grid collapses to one column and its team-slot grid drops to 2 columns)
-and 480px (KPI cards stack vertically, filter selects go full-width).
-Tables scroll horizontally inside `.table-scroll` rather than reflowing —
-this is existing, unchanged convention, kept for the two new leaderboard
-tables and the Speed Tiers table.
+grid drops to 2 columns, `.grid-6xn` drops to 3 columns, Team Builder's
+two-column grid collapses to one column and its team-slot grid drops to 2
+columns, the Matchup tab's attacker/defender panels stack) and 480px (KPI
+cards stack vertically, `.grid-6xn` drops to 2 columns, filter selects go
+full-width). Tables scroll horizontally inside `.table-scroll` rather than
+reflowing — existing, unchanged convention.
 
 ## Backlog: not yet buildable
 
@@ -404,25 +646,26 @@ underlying data doesn't exist in this dataset yet — adding it as a
 frontend-only feature would mean fabricating data, which this repo's
 "provenance is mandatory" convention (`CLAUDE.md`) rules out:
 
-- **Type-effectiveness / head-to-head matchups.** No in-scope source
-  (PokéAPI, OP.GG, MunchStats, PokéBase, Bulbagarden) publishes Pokémon
-  *types*, and MunchStats reports team rosters and a team's aggregate
-  win/loss record, not individual battle outcomes against a named
-  opponent — so there's no real signal for "what does Pokémon X lose to"
-  or "who typically beats Pokémon Y." Building this for real needs either
-  a new type-data source (e.g. PokéAPI's own `/type` endpoints, which
-  *are* available and could close the type half of this gap in a future
-  pass) or a battle-log source neither currently in scope nor deferred
-  source (Limitless VGC, Victory Road) is confirmed to provide. Tracked in
-  `docs/todo.md`'s M6 backlog.
+- **Real head-to-head battle-outcome matchups** ("what beats Pokémon X X%
+  of the time in practice"). The type-effectiveness half of this gap is
+  now closed (see the "Matchup" section above) — Pokémon type and move
+  power/accuracy/category are real PokéAPI data now. What's still missing
+  is individual battle-outcome data: MunchStats reports team rosters and a
+  team's aggregate win/loss record, not per-battle results against a named
+  opponent, so the Matchup tab's co-usage panel is an explicitly-labeled
+  teammate-pairing *proxy*, not a real matchup-outcome signal. Closing this
+  for real needs a battle-log source neither currently in scope nor
+  deferred source (Limitless VGC, Victory Road) is confirmed to provide.
+  Tracked in `docs/todo.md`'s M6 backlog.
 - **Date-range filtering / trend charts.** Only one `snapshot_date` exists
   in the data so far, so a date-range control would have nothing to range
   over — see `docs/dashboard.md`'s "Removed sections" for the same
   degenerate-data reasoning applied to the earlier legal-pool-trend
   section. Tracked in `docs/todo.md`.
 
-Sortable table columns (previously listed here as backlog) are now
-shipped — see "Leaderboard table" above.
+Sortable table columns and type-effectiveness (both previously listed
+here as backlog) are now shipped — see "Leaderboard table" and "Matchup"
+above.
 
 See `docs/todo.md`'s M6 backlog section for the full, current list — this
 document only calls out the items directly relevant to this pass's

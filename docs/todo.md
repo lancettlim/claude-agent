@@ -216,15 +216,17 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   sortable by usage/win-rate/speed, with a speed-order readout reusing
   the Speed Tiers badge scale. Rank badges added to the Usage and Win-rate
   leaders tables for a consistent leaderboard pattern across tabs.
-- [ ] Backlog: type-effectiveness / head-to-head matchups. Not buildable
-  today: no in-scope source publishes Pokémon types, and MunchStats
+- [x] Backlog: type-effectiveness / head-to-head matchups — **partially
+  resolved** by the competitive-UX redesign pass below (new **Matchup**
+  tab: type effectiveness + a stats/setup/weather damage calculator, using
+  new `pokemon.type_1`/`type_2` and `move_detail` data from PokéAPI). Still
+  not buildable: real head-to-head battle-outcome data — MunchStats
   reports team-level win/loss records, not individual battle outcomes
-  against a named opponent, so there's no real signal for "what beats
-  Pokémon X." Closing the type half is plausible in a future pass via
-  PokéAPI's own `/type` endpoints (already an in-scope source, just an
-  unfetched endpoint); the battle-log half would need a new source not
-  currently in scope or deferred (see `docs/design-system.md`'s
-  "Backlog: not yet buildable").
+  against a named opponent, so "what beats Pokémon X in practice" has no
+  real signal; the Matchup tab's co-usage panel is an explicitly-labeled
+  teammate-pairing proxy, not that signal. Closing this for real needs a
+  battle-log source not currently in scope or deferred (see
+  `docs/design-system.md`'s "Backlog: not yet buildable").
 - [x] Broadcast/esports dashboard redesign + feature expansion: full
   visual re-theme (`docs/design-system.md`'s broadcast color-block header,
   `--accent-red`/`--accent-gold` tokens, three-step `--icon-sm/md/lg`
@@ -261,13 +263,36 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
   Team Builder tab with a "Load into my builder" button) — see
   `docs/dashboard.md`'s "Pro Team Gallery", "Cumulative legal pool", and
   "Archetype Explorer" sections.
+- [x] Competitive-UX dashboard redesign pass: new PokéAPI extraction
+  (`pokemon.type_1`/`type_2`; new `move_detail`/`ability_detail`/
+  `item_detail` reference tables, scoped to names seen in real tournament
+  rosters) closing the type/move-detail half of the matchup backlog item
+  above; new `top_tournament_teams` mart (real MunchStats team leaderboard
+  by win_rate); removed the **Archetypes** and **Regulations** tabs
+  (`legality_summary_by_regulation` still feeds the page-level Legal Pool
+  KPI card, just has no dedicated tab); removed Overview's Top 30 ranked
+  list (Top 12 grid only — the Usage tab is the full leaderboard now);
+  replaced the ranked-list bar component with a dashboard-wide `.grid-6xn`
+  6-column grid (`renderGrid6xn()`) used for every usage/win-rate metric,
+  with bolded headline percentages; split the old combined
+  `pokemon_build_usage` mart into `pokemon_item_usage`/
+  `pokemon_ability_usage`, and gave the Pokémon Profile tab three separate
+  Items(top 5)/Ability(top 5)/Moves(top 15) `.grid-6xn` sections instead of
+  one combined table, each showing a PokéAPI `short_effect` description; a
+  larger `--icon-xl` dual-type badge on the Profile header; new type/role/
+  stat-range/usage-range filters (Usage, Speed Tiers, Team Builder); new
+  **Matchup** tab (type effectiveness, teammate co-usage, and a damage
+  calculator — core mechanics plus a curated item/ability toggle list,
+  documented scope in `docs/design-system.md`); new **Top Teams** tab
+  (real `top_tournament_teams` leaderboard, the Pro Team Gallery moved
+  here from Team Builder, and a pokepast.es-style Showdown-text paste-in/
+  out importer/exporter); Team Builder slots now show stats/top-ability/
+  top-4-moves per pick, plus an "Export as pokepaste text" button. See
+  `docs/design-system.md` for the full component/token reference.
 - [ ] Backlog: further dashboard capability items not covered by the above
-  redesign: a tournament-event/date filter once multiple snapshots exist
-  (still blocked — only one `snapshot_date` in the data), trend/line
-  charts once that same multi-snapshot data exists, and a loading/empty
-  state for the Pokémon Profile tab before a Pokémon is picked (currently
-  defaults to the highest-usage Pokémon rather than showing an empty
-  state, which may be preferable anyway)
+  redesigns: a tournament-event/date filter once multiple snapshots exist
+  (still blocked — only one `snapshot_date` in the data), and trend/line
+  charts once that same multi-snapshot data exists
 - [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
   `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
   dataset has enough snapshots/trend data (multiple `snapshot_date`s, a
