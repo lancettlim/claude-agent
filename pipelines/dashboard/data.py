@@ -39,7 +39,7 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "pokemon_item_usage": (("usage_count", "usage_rank"), ("item_share",)),
     "pokemon_ability_usage": (("usage_count", "usage_rank"), ("ability_share",)),
     "pokemon_move_usage": (
-        ("usage_count", "usage_rank", "power", "accuracy", "priority"),
+        ("usage_count", "usage_rank", "power", "accuracy", "priority", "pp"),
         ("move_share",),
     ),
     "pokemon_team_core_usage": (("co_occurrence_count", "usage_rank"), ("partner_share",)),

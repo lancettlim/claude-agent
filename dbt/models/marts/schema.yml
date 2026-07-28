@@ -57,8 +57,8 @@ models:
       own total move rows) per Pokémon x move, unnesting
       tournament_team_member's pipe-delimited moves list, restricted to
       the current legal pool, ranked within each Pokémon, with
-      move_type/power/accuracy/category/priority/short_effect joined from
-      move_detail. Written to data/marts/pokemon_move_usage.csv.
+      move_type/power/accuracy/category/priority/pp/short_effect joined
+      from move_detail. Written to data/marts/pokemon_move_usage.csv.
   - name: top_tournament_teams
     description: >
       Top Teams tab's leaderboard feed: one row per tournament_team with a

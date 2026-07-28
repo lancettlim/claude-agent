@@ -44,10 +44,10 @@
        --icon-xl is a deliberate 4th tier, reserved for the Pokémon Profile
        header's dual-type badge (a new, hero-level piece of information —
        see "Larger type badge" in docs/design-system.md). */
-    --icon-sm: 32px;
-    --icon-md: 48px;
-    --icon-lg: 72px;
-    --icon-xl: 96px;
+    --icon-sm: 40px;
+    --icon-md: 64px;
+    --icon-lg: 96px;
+    --icon-xl: 128px;
 
     /* Speed-tier badge scale (docs/design-system.md's "Speed-tier badge"
        component) — bucketed off pokemon_champions_profile.speed. */
@@ -116,12 +116,12 @@
     background: #fff;
     border: 2px solid var(--border);
     border-radius: 10px;
-    padding: 16px;
+    padding: var(--space-5);
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: var(--space-3);
   }
-  .kpi-card .kpi-sprite { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; flex: 0 0 auto; image-rendering: pixelated; }
+  .kpi-card .kpi-sprite { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; flex: 0 0 auto; }
   .kpi-card .kpi-body { min-width: 0; }
   .kpi-card .label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
   .kpi-card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; overflow-wrap: break-word; }
@@ -155,20 +155,48 @@
   }
   .tab-panel[hidden] { display: none; }
 
+  /* --- Sub-tabs: a compact pill row nested inside one top-level tab/
+     section (e.g. Usage's leaderboards, Pokémon Profile's Items/Ability/
+     Moves/Team Cores), so several equally-important views can share one
+     section instead of stacking. Deliberately visually lighter than the
+     top-level `.tabs` row above, which stays reserved for the page's
+     seven main tabs. --- */
+  .subtabs {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    margin-bottom: var(--space-4);
+  }
+  .subtab-btn {
+    flex: 0 0 auto;
+    background: var(--light-blue);
+    border: none;
+    border-radius: var(--radius-pill);
+    color: var(--muted);
+    font-size: var(--font-sm);
+    font-weight: 600;
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .subtab-btn:hover { color: var(--navy); }
+  .subtab-btn[aria-selected="true"] { background: var(--blue); color: #fff; }
+  .subtab-panel[hidden] { display: none; }
+
   section {
     background: #fff;
     border: 2px solid var(--border);
     border-radius: 10px;
-    padding: 0 20px 20px;
-    margin-bottom: 24px;
+    padding: 0 var(--space-8) var(--space-8);
+    margin-bottom: var(--space-6);
     overflow: hidden;
   }
   /* Broadcast color-block section header (docs/design-system.md) — bold,
      uppercase, letter-spaced, on a dark bar, replacing plain
      text-on-white section titles. */
   section h2 {
-    margin: 0 -20px 16px;
-    padding: 14px 20px;
+    margin: 0 calc(var(--space-8) * -1) var(--space-4);
+    padding: var(--space-4) var(--space-8);
     background: var(--panel-dark);
     color: #fff;
     font-size: 1rem;
@@ -206,7 +234,7 @@
 
   /* Sprite/icon cells populated by app.js's pokemonCell()/iconCell() helpers */
   .cell-with-icon { display: flex; align-items: center; gap: 8px; }
-  .cell-icon { width: var(--icon-sm); height: var(--icon-sm); object-fit: contain; flex: 0 0 auto; image-rendering: pixelated; }
+  .cell-icon { width: var(--icon-sm); height: var(--icon-sm); object-fit: contain; flex: 0 0 auto; }
 
   /* Small muted annotation next to a value (Win rate leaders table's
      "(n=X)" sample-size note — see "Percentages, not raw counts" in
@@ -226,7 +254,7 @@
   .grid-6xn-tile {
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
-    padding: var(--space-3);
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -240,7 +268,7 @@
      label when a tile has no icon (e.g. an item/ability/move/team with no
      resolvable sprite). */
   .grid-6xn-tile .badge-rank { align-self: flex-start; }
-  .grid-6xn-tile img { width: var(--icon-md); height: var(--icon-md); object-fit: contain; image-rendering: pixelated; }
+  .grid-6xn-tile img { width: var(--icon-md); height: var(--icon-md); object-fit: contain; }
   .grid-6xn-tile .grid-6xn-label { font-weight: 600; font-size: var(--font-xs); overflow-wrap: anywhere; }
   .grid-6xn-value { font-weight: 800; font-size: var(--font-lg); color: var(--navy); }
   .grid-6xn-tile.is-leader .grid-6xn-value { color: var(--accent-red); }
@@ -250,7 +278,7 @@
   .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-4); }
   .gallery-card { border: 2px solid var(--border); border-radius: var(--radius-md); overflow: hidden; display: flex; flex-direction: column; }
   .gallery-card img.gallery-card-image { width: 100%; display: block; }
-  .gallery-card .gallery-card-body { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-1); }
+  .gallery-card .gallery-card-body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-1); }
   .gallery-card .gallery-card-player { font-weight: 700; }
   .gallery-card .gallery-card-meta { font-size: var(--font-xs); color: var(--muted); }
 
@@ -279,18 +307,27 @@
 
   /* --- Type badge (Pokémon Profile header, Matchup tab pickers) — the
      dashboard's first-ever Pokémon-type display (pokemon.type_1/type_2,
-     PokéAPI). Uses --icon-xl for hero-level prominence, the one
-     documented exception to the 3-tier icon scale. --- */
+     PokéAPI). Icon-only emblems (no visible text label) — the type name
+     is exposed via the pill's aria-label/the icon's title attribute
+     instead, so it stays accessible without cluttering the badge. Uses
+     --icon-xl for hero-level prominence, the one documented exception to
+     the 3-tier icon scale. --- */
   .type-badge-row { display: flex; align-items: center; gap: var(--space-2); }
-  .type-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-pill); background: var(--navy); color: #fff; font-size: var(--font-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
-  .type-pill img { width: 18px; height: 18px; }
+  .type-pill { display: inline-flex; align-items: center; justify-content: center; }
 
   /* Profile header's dual-type display — the one place a type icon uses
      --icon-xl instead of the sm/md/lg scale (see "Icon size scale" above). */
   .type-badge-row.type-badge-lg { gap: var(--space-3); }
-  .type-badge-lg .type-pill-lg { display: flex; flex-direction: column; align-items: center; gap: var(--space-1); background: none; padding: 0; border-radius: 0; color: var(--navy); }
-  .type-badge-lg .type-pill-lg img { width: var(--icon-xl); height: var(--icon-xl); }
-  .type-badge-lg .type-pill-lg span { font-size: var(--font-sm); font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; background: var(--navy); color: #fff; padding: 2px 10px; border-radius: var(--radius-pill); }
+  .type-badge-lg .type-pill-lg { display: inline-flex; align-items: center; justify-content: center; }
+
+  /* Crops static/icons/types/*.png (wide 200x40 "icon + type name" badges,
+     not bare square icons) down to just the icon's fixed-width left
+     square, so every type-icon use (compact pills, the large Profile
+     badge, the Matchup effectiveness grid, filter chips) shows a real
+     icon-only emblem instead of a squished text badge — see
+     typeIconImg() in app.js. */
+  .type-icon-crop { display: inline-block; overflow: hidden; border-radius: var(--radius-sm); vertical-align: -3px; }
+  .type-icon-crop img { display: block; }
 
   /* --- Descriptive sub-text under a name (Pokémon Profile's Items/
      Ability/Moves sections; Matchup panel move picker) --- */
@@ -314,7 +351,7 @@
   .type-effect-0x { background: var(--navy); color: #fff; }
 
   .matchup-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-  .matchup-side { border: 1px solid var(--light-blue); border-radius: var(--radius-md); padding: var(--space-3); }
+  .matchup-side { border: 1px solid var(--light-blue); border-radius: var(--radius-md); padding: var(--space-4); }
   .matchup-side h4 { margin: 0 0 var(--space-2); }
   .stage-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-1); }
   .stage-row label { font-size: var(--font-xs); color: var(--muted); flex: 0 0 60px; }
@@ -425,7 +462,7 @@
   .team-slot {
     border: 2px solid var(--border);
     border-radius: var(--radius-md);
-    padding: var(--space-3);
+    padding: var(--space-4);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -435,10 +472,11 @@
     justify-content: center;
   }
   .team-slot.empty { border-style: dashed; color: var(--muted); font-size: var(--font-xs); }
-  .team-slot img { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; image-rendering: pixelated; }
+  .team-slot img { width: var(--icon-lg); height: var(--icon-lg); object-fit: contain; }
   .team-slot .slot-name { font-weight: 600; font-size: var(--font-sm); }
   .team-slot .slot-detail { font-size: var(--font-xs); color: var(--muted); }
   .team-slot select { width: 100%; margin-top: 2px; }
+  .team-slot .slot-move-selects { display: flex; flex-direction: column; gap: 2px; width: 100%; }
 
   .speed-order-list { list-style: none; margin: 0; padding: 0; }
   .speed-order-list li {
@@ -484,7 +522,8 @@
     .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .kpi-card { flex-direction: column; align-items: flex-start; gap: 6px; }
     .controls select { width: 100%; }
-    section { padding: 14px; }
+    section { padding: var(--space-4); }
+    section h2 { margin: 0 calc(var(--space-4) * -1) var(--space-4); padding: var(--space-3) var(--space-4); }
     .grid-6xn { grid-template-columns: repeat(2, 1fr); }
   }
 
@@ -558,6 +597,7 @@
 
   <section class="tab-panel" data-panel="usage" hidden>
     <h2>Usage</h2>
+    <p class="sub">Real Pokémon Champions tournament data (MunchStats) — every usage and win-rate figure below is computed from actual recorded rosters, not a blend with other sources.</p>
     <div class="controls">
       <label>Tier
         <select id="usage-tier-filter"></select>
@@ -590,32 +630,40 @@
     </div>
     <div class="grid-6xn" id="usage-grid"></div>
 
-    <h2>Usage leaders</h2>
-    <p class="sub">Ranked by % of meta within the selected tier and filters. Click a column header to re-sort.</p>
-    <div class="table-scroll">
-      <table id="usage-leaders-table">
-        <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">% of meta</th></tr></thead>
-        <tbody></tbody>
-      </table>
+    <h3>Leaderboards</h3>
+    <div class="subtabs" role="tablist">
+      <button class="subtab-btn" role="tab" data-subtab="usage-leaders" aria-selected="true">Usage leaders</button>
+      <button class="subtab-btn" role="tab" data-subtab="win-rate-leaders" aria-selected="false">Win rate leaders</button>
     </div>
 
-    <h2>Win rate leaders</h2>
-    <div class="controls">
-      <label>Min. recorded matches
-        <select id="win-rate-min-record-count-filter">
-          <option value="5">5+</option>
-          <option value="10">10+</option>
-          <option value="20">20+</option>
-          <option value="50">50+</option>
-        </select>
-      </label>
+    <div class="subtab-panel" data-subpanel="usage-leaders">
+      <p class="sub">Ranked by % of meta within the selected tier and filters. Click a column header to re-sort.</p>
+      <div class="table-scroll">
+        <table id="usage-leaders-table">
+          <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">% of meta</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
-    <div class="grid-6xn" id="win-rate-grid"></div>
-    <div class="table-scroll">
-      <table id="win-rate-table">
-        <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
-        <tbody></tbody>
-      </table>
+
+    <div class="subtab-panel" data-subpanel="win-rate-leaders" hidden>
+      <div class="controls">
+        <label>Min. recorded matches
+          <select id="win-rate-min-record-count-filter">
+            <option value="5">5+</option>
+            <option value="10">10+</option>
+            <option value="20">20+</option>
+            <option value="50">50+</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid-6xn" id="win-rate-grid"></div>
+      <div class="table-scroll">
+        <table id="win-rate-table">
+          <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -629,18 +677,48 @@
 
     <div id="pokemon-profile-stats" class="empty-state"></div>
 
-    <h3>Items <span class="sub">(top 5)</span></h3>
-    <div class="grid-6xn" id="profile-item-grid"></div>
+    <div class="subtabs" role="tablist">
+      <button class="subtab-btn" role="tab" data-subtab="profile-items" aria-selected="true">Items</button>
+      <button class="subtab-btn" role="tab" data-subtab="profile-ability">Ability</button>
+      <button class="subtab-btn" role="tab" data-subtab="profile-moves">Moves</button>
+      <button class="subtab-btn" role="tab" data-subtab="profile-team-cores">Team Cores</button>
+    </div>
 
-    <h3>Ability <span class="sub">(top 5)</span></h3>
-    <div class="grid-6xn" id="profile-ability-grid"></div>
+    <div class="subtab-panel" data-subpanel="profile-items">
+      <p class="sub">Top 5 recorded held items.</p>
+      <div class="grid-6xn" id="profile-item-grid"></div>
+    </div>
 
-    <h3>Moves <span class="sub">(top 15)</span></h3>
-    <div class="grid-6xn" id="profile-move-grid"></div>
+    <div class="subtab-panel" data-subpanel="profile-ability" hidden>
+      <p class="sub">Top 5 recorded abilities.</p>
+      <div class="grid-6xn" id="profile-ability-grid"></div>
+    </div>
 
-    <h3>Team Cores</h3>
-    <p class="sub">Which Pokémon most often share a team with this Pokémon.</p>
-    <div class="grid-6xn" id="profile-team-core-grid"></div>
+    <div class="subtab-panel" data-subpanel="profile-moves" hidden>
+      <p class="sub">Top 15 recorded moves, with full mechanics.</p>
+      <div class="table-scroll">
+        <table id="profile-move-table">
+          <thead>
+            <tr>
+              <th>Move</th>
+              <th class="sortable" data-sort-key="move_share">Usage</th>
+              <th>Category</th>
+              <th class="sortable" data-sort-key="power">Power</th>
+              <th class="sortable" data-sort-key="accuracy">Accuracy</th>
+              <th class="sortable" data-sort-key="pp">PP</th>
+              <th class="sortable" data-sort-key="priority">Priority</th>
+              <th>Effect</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="profile-team-cores" hidden>
+      <p class="sub">Which Pokémon most often share a team with this Pokémon.</p>
+      <div class="grid-6xn" id="profile-team-core-grid"></div>
+    </div>
   </section>
 
   <section class="tab-panel" data-panel="speed-tiers" hidden>
@@ -693,6 +771,7 @@
         <h4>Attacker</h4>
         <label>Pokémon <select id="matchup-attacker-select"></select></label>
         <div id="matchup-attacker-type" class="type-badge-row"></div>
+        <div id="matchup-attacker-stats" class="desc-text"></div>
         <label>Move <select id="matchup-move-select"></select></label>
         <div id="matchup-move-desc" class="desc-text"></div>
         <h4>Setup</h4>
@@ -702,6 +781,7 @@
         <h4>Defender</h4>
         <label>Pokémon <select id="matchup-defender-select"></select></label>
         <div id="matchup-defender-type" class="type-badge-row"></div>
+        <div id="matchup-defender-stats" class="desc-text"></div>
         <h4>Setup</h4>
         <div id="matchup-defender-stages"></div>
       </div>
@@ -790,7 +870,7 @@
     </div>
 
     <h2>Top Teams</h2>
-    <p class="sub">Real tournament teams ranked by reported win rate.</p>
+    <p class="sub">Real Pokémon Champions tournament teams (MunchStats), ranked by reported win rate — distinct from the curated Pro Team Gallery below.</p>
     <div class="grid-6xn" id="top-teams-grid"></div>
 
     <h3>Pro Team Gallery</h3>

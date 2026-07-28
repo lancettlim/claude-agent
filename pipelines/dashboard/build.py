@@ -36,6 +36,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from pipelines.dashboard import data, sprites
 from pipelines.render import assets as render_assets
+from pipelines.render import bulbagarden_items
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -96,13 +97,16 @@ def _resolve_item_icons(
     icon_cache_dir: Path,
     fetch_icons: bool,
 ) -> dict[str, str]:
-    """Resolves an icon for each distinct item_name in pokemon_item_usage
-    via pipelines.render.assets.ensure_item_icon (PokeAPI community sprites,
-    cached to icon_cache_dir) and copies resolved icons into
-    output_dir/images/icons/items/. Returns a {item_name: relative_path}
-    map of what succeeded; unresolved items are simply absent, degrading to
-    a text-only item name in the UI. When fetch_icons is False (offline
-    builds, tests), no network calls are made and this returns {}."""
+    """Resolves an icon for each distinct item_name in pokemon_item_usage,
+    preferring pipelines.render.bulbagarden_items.ensure_item_icon_bulbagarden
+    (Bulbagarden Archives held-item sprites) and falling back to
+    pipelines.render.assets.ensure_item_icon (PokéAPI community sprites) on
+    a per-item resolution miss, both cached under icon_cache_dir. Copies
+    whichever source resolved into output_dir/images/icons/items/. Returns
+    a {item_name: relative_path} map of what succeeded; unresolved items
+    are simply absent, degrading to a text-only item name in the UI. When
+    fetch_icons is False (offline builds, tests), no network calls are
+    made and this returns {}."""
     item_names = sorted(
         {row["item_name"] for row in marts.get("pokemon_item_usage", []) if row.get("item_name")}
     )
@@ -115,9 +119,13 @@ def _resolve_item_icons(
     resolved: dict[str, str] = {}
     session = requests.Session()
     for item_name in item_names:
-        source_path = render_assets.ensure_item_icon(
+        source_path = bulbagarden_items.ensure_item_icon_bulbagarden(
             item_name, cache_dir=icon_cache_dir, session=session
         )
+        if not source_path or not source_path.exists():
+            source_path = render_assets.ensure_item_icon(
+                item_name, cache_dir=icon_cache_dir, session=session
+            )
         if not source_path or not source_path.exists():
             continue
         dest_path = dest_dir / source_path.name

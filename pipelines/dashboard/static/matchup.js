@@ -154,6 +154,18 @@
     };
   }
 
+  // Visible HP/Atk/Def/SpA/SpD/Spe stat line for a matchup-side panel —
+  // the damage calculator already uses these stats (level-50 formula,
+  // hpAtLevel50() for the %-of-HP result) but previously didn't surface
+  // them anywhere in the UI, only the derived percentage.
+  function statLine(pokemon) {
+    if (!pokemon) return "";
+    return (
+      "HP " + pokemon.hp + " Atk " + pokemon.attack + " Def " + pokemon.defense +
+      " SpA " + pokemon.sp_attack + " SpD " + pokemon.sp_defense + " Spe " + pokemon.speed
+    );
+  }
+
   // ---------- tab wiring ----------
   function setupMatchup() {
     var profileRows = marts.pokemon_champions_profile || [];
@@ -170,6 +182,8 @@
     var weatherSelect = document.getElementById("matchup-weather");
     var attackerTypeEl = document.getElementById("matchup-attacker-type");
     var defenderTypeEl = document.getElementById("matchup-defender-type");
+    var attackerStatsEl = document.getElementById("matchup-attacker-stats");
+    var defenderStatsEl = document.getElementById("matchup-defender-stats");
     var moveDescEl = document.getElementById("matchup-move-desc");
     var attackerStagesEl = document.getElementById("matchup-attacker-stages");
     var defenderStagesEl = document.getElementById("matchup-defender-stages");
@@ -321,6 +335,8 @@
       var defender = byName[defenderSelect.value];
       App.renderTypeBadgeRow(attackerTypeEl, attacker && attacker.type_1, attacker && attacker.type_2, false);
       App.renderTypeBadgeRow(defenderTypeEl, defender && defender.type_1, defender && defender.type_2, false);
+      if (attackerStatsEl) attackerStatsEl.textContent = statLine(attacker);
+      if (defenderStatsEl) defenderStatsEl.textContent = statLine(defender);
       drawTypeGrid(defender);
       drawCoUsage(defender);
 
