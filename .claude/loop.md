@@ -45,10 +45,14 @@ consecutive iterations make no progress on the same item.
 Turns gaps and open questions into new, well-formed `docs/todo.md` items
 instead of leaving them implicit.
 
-1. Scan `docs/dataset-spec.md`, `docs/prd.md`, `docs/data-sources.md`, and
-   any validation reports under `reports/validation/` for work that isn't
-   yet represented as a `docs/todo.md` checkbox (new entities, unaddressed
-   risks, open questions, newly deferred-then-revived sources).
+1. Scan `docs/dataset-spec.md`, `docs/prd.md`, `docs/data-sources.md`,
+   `docs/backlog.md`, and any validation reports under `reports/validation/`
+   for work that isn't yet represented as a `docs/todo.md` checkbox (new
+   entities, unaddressed risks, open questions, newly deferred-then-revived
+   sources). `docs/backlog.md` is the richest source here: it already holds
+   sized, dependency-tagged candidates, so grooming it mostly means picking
+   an accepted item and restating it as a checklist entry — the
+   backlog → todo graduation the two files are designed around.
 2. Write each gap as one action-sized `docs/todo.md` item under the right
    phase heading, following the existing bullet style (imperative,
    references the concrete file/table/field it touches).
