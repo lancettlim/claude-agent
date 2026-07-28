@@ -1,0 +1,377 @@
+/* Matchup tab: type effectiveness, teammate co-usage, and a stats/setup/
+ * weather-aware damage calculator (docs/design-system.md's "Matchup tab
+ * components"). Loaded after app.js and reuses window.DashboardApp for
+ * data/helpers rather than duplicating them.
+ *
+ * The 18x18 type chart, weather-boost multipliers, the level-50 stat
+ * formula, and the curated item/ability toggle list below are universal
+ * Pokémon game mechanics, not per-record dataset facts — they're hardcoded
+ * constants here (the same treatment app.js's SPEED_TIERS bucketing
+ * already gets), not something requiring extraction/provenance. Pokémon
+ * *type* and move *power/accuracy/category* are real sourced data
+ * (pokemon.type_1/type_2, move_detail — see docs/dataset-spec.md),
+ * fetched from PokéAPI.
+ *
+ * Scope, documented rather than silently approximated: this calculator
+ * assumes a level-50, IV 31 / EV 252 "maximally invested" stat on
+ * whichever offensive/defensive stat the chosen move uses (real
+ * nature/EV/IV data isn't reliably reported by MunchStats — nature
+ * coverage is only ~17%, see docs/dashboard.md), models STAB, type
+ * effectiveness, stat stages, rain/sun weather boosts, sand/snow's
+ * Rock-SpDef/Ice-Def boosts, and a curated set of common competitive
+ * items/abilities as flat multipliers. It does NOT model status
+ * conditions (e.g. burn), critical hits, multi-hit moves, or any
+ * item/ability outside the curated toggle list below. */
+(function () {
+  "use strict";
+
+  var App = window.DashboardApp;
+  if (!App) return;
+
+  var marts = App.marts;
+  var sprites = App.sprites;
+
+  // ---------- type chart (standard Gen 6+ Pokémon type effectiveness) ----------
+  // TYPE_CHART[attackType][defendType] = multiplier; unlisted pairs are 1x.
+  var TYPE_CHART = {
+    normal: { rock: 0.5, ghost: 0, steel: 0.5 },
+    fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+    water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+    electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+    grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+    ice: { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+    fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5 },
+    poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2 },
+    ground: { fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+    flying: { electric: 0.5, grass: 2, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+    psychic: { fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5 },
+    bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5 },
+    rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+    ghost: { normal: 0, psychic: 2, ghost: 2, dark: 0.5 },
+    dragon: { dragon: 2, steel: 0.5, fairy: 0 },
+    dark: { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5 },
+    steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
+    fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
+  };
+
+  function typeEffectiveness(attackType, defendTypes) {
+    var chart = TYPE_CHART[attackType] || {};
+    var multiplier = 1;
+    defendTypes.filter(Boolean).forEach(function (t) {
+      multiplier *= chart[t] === undefined ? 1 : chart[t];
+    });
+    return multiplier;
+  }
+
+  function effectClass(m) {
+    if (m === 0) return "type-effect-0x";
+    if (m === 0.25) return "type-effect-quarter";
+    if (m === 0.5) return "type-effect-half";
+    if (m === 1) return "type-effect-1x";
+    if (m === 2) return "type-effect-2x";
+    return "type-effect-4x";
+  }
+
+  // ---------- curated item/ability toggle list ----------
+  var TOGGLES = [
+    { id: "choice-band", label: "Choice Band" },
+    { id: "choice-specs", label: "Choice Specs" },
+    { id: "life-orb", label: "Life Orb" },
+    { id: "expert-belt", label: "Expert Belt" },
+    { id: "huge-power", label: "Huge Power / Pure Power" },
+    { id: "adaptability", label: "Adaptability" },
+    { id: "technician", label: "Technician" },
+    { id: "intimidate", label: "Intimidate (on defender)" },
+  ];
+
+  // ---------- level-50 stat formula (IV 31 / EV 252 "maxed" baseline —
+  // see the file-header scope note) ----------
+  function statAtLevel50(base) {
+    return Math.floor(Math.floor((2 * base + 31 + Math.floor(252 / 4)) * 50 / 100) + 5);
+  }
+  function hpAtLevel50(base) {
+    return Math.floor((2 * base + 31 + Math.floor(252 / 4)) * 50 / 100) + 50 + 10;
+  }
+  function stageMultiplier(stage) {
+    stage = Math.max(-6, Math.min(6, stage || 0));
+    return stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage);
+  }
+
+  function computeDamage(params) {
+    var move = params.move;
+    if (!move || !move.power) return null;
+    var category = move.category === "special" ? "special" : "physical";
+    var atkBase = category === "special" ? params.attacker.sp_attack : params.attacker.attack;
+    var defBase = category === "special" ? params.defender.sp_defense : params.defender.defense;
+
+    var atkStage = category === "special" ? params.attackerStages.spa : params.attackerStages.atk;
+    var defStage = category === "special" ? params.defenderStages.spd : params.defenderStages.def;
+    if (params.toggles["intimidate"] && category === "physical") atkStage -= 1;
+
+    var atkStat = statAtLevel50(atkBase) * stageMultiplier(atkStage);
+    if (params.toggles["huge-power"] && category === "physical") atkStat *= 2;
+
+    var defStat = statAtLevel50(defBase) * stageMultiplier(defStage);
+    var defenderTypes = [params.defender.type_1, params.defender.type_2].filter(Boolean);
+    if (params.weather === "sand" && category === "special" && defenderTypes.indexOf("rock") !== -1) defStat *= 1.5;
+    if (params.weather === "snow" && category === "physical" && defenderTypes.indexOf("ice") !== -1) defStat *= 1.5;
+
+    var base = (2 * 50 / 5 + 2) * move.power * (atkStat / defStat) / 50 + 2;
+
+    var attackerTypes = [params.attacker.type_1, params.attacker.type_2].filter(Boolean);
+    var stab = attackerTypes.indexOf(move.move_type) !== -1 ? (params.toggles["adaptability"] ? 2 : 1.5) : 1;
+    var effectiveness = typeEffectiveness(move.move_type, defenderTypes);
+
+    var weatherMod = 1;
+    if (params.weather === "rain") {
+      if (move.move_type === "water") weatherMod = 1.5;
+      if (move.move_type === "fire") weatherMod = 0.5;
+    } else if (params.weather === "sun") {
+      if (move.move_type === "fire") weatherMod = 1.5;
+      if (move.move_type === "water") weatherMod = 0.5;
+    }
+
+    var itemMod = 1;
+    if (params.toggles["choice-band"] && category === "physical") itemMod *= 1.5;
+    if (params.toggles["choice-specs"] && category === "special") itemMod *= 1.5;
+    if (params.toggles["life-orb"]) itemMod *= 1.3;
+    if (params.toggles["expert-belt"] && effectiveness > 1) itemMod *= 1.2;
+    if (params.toggles["technician"] && move.power <= 60) itemMod *= 1.5;
+
+    var multiplier = stab * effectiveness * weatherMod * itemMod;
+    var low = Math.floor(base * multiplier * 0.85);
+    var high = Math.floor(base * multiplier);
+    var defenderHp = hpAtLevel50(params.defender.hp);
+
+    return {
+      low: low,
+      high: high,
+      lowPct: (low / defenderHp) * 100,
+      highPct: (high / defenderHp) * 100,
+      effectiveness: effectiveness,
+      stab: stab,
+      category: category,
+    };
+  }
+
+  // ---------- tab wiring ----------
+  function setupMatchup() {
+    var profileRows = marts.pokemon_champions_profile || [];
+    var moveRows = marts.pokemon_move_usage || [];
+    var coreRows = marts.pokemon_team_core_usage || [];
+    var byName = {};
+    profileRows.forEach(function (r) {
+      byName[r.pokemon_name] = r;
+    });
+
+    var attackerSelect = document.getElementById("matchup-attacker-select");
+    var defenderSelect = document.getElementById("matchup-defender-select");
+    var moveSelect = document.getElementById("matchup-move-select");
+    var weatherSelect = document.getElementById("matchup-weather");
+    var attackerTypeEl = document.getElementById("matchup-attacker-type");
+    var defenderTypeEl = document.getElementById("matchup-defender-type");
+    var moveDescEl = document.getElementById("matchup-move-desc");
+    var attackerStagesEl = document.getElementById("matchup-attacker-stages");
+    var defenderStagesEl = document.getElementById("matchup-defender-stages");
+    var toggleRowEl = document.getElementById("matchup-toggle-row");
+    var resultEl = document.getElementById("matchup-damage-result");
+    var typeGridEl = document.getElementById("matchup-type-grid");
+    var coUsageGridEl = document.getElementById("matchup-co-usage-grid");
+    if (!attackerSelect || !defenderSelect) return;
+
+    var sortedProfiles = profileRows.slice().sort(function (a, b) {
+      return (b.usage_share || 0) - (a.usage_share || 0);
+    });
+    var names = sortedProfiles.map(function (r) {
+      return r.pokemon_name;
+    });
+    App.fillSelect(attackerSelect, names, "Select a Pokémon…");
+    App.fillSelect(defenderSelect, names, "Select a Pokémon…");
+    attackerSelect.removeChild(attackerSelect.firstChild); // no blank "Select a Pokémon…" for required pickers
+    defenderSelect.removeChild(defenderSelect.firstChild);
+    if (names.length) {
+      attackerSelect.value = names[0];
+      defenderSelect.value = names[Math.min(1, names.length - 1)];
+    }
+
+    var attackerStages = { atk: 0, spa: 0 };
+    var defenderStages = { def: 0, spd: 0 };
+    var toggles = {};
+
+    function renderStageSliders(container, stages, keys) {
+      container.innerHTML = "";
+      keys.forEach(function (spec) {
+        var row = document.createElement("div");
+        row.className = "stage-row";
+        var valueSpan = document.createElement("span");
+        valueSpan.className = "stage-value";
+        valueSpan.textContent = (stages[spec.key] > 0 ? "+" : "") + stages[spec.key];
+        var label = document.createElement("label");
+        label.textContent = spec.label;
+        var input = document.createElement("input");
+        input.type = "range";
+        input.min = "-6";
+        input.max = "6";
+        input.value = String(stages[spec.key]);
+        input.addEventListener("input", function () {
+          stages[spec.key] = parseInt(input.value, 10);
+          valueSpan.textContent = (stages[spec.key] > 0 ? "+" : "") + stages[spec.key];
+          updateAll();
+        });
+        row.appendChild(label);
+        row.appendChild(input);
+        row.appendChild(valueSpan);
+        container.appendChild(row);
+      });
+    }
+    renderStageSliders(attackerStagesEl, attackerStages, [
+      { key: "atk", label: "Atk" },
+      { key: "spa", label: "SpA" },
+    ]);
+    renderStageSliders(defenderStagesEl, defenderStages, [
+      { key: "def", label: "Def" },
+      { key: "spd", label: "SpD" },
+    ]);
+
+    if (toggleRowEl) {
+      toggleRowEl.innerHTML = "";
+      TOGGLES.forEach(function (toggle) {
+        var chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "toggle-chip";
+        chip.setAttribute("aria-pressed", "false");
+        chip.textContent = toggle.label;
+        chip.addEventListener("click", function () {
+          if (toggles[toggle.id]) {
+            delete toggles[toggle.id];
+          } else {
+            toggles[toggle.id] = true;
+          }
+          chip.setAttribute("aria-pressed", toggles[toggle.id] ? "true" : "false");
+          updateAll();
+        });
+        toggleRowEl.appendChild(chip);
+      });
+    }
+
+    function refreshMoveOptions() {
+      var attacker = byName[attackerSelect.value];
+      var moves = attacker
+        ? moveRows
+            .filter(function (r) {
+              return r.pokemon_key === attacker.pokemon_key && r.category && r.category !== "status";
+            })
+            .sort(function (a, b) {
+              return a.usage_rank - b.usage_rank;
+            })
+        : [];
+      App.fillSelect(
+        moveSelect,
+        moves.map(function (r) {
+          return r.move_name;
+        }),
+        "Select a move…"
+      );
+      moveSelect.removeChild(moveSelect.firstChild);
+      if (moves.length) moveSelect.value = moves[0].move_name;
+      return moves;
+    }
+
+    function drawTypeGrid(defender) {
+      if (!typeGridEl) return;
+      typeGridEl.innerHTML = "";
+      if (!defender) return;
+      var defenderTypes = [defender.type_1, defender.type_2].filter(Boolean);
+      App.ALL_TYPES.forEach(function (attackType) {
+        var multiplier = typeEffectiveness(attackType, defenderTypes);
+        var tile = document.createElement("div");
+        tile.className = "type-effect-tile " + effectClass(multiplier);
+        tile.innerHTML = App.typeIconImg(attackType, 16) + " " + attackType + "<br>" + multiplier + "×";
+        typeGridEl.appendChild(tile);
+      });
+    }
+
+    function drawCoUsage(defender) {
+      if (!coUsageGridEl) return;
+      var rows = defender
+        ? coreRows
+            .filter(function (r) {
+              return r.pokemon_key === defender.pokemon_key;
+            })
+            .sort(function (a, b) {
+              return a.usage_rank - b.usage_rank;
+            })
+            .slice(0, 15)
+        : [];
+      App.renderGrid6xn(coUsageGridEl, rows, {
+        keyFn: function (r) {
+          return r.partner_pokemon_key;
+        },
+        labelFn: function (r) {
+          return r.partner_pokemon_name;
+        },
+        displayFn: function (r) {
+          return App.formatPercent(r.partner_share);
+        },
+      });
+    }
+
+    function updateAll() {
+      var attacker = byName[attackerSelect.value];
+      var defender = byName[defenderSelect.value];
+      App.renderTypeBadgeRow(attackerTypeEl, attacker && attacker.type_1, attacker && attacker.type_2, false);
+      App.renderTypeBadgeRow(defenderTypeEl, defender && defender.type_1, defender && defender.type_2, false);
+      drawTypeGrid(defender);
+      drawCoUsage(defender);
+
+      var moveName = moveSelect.value;
+      var move = moveName
+        ? moveRows.filter(function (r) {
+            return attacker && r.pokemon_key === attacker.pokemon_key && r.move_name === moveName;
+          })[0]
+        : null;
+      if (moveDescEl) moveDescEl.textContent = move ? move.short_effect || "" : "";
+
+      if (!resultEl) return;
+      if (!attacker || !defender || !move) {
+        resultEl.innerHTML = '<div class="damage-sub">Pick an attacker, a move, and a defender to see estimated damage.</div>';
+        return;
+      }
+      if (!move.power) {
+        resultEl.innerHTML = '<div class="damage-sub">' + App.escapeHtml(move.move_name) + " is a status move — no direct damage to calculate.</div>";
+        return;
+      }
+      var result = computeDamage({
+        attacker: attacker,
+        defender: defender,
+        move: move,
+        attackerStages: attackerStages,
+        defenderStages: defenderStages,
+        weather: weatherSelect ? weatherSelect.value : "",
+        toggles: toggles,
+      });
+      if (!result) {
+        resultEl.innerHTML = '<div class="damage-sub">Unable to calculate damage for this move.</div>';
+        return;
+      }
+      resultEl.innerHTML =
+        '<div class="damage-range">' + result.low + "–" + result.high + " dmg</div>" +
+        '<div class="damage-sub">' + result.lowPct.toFixed(1) + "%–" + result.highPct.toFixed(1) + "% of " +
+        App.escapeHtml(defender.pokemon_name) + "'s HP · " + result.effectiveness + "× effective · " +
+        (result.stab > 1 ? result.stab + "× STAB" : "no STAB") + "</div>";
+    }
+
+    attackerSelect.addEventListener("change", function () {
+      refreshMoveOptions();
+      updateAll();
+    });
+    defenderSelect.addEventListener("change", updateAll);
+    moveSelect.addEventListener("change", updateAll);
+    if (weatherSelect) weatherSelect.addEventListener("change", updateAll);
+
+    refreshMoveOptions();
+    updateAll();
+  }
+
+  App.registerTab("matchup", setupMatchup);
+})();

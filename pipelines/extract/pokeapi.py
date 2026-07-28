@@ -38,6 +38,8 @@ for names that already appear in real tournament roster data.
 from __future__ import annotations
 
 import csv
+import sys
+import time
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -213,8 +215,21 @@ def _slugify(display_name: str) -> str:
     item/ability names elsewhere in this pipeline are Title Case (see
     dbt/seeds/pokeapi_move_types.csv's "move display name, Title Case"
     convention), so both directions are needed at the extraction boundary.
+
+    Strips both the straight apostrophe (') and the Unicode right/left
+    single quotation marks (’/‘) some real tournament roster text
+    uses in place of a straight apostrophe (e.g. "King’s Shield") — left
+    unstripped, the curly form survives into the URL as a percent-encoded
+    byte sequence PokéAPI's router 400s on, rather than resolving the same
+    as the straight-apostrophe form.
     """
-    return display_name.lower().replace("'", "").replace(" ", "-")
+    return (
+        display_name.lower()
+        .replace("'", "")
+        .replace("’", "")
+        .replace("‘", "")
+        .replace(" ", "-")
+    )
 
 
 def _english_short_effect(payload: dict) -> str | None:
@@ -229,6 +244,42 @@ def _fetch_resource(session: requests.Session, resource: str, slug: str) -> dict
     response = session.get(url, timeout=30)
     response.raise_for_status()
     return response.json()
+
+
+_TRANSIENT_RETRY_ATTEMPTS = 3
+_TRANSIENT_RETRY_DELAY_SECONDS = 2.0
+
+
+def _fetch_resource_or_none(session: requests.Session, resource: str, slug: str) -> dict | None:
+    """Like _fetch_resource, but returns None instead of raising when a
+    single move/ability/item can't be fetched, rather than aborting
+    extraction for every other name:
+    - A 404 means the name doesn't resolve to any PokéAPI resource (a
+      genuine data-quality issue in the upstream source, e.g. a truncated
+      move name) — returns None immediately, no retry.
+    - A transient error (5xx, connection/timeout) is retried a few times
+      with a short delay, then treated the same as a 404 (skip, don't
+      crash the whole run) if it never recovers — a single flaky response
+      out of hundreds of lookups shouldn't lose everything else already
+      fetched.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(_TRANSIENT_RETRY_ATTEMPTS):
+        try:
+            return _fetch_resource(session, resource, slug)
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                return None
+            last_exc = exc
+        except requests.exceptions.RequestException as exc:
+            last_exc = exc
+        if attempt < _TRANSIENT_RETRY_ATTEMPTS - 1:
+            time.sleep(_TRANSIENT_RETRY_DELAY_SECONDS)
+    print(
+        f"Giving up on {resource}/{slug} after {_TRANSIENT_RETRY_ATTEMPTS} attempts: {last_exc}",
+        file=sys.stderr,
+    )
+    return None
 
 
 def extract_moves(
@@ -251,7 +302,10 @@ def extract_moves(
     rows = []
     for move_name in move_names:
         slug = _slugify(move_name)
-        payload = _fetch_resource(http, "move", slug)
+        payload = _fetch_resource_or_none(http, "move", slug)
+        if payload is None:
+            print(f"Skipping unresolved move: {move_name!r} (slug {slug!r})", file=sys.stderr)
+            continue
         rows.append(
             {
                 "move_name": move_name,
@@ -294,7 +348,10 @@ def extract_abilities(
     rows = []
     for ability_name in ability_names:
         slug = _slugify(ability_name)
-        payload = _fetch_resource(http, "ability", slug)
+        payload = _fetch_resource_or_none(http, "ability", slug)
+        if payload is None:
+            print(f"Skipping unresolved ability: {ability_name!r} (slug {slug!r})", file=sys.stderr)
+            continue
         rows.append(
             {
                 "ability_name": ability_name,
@@ -331,7 +388,10 @@ def extract_items(
     rows = []
     for item_name in item_names:
         slug = _slugify(item_name)
-        payload = _fetch_resource(http, "item", slug)
+        payload = _fetch_resource_or_none(http, "item", slug)
+        if payload is None:
+            print(f"Skipping unresolved item: {item_name!r} (slug {slug!r})", file=sys.stderr)
+            continue
         rows.append(
             {
                 "item_name": item_name,

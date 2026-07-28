@@ -8,6 +8,15 @@
 -- MunchStats data, distinct from the curated, hand-authored Pro Team
 -- Gallery (data/reference_teams/reference_teams.json) the same tab also
 -- surfaces -- see docs/dashboard.md's "Pro Team Gallery" section.
+--
+-- Capped to the top 100 by win_rate (`limit 100` below): MunchStats
+-- reports tens of thousands of individual teams, but the dashboard only
+-- ever surfaces the top ~18 in a .grid-6xn tile grid with no table tier
+-- underneath (docs/design-system.md's "Top Teams" section) -- shipping
+-- every team into the page's baked-in JSON (window.DASHBOARD_DATA) would
+-- bloat every visitor's page load for rows nothing in the UI ever reads.
+-- 100 leaves headroom for a future detail-table tier without the
+-- unbounded-row-count cost.
 with member_rosters as (
   select
     team_id,
@@ -40,3 +49,4 @@ where team.record_wins is not null
   and team.record_losses is not null
   and (team.record_wins + team.record_losses) > 0
 order by win_rate desc
+limit 100
