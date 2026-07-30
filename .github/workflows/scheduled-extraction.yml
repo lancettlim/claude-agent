@@ -1,0 +1,70 @@
+name: Scheduled extraction
+
+# Runs pipelines/extract/*.py on the refresh cadences docs/dataset-spec.md
+# specifies per source (see "Refresh policy"): PokéAPI weekly, OP.GG/
+# MunchStats/PokéBase daily. Bulbagarden is deliberately excluded — its
+# extractor's docstring flags an unverified rate-limit/ToS posture for
+# sustained automated access, so it stays on-demand (see backlog.md #3).
+#
+# data/staging/ is gitignored (pipelines/cli.py's snapshot history — see
+# backlog.md #1 — would otherwise grow unboundedly in git history), so
+# runner-to-runner persistence goes through actions/cache instead: each run
+# saves under a unique key and restores from the most recent prior save via
+# restore-keys, which is the standard pattern for a cache that needs to keep
+# growing (a cache entry is immutable once created, so a fixed key could
+# only ever be written once).
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily 06:00 UTC: OP.GG, MunchStats, PokéBase
+    - cron: "0 7 * * 1" # weekly, Monday 07:00 UTC: PokéAPI
+  workflow_dispatch:
+    inputs:
+      source:
+        description: "Source to extract (pokeapi | opgg | munchstats | pokebase | bulbagarden | all); defaults to the triggering schedule's normal set"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Restore staging snapshot history
+        uses: actions/cache@v4
+        with:
+          path: data/staging
+          key: staging-snapshots-${{ github.run_id }}
+          restore-keys: |
+            staging-snapshots-
+
+      - name: Determine sources for this run
+        id: sources
+        run: |
+          if [ -n "${{ github.event.inputs.source }}" ]; then
+            echo "sources=${{ github.event.inputs.source }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "0 7 * * 1" ]; then
+            echo "sources=pokeapi" >> "$GITHUB_OUTPUT"
+          else
+            echo "sources=opgg munchstats pokebase" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run extraction
+        run: |
+          set -euo pipefail
+          for source in ${{ steps.sources.outputs.sources }}; do
+            echo "::group::extract $source"
+            uv run python -m pipelines.cli extract "$source"
+            echo "::endgroup::"
+          done
