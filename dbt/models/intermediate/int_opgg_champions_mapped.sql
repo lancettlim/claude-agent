@@ -14,7 +14,7 @@ with resolved as (
     source.*,
     pokemon.pokemon_key as resolved_pokemon_key,
     pokemon.pokemon_id as resolved_pokemon_id
-  from {{ ref('stg_opgg_champions') }} source
+  from {{ ref('int_opgg_champions_latest') }} source
   inner join {{ ref('opgg_key_to_pokeapi_form') }} seed_map
     on seed_map.opgg_key = source.source_record_id
   inner join {{ ref('pokemon') }} pokemon

@@ -1,3 +1,6 @@
--- Passthrough of the raw OP.GG Champions staging snapshot. Phase 1 fills in
--- data/staging/opgg_champions.csv via pipelines/extract/opgg.py.
-select * from {{ source('staging', 'opgg_champions') }}
+-- Full history of raw OP.GG Champions staging snapshots. See
+-- stg_pokeapi.sql's header for the snapshot_date/history-vs-latest design.
+select
+  *,
+  cast(extracted_at_utc as date) as snapshot_date
+from {{ source('staging', 'opgg_champions') }}

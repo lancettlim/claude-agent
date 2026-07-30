@@ -9,7 +9,7 @@ with resolved as (
     source.*,
     pokemon.pokemon_key as resolved_pokemon_key,
     pokemon.pokemon_id as resolved_pokemon_id
-  from {{ ref('stg_bulbagarden') }} source
+  from {{ ref('int_bulbagarden_latest') }} source
   inner join {{ ref('bulbagarden_title_to_pokeapi_form') }} seed_map
     on seed_map.bulbagarden_title = source.bulbagarden_title
   inner join {{ ref('pokemon') }} pokemon

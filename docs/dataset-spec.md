@@ -217,6 +217,18 @@ value there (vs. as dashboard-only support data) is clearer.
 - **MunchStats**: daily check with publish after new tournament/event detection
 - **Versioning rule**: publish `dataset_version` on every successful refresh
   cycle with changelog notes for schema or major row-count shifts
+- **Snapshot history**: `python -m pipelines.cli extract <source>` writes
+  each run to a date-partitioned CSV under `data/staging/<source>/<date>.csv`
+  rather than overwriting a single file, pruned to a bounded number of
+  retained snapshots per source (see `pipelines/cli.py`'s
+  `_RETENTION_COUNTS`). Each `dbt/models/staging/stg_*.sql` model unions
+  every retained snapshot with a `snapshot_date` dimension, so extraction
+  history is queryable directly from staging; a parallel
+  `dbt/models/intermediate/int_*_latest.sql` selector per source filters
+  back down to the current point-in-time snapshot that `models/normalized/`
+  is built from, so the normalized entities' primary-key and referential-
+  integrity contracts are unaffected by staging now holding multiple
+  snapshots.
 
 ### Provenance rules
 

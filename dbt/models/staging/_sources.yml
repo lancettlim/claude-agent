@@ -3,7 +3,15 @@ version: 2
 sources:
   - name: staging
     meta:
-      external_location: "../data/staging/{name}.csv"
+      # Each table now reads every retained date-partitioned snapshot under
+      # its own data/staging/<name>/ subdirectory (pipelines/cli.py writes
+      # one CSV per UTC extraction day there, per backlog.md #1) rather than
+      # a single overwritten file — DuckDB's CSV reader unions all matches
+      # of the glob. stg_*.sql models expose the full unioned history with a
+      # snapshot_date column; int_*_latest.sql models select the current
+      # point-in-time snapshot for the rest of the normalized layer to
+      # build on (backlog.md #2).
+      external_location: "../data/staging/{name}/*.csv"
     tables:
       - name: pokeapi
         description: "Raw PokéAPI identity + base stat rows. See data/staging/pokeapi.schema.json."
