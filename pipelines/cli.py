@@ -1,11 +1,21 @@
 """CLI entry point for the pipelines package.
 
 Subcommands:
-    extract <source>   Run one source extractor (pokeapi | opgg | munchstats | pokebase | bulbagarden)
+    extract <source>   Run one source extractor (pokeapi | opgg | munchstats | pokebase | bulbagarden | all)
     validate           Reshape dbt's test results into a validation report
     release            Publish a versioned release package (gated on validate)
     render-card        Render a team card PNG, from a team_id or an ad-hoc build spec
     build-dashboard    Build the static analytics dashboard site from data/marts/*.csv
+
+Staging snapshots (see `_run_extract` below) are written date-partitioned,
+one CSV per source per UTC calendar day, under a per-source subdirectory of
+data/staging/ (e.g. data/staging/pokeapi/2026-07-30.csv) rather than a
+single file that gets overwritten every run — see backlog.md #1. CSV stays
+the format (not Parquet): it matches the existing data/staging/*.schema.json
+contracts and needs no new dependency. Retention is pruned per source after
+each write via _RETENTION_COUNTS, sized to each source's refresh cadence
+(docs/dataset-spec.md) and row volume — munchstats.csv alone runs ~37MB, so
+it keeps the fewest snapshots.
 """
 
 from __future__ import annotations
@@ -14,8 +24,10 @@ import argparse
 import csv
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
+from pipelines import versioning
 from pipelines.dashboard import build as dashboard_build
 from pipelines.extract import bulbagarden, munchstats, opgg, pokeapi, pokebase
 from pipelines.release import build as release_build
@@ -26,25 +38,74 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DBT_PROJECT_DIR = REPO_ROOT / "dbt"
 STAGING_DIR = REPO_ROOT / "data" / "staging"
 
+# source subcommand -> (extractor module, staging subdirectory name).
+# Order matters for `extract all`: munchstats must run before pokeapi so
+# pokeapi's move/ability/item detail fetch has roster names to scope to
+# (see _referenced_move_ability_item_names).
 _EXTRACTORS = {
-    "pokeapi": (pokeapi, STAGING_DIR / "pokeapi.csv"),
-    "opgg": (opgg, STAGING_DIR / "opgg_champions.csv"),
-    "munchstats": (munchstats, STAGING_DIR / "munchstats.csv"),
-    "pokebase": (pokebase, STAGING_DIR / "pokebase.csv"),
-    "bulbagarden": (bulbagarden, STAGING_DIR / "bulbagarden.csv"),
+    "munchstats": (munchstats, "munchstats"),
+    "opgg": (opgg, "opgg_champions"),
+    "pokebase": (pokebase, "pokebase"),
+    "bulbagarden": (bulbagarden, "bulbagarden"),
+    "pokeapi": (pokeapi, "pokeapi"),
+}
+
+# Snapshots kept per staging subdirectory before older ones are pruned.
+# PokéAPI sources refresh weekly (docs/dataset-spec.md) so a year of history
+# fits in ~12 snapshots; OP.GG/PokéBase/Bulbagarden refresh daily-or-less and
+# are small per-row, so two weeks is cheap; MunchStats also refreshes daily
+# but is ~37MB/run, so it keeps the least history of the daily sources.
+_RETENTION_COUNTS = {
+    "pokeapi": 12,
+    "pokeapi_move": 12,
+    "pokeapi_ability": 12,
+    "pokeapi_item": 12,
+    "opgg_champions": 14,
+    "munchstats": 7,
+    "pokebase": 14,
+    "bulbagarden": 10,
 }
 
 
-def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]:
-    """Read data/staging/munchstats.csv for the distinct move/ability/item
-    names real tournament rosters reported, so `extract pokeapi` can scope
-    its move/ability/item detail fetches to names that matter to the
-    dashboard instead of PokéAPI's full catalog. Reads munchstats.csv
-    directly (not the dbt-normalized tournament_team_member table) to avoid
-    a circular dependency on `dbt build` running before `extract pokeapi`.
+def _snapshot_date() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _dated_snapshot_path(staging_subdir: str, date_str: str) -> Path:
+    return STAGING_DIR / staging_subdir / f"{date_str}.csv"
+
+
+def _latest_snapshot_path(staging_subdir: str) -> Path | None:
+    source_dir = STAGING_DIR / staging_subdir
+    if not source_dir.exists():
+        return None
+    snapshots = sorted(source_dir.glob("*.csv"))
+    return snapshots[-1] if snapshots else None
+
+
+def _prune_old_snapshots(staging_subdir: str) -> None:
+    """Delete all but the newest `_RETENTION_COUNTS[staging_subdir]` dated
+    snapshots. Filenames are `YYYY-MM-DD.csv`, so lexicographic sort order
+    is chronological order.
     """
-    munchstats_path = STAGING_DIR / "munchstats.csv"
-    if not munchstats_path.exists():
+    keep = _RETENTION_COUNTS[staging_subdir]
+    source_dir = STAGING_DIR / staging_subdir
+    snapshots = sorted(source_dir.glob("*.csv"))
+    for stale in snapshots[:-keep]:
+        stale.unlink()
+
+
+def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]:
+    """Read the latest data/staging/munchstats/<date>.csv snapshot for the
+    distinct move/ability/item names real tournament rosters reported, so
+    `extract pokeapi` can scope its move/ability/item detail fetches to
+    names that matter to the dashboard instead of PokéAPI's full catalog.
+    Reads the munchstats snapshot directly (not the dbt-normalized
+    tournament_team_member table) to avoid a circular dependency on
+    `dbt build` running before `extract pokeapi`.
+    """
+    munchstats_path = _latest_snapshot_path("munchstats")
+    if munchstats_path is None:
         return set(), set(), set()
 
     moves: set[str] = set()
@@ -61,9 +122,19 @@ def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]
     return moves, abilities, items
 
 
-def _run_extract(source: str) -> int:
-    module, output_path = _EXTRACTORS[source]
-    module.extract(output_path)
+def _run_extract(source: str, dataset_version: str) -> int:
+    if source == "all":
+        for one_source in _EXTRACTORS:
+            exit_code = _run_extract(one_source, dataset_version)
+            if exit_code != 0:
+                return exit_code
+        return 0
+
+    module, staging_subdir = _EXTRACTORS[source]
+    date_str = _snapshot_date()
+    output_path = _dated_snapshot_path(staging_subdir, date_str)
+    module.extract(output_path, dataset_version=dataset_version)
+    _prune_old_snapshots(staging_subdir)
     if source == "pokeapi":
         moves, abilities, items = _referenced_move_ability_item_names()
         if not moves and not abilities and not items:
@@ -73,9 +144,17 @@ def _run_extract(source: str) -> int:
                 file=sys.stderr,
             )
             return 0
-        pokeapi.extract_moves(STAGING_DIR / "pokeapi_move.csv", sorted(moves))
-        pokeapi.extract_abilities(STAGING_DIR / "pokeapi_ability.csv", sorted(abilities))
-        pokeapi.extract_items(STAGING_DIR / "pokeapi_item.csv", sorted(items))
+        for staging_subdir, names, extract_fn in (
+            ("pokeapi_move", sorted(moves), pokeapi.extract_moves),
+            ("pokeapi_ability", sorted(abilities), pokeapi.extract_abilities),
+            ("pokeapi_item", sorted(items), pokeapi.extract_items),
+        ):
+            extract_fn(
+                _dated_snapshot_path(staging_subdir, date_str),
+                names,
+                dataset_version=dataset_version,
+            )
+            _prune_old_snapshots(staging_subdir)
     return 0
 
 
@@ -134,8 +213,17 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="pokemon-champions-cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    extract_parser = subparsers.add_parser("extract", help="Run one source extractor")
-    extract_parser.add_argument("source", choices=sorted(_EXTRACTORS))
+    extract_parser = subparsers.add_parser(
+        "extract", help="Run one source extractor, or 'all' to run every source in sequence"
+    )
+    extract_parser.add_argument("source", choices=[*sorted(_EXTRACTORS), "all"])
+    extract_parser.add_argument(
+        "--dataset-version",
+        dest="dataset_version",
+        default=None,
+        help="Stamped onto every extracted row's dataset_version field; "
+        "defaults to the latest published version (see pipelines/versioning.py)",
+    )
 
     subparsers.add_parser("validate", help="Run dbt build and write the validation report")
 
@@ -179,7 +267,10 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "extract":
-        return _run_extract(args.source)
+        dataset_version = args.dataset_version
+        if dataset_version is None:
+            dataset_version = versioning.latest_published_version()
+        return _run_extract(args.source, dataset_version)
     if args.command == "validate":
         return _run_validate()
     if args.command == "release":
