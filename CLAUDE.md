@@ -90,13 +90,21 @@ docs/
 `data/staging/*.csv`, `data/normalized/*.csv`, and `data/marts/*.csv` are
 all gitignored build output — regenerate staging with `python -m
 pipelines.cli extract <source>` (`pokeapi` | `opgg` | `munchstats` |
-`pokebase` | `bulbagarden`) and normalized/marts with `make dbt-build`. They're
-inputs/intermediate/derived output, not deliverables
-(`data/staging/*.schema.json` carries the durable, tracked contract for
-each source instead), and staging snapshots grow on every refresh per
-`dataset-spec.md`'s refresh policy — `munchstats.csv` alone is already
-~37MB — so committing them isn't sustainable. `python -m pipelines.cli
-release --version X.Y.Z` populates `releases/`, gated on
+`pokebase` | `bulbagarden` | `all`) and normalized/marts with `make
+dbt-build`. `make extract-all` / `make refresh` (extract-all → dbt-build →
+validate) / `make release VERSION=X.Y.Z` (refresh → release) chain these,
+mirroring `make dashboard`'s `dbt-build` → `build-dashboard` chain. Each
+`extract` run writes a date-partitioned snapshot
+(`data/staging/<source>/<date>.csv`, one per UTC day) rather than
+overwriting a single file, pruned to a bounded number of retained snapshots
+per source (`pipelines/cli.py`'s `_RETENTION_COUNTS`); a
+`.github/workflows/scheduled-extraction.yml` cron keeps them accumulating on
+the cadences `dataset-spec.md` specifies. They're inputs/intermediate/
+derived output, not deliverables (`data/staging/*.schema.json` carries the
+durable, tracked contract for each source instead), and even pruned,
+staging snapshots are sizeable — a single `munchstats` snapshot alone is
+already ~37MB — so committing them isn't sustainable. `python -m
+pipelines.cli release --version X.Y.Z` populates `releases/`, gated on
 `reports/validation/validation_report.json` reporting zero
 `release_blocking_findings` — `dataset_version 0.1.0` is published as of
 this writing. Respect this layout: staging → normalized → releases
@@ -137,7 +145,9 @@ make check      # lint + unit tests + dbt build/test + validation report
 
 Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
 (`cd dbt && dbt build`), `make validate` (runs dbt build, then writes
-`reports/validation/validation_report.json`).
+`reports/validation/validation_report.json`), `make extract-all` (`extract
+all`), `make refresh` (extract-all → dbt-build → validate), `make release
+VERSION=X.Y.Z` (refresh → release).
 
 - `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG,
   MunchStats, PokéBase, Bulbagarden) that writes provenance-tagged rows into
@@ -151,11 +161,18 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
   bytes to `data/assets/bulbagarden/` — the only extractor that writes
   anything besides a CSV row (see `pipelines/extract/bulbagarden.py`'s
   docstring).
-- `dbt/` — a dbt-duckdb project. `models/staging/` reads `data/staging/*.csv`
-  as sources; `models/intermediate/` resolves cross-source identity mapping
-  (OP.GG/MunchStats/PokéBase/Bulbagarden Pokémon names/keys onto canonical
-  `pokemon_key`, via the controlled mapping seeds in `dbt/seeds/` — see
-  their `schema.yml` for the verified transform rules); `models/normalized/`
+- `dbt/` — a dbt-duckdb project. `models/staging/` reads every retained
+  date-partitioned snapshot per source (`data/staging/<source>/*.csv`) as a
+  source, unioned with a `snapshot_date` dimension so extraction history is
+  directly queryable; `models/intermediate/` has one `int_<source>_latest.sql`
+  per source that filters back down to the current point-in-time snapshot
+  (a parallel history layer alongside the normalized entities, so their
+  primary-key/referential-integrity contracts don't depend on staging only
+  ever holding one snapshot), plus the models that resolve cross-source
+  identity mapping (OP.GG/MunchStats/PokéBase/Bulbagarden Pokémon names/keys
+  onto canonical `pokemon_key`, via the controlled mapping seeds in
+  `dbt/seeds/` — see their `schema.yml` for the verified transform rules);
+  `models/normalized/`
   (external-materialized) produces the nine core entities into
   `data/normalized/*.csv`; the `docs/dataset-spec.md` release gates
   (coverage, null-rate, duplicate-key, referential-integrity) are singular
