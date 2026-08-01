@@ -419,6 +419,50 @@ All five are now shipped.
   Pages dashboard was missing real, already-built UI features. Fixed by
   rerunning `make dashboard` and committing the regenerated
   `docs/dashboard/`.
+- [x] Backlog #37: Derive the validation report from dbt's manifest —
+  `pipelines/validate/report.py` used to map tests to report sections via
+  four hardcoded dicts; five real singular tests (`ability_detail`,
+  `item_detail`, `move_detail`'s duplicate-key tests, plus
+  `archetype_pokemon_map`'s duplicate-key and referential-integrity tests)
+  ran on every build but appeared in no report section, so they could
+  never block a release. Every singular test now declares its own
+  `{{ config(meta={category: ..., ...}) }}`, and `build_report` buckets by
+  `meta.category` instead of a name lookup; an uncategorized test lands in
+  a new `uncategorized_checks` section (still gate-eligible) instead of
+  vanishing. Verified against a real `extract all` + `dbt build`: all 13
+  duplicate-key tables and 9 referential-integrity checks now appear with
+  real status.
+- [x] Backlog #39: Source freshness gate — `dbt/models/staging/_sources.yml`'s
+  seven scheduled sources gained `freshness:`/`loaded_at_field` config
+  (thresholds mirroring `docs/dataset-spec.md`'s weekly/daily cadences);
+  `pipelines/cli.py`'s `_run_validate` now also runs `dbt source
+  freshness`, and `report.py`'s new `build_freshness_checks` folds a stale
+  ("error") source into `release_blocking_findings` the same as any other
+  failing gate. Verified against a real `extract all` run: all seven
+  sources report `pass` with real age data.
+- [x] Backlog #47: `sprites.py` rebuild ordering constraint —
+  `copy_sprites` used to `rmtree` the whole `images/` output directory,
+  which would wipe out `images/icons/`/`images/reference_teams/` if it
+  ever ran after those `build.py` steps instead of before (today's order
+  happened to be safe, nothing enforced it). It now only unlinks the
+  top-level `*.png` files it owns, leaving sibling subdirectories alone
+  regardless of call order. New regression test confirms a pre-populated
+  icons subdirectory survives a `copy_sprites` call.
+
+## Consumption surfaces (backlog Section 2)
+
+- [x] Backlog #28: Local query and notebook quickstart — new
+  `docs/local-queries.md`: how to open `dbt/data/warehouse.duckdb`
+  directly (DuckDB CLI or Python) and seven starter queries, each verified
+  against a real, freshly-extracted snapshot. Several of the queries
+  (tera type usage, team synergy lift, placement-weighted usage, build
+  concentration) surface marts not yet wired into the dashboard UI at
+  all, so this doc is currently the only way to see their output.
+- [x] Backlog #34: Pokémon Profile empty state — decided to keep the
+  current default-to-highest-usage behavior rather than build an empty
+  state, matching every other tab's "show ranked content immediately"
+  convention. Documented in `docs/design-system.md`'s new "Default
+  selection, not an empty state (Pokémon Profile)" subsection.
 
 ## Analytics depth (backlog Section 1, "buildable today")
 

@@ -240,6 +240,58 @@ def test_run_validate_refuses_stale_run_results_after_compile_error(tmp_path, mo
     assert calls == []
 
 
+def _sources_path(dbt_project_dir):
+    return dbt_project_dir / "target" / "sources.json"
+
+
+def test_run_validate_runs_source_freshness_and_still_passes(tmp_path, monkeypatch):
+    """backlog.md #39: validate must also invoke `dbt source freshness`
+    (a separate command from `dbt build`), and a fresh, all-pass
+    sources.json must not block validation."""
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+    calls = []
+
+    def fake_run(cmd, cwd):
+        calls.append(cmd)
+        if cmd[-2:] == ["source", "freshness"]:
+            _sources_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+            _sources_path(tmp_path).write_text("{}")
+        else:
+            _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+            _run_results_path(tmp_path).write_text("{}")
+        return subprocess.CompletedProcess(cmd, returncode=0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.report, "generate", lambda: {"release_blocking_findings": []})
+
+    assert cli._run_validate() == 0
+    assert calls == [
+        ["uv", "run", "dbt", "build"],
+        ["uv", "run", "dbt", "source", "freshness"],
+    ]
+
+
+def test_run_validate_proceeds_when_source_freshness_produces_no_artifact(tmp_path, monkeypatch):
+    """If `dbt source freshness` doesn't write a fresh sources.json (e.g. a
+    compile error in the sources.yml freshness config), validate should
+    still proceed -- freshness is an additional gate, not a hard
+    prerequisite for the rest of the report."""
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+
+    def fake_run(cmd, cwd):
+        if cmd[-2:] == ["source", "freshness"]:
+            return subprocess.CompletedProcess(cmd, returncode=2)
+        _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+        _run_results_path(tmp_path).write_text("{}")
+        return subprocess.CompletedProcess(cmd, returncode=0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.report, "generate", lambda: {"release_blocking_findings": []})
+
+    assert cli._run_validate() == 0
+    assert not _sources_path(tmp_path).exists()
+
+
 def test_main_extract_accepts_all_choice(monkeypatch):
     captured = {}
     monkeypatch.setattr(

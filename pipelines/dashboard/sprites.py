@@ -51,14 +51,21 @@ def copy_sprites(
     output_dir/images/<pokemon_key>.png and returns a
     {pokemon_key: "images/<pokemon_key>.png"} map of what succeeded.
 
-    output_dir/images/ is cleared and recreated on every call so sprites for
-    Pokémon no longer referenced (renamed keys, dropped mart rows) don't
-    accumulate across rebuilds.
+    Stale sprite files (renamed keys, dropped mart rows) are pruned by name
+    at the top level of output_dir/images/ on every call, so they don't
+    accumulate across rebuilds. This deliberately only removes *.png files
+    directly in images/ rather than rmtree-ing the whole directory
+    (backlog.md #47): build.py also populates images/icons/ and
+    images/reference_teams/ as sibling subdirectories, and an rmtree here
+    would wipe those out too if this function ever ran after them instead
+    of before -- a call-order hazard nothing enforced. Pruning by name makes
+    this function's own cleanup independent of when it runs relative to
+    the others.
     """
     images_dir = output_dir / "images"
-    if images_dir.exists():
-        shutil.rmtree(images_dir)
     images_dir.mkdir(parents=True, exist_ok=True)
+    for stale_sprite in images_dir.glob("*.png"):
+        stale_sprite.unlink()
 
     asset_map = load_asset_map(normalized_dir)
     resolved: dict[str, str] = {}

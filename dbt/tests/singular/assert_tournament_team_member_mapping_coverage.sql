@@ -8,7 +8,7 @@
 -- fail_calc must resolve to an integer (dbt's run-results schema requires it), so this
 -- reports coverage in basis points (100% = 10000 bps); pipelines/validate/report.py
 -- divides by 10000 to recover the ratio for the report's metric_value.
-{{ config(fail_calc='max(coverage_bps)', error_if='<9000', warn_if='<9000') }}
+{{ config(fail_calc='max(coverage_bps)', error_if='<9000', warn_if='<9000', meta={'category': 'coverage', 'check_name': 'tournament_team_member_mapping_coverage', 'description': 'Share of tournament roster rows mapped to normalized team tables', 'threshold': '>=0.90'}) }}
 select
   case
     when count(*) = 0 then 0

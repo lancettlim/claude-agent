@@ -2,7 +2,7 @@
 -- fail_calc must resolve to an integer (dbt's run-results schema requires it), so this
 -- reports the null rate in basis points (1% = 100 bps); pipelines/validate/report.py
 -- divides by 10000 to recover the ratio for the report's metric_value.
-{{ config(fail_calc='max(null_rate_bps)', error_if='>100', warn_if='>100') }}
+{{ config(fail_calc='max(null_rate_bps)', error_if='>100', warn_if='>100', meta={'category': 'null_rate', 'table_name': 'pokemon'}) }}
 select
   case when count(*) = 0 then 0 else round((
     sum(case when pokemon_key is null then 1 else 0 end) +

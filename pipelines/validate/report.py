@@ -7,11 +7,17 @@ target/manifest.json and target/run_results.json after a `dbt build` (or
 `dbt test`) run and reshapes those results into the project-specific report
 shape defined by reports/validation/validation_report.template.json.
 
-Matching a singular test's result back to a report entry is done via the
-test's `name` (the file stem, e.g. "assert_duplicate_key_pokemon"), which
-dbt keeps stable and human-readable — unlike a test's `unique_id`, which may
-carry a hash suffix. `name` -> `unique_id` comes from manifest.json;
-`unique_id` -> pass/fail/failure-count comes from run_results.json.
+Which report section a test belongs in, and the fields that section needs
+(table_name/primary_key, check_name/description/threshold, ...), is read
+from each test's own `meta` config (a `{{ config(meta={...}) }}` Jinja call
+in the test's .sql file — see dbt/tests/singular/*.sql), not from a
+hardcoded name -> section mapping kept here. This closes backlog #37's gap:
+previously, a new singular test was invisible to the release gate until
+someone remembered to add it to one of four dicts in this file (as actually
+happened to five real tests — see docs/backlog.md #37). Now a test just
+declares its own `meta.category`; any test that runs but declares no
+recognized category lands in `uncategorized_checks` instead of disappearing,
+so a failing test can never silently skip blocking a release.
 
 Null-rate and coverage checks need an actual ratio (not just a failing-row
 count) in `metric_value`. dbt's run_results.json schema requires `failures`
@@ -38,74 +44,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_TARGET_DIR = REPO_ROOT / "dbt" / "target"
 REPORT_PATH = REPO_ROOT / "reports" / "validation" / "validation_report.json"
 
-# table_name -> (primary_key, singular test file stem)
-DUPLICATE_KEY_TABLES: dict[str, tuple[str, str]] = {
-    "pokemon": ("pokemon_key", "assert_duplicate_key_pokemon"),
-    "pokemon_stat_canonical": (
-        "pokemon_stat_canonical_key",
-        "assert_duplicate_key_pokemon_stat_canonical",
-    ),
-    "pokemon_stat_champions": (
-        "pokemon_stat_champions_key",
-        "assert_duplicate_key_pokemon_stat_champions",
-    ),
-    "pokemon_stat_delta": ("pokemon_stat_delta_key", "assert_duplicate_key_pokemon_stat_delta"),
-    "legality_snapshot": ("legality_snapshot_key", "assert_duplicate_key_legality_snapshot"),
-    "tournament_event": ("event_id", "assert_duplicate_key_tournament_event"),
-    "tournament_team": ("team_id", "assert_duplicate_key_tournament_team"),
-    "tournament_team_member": ("team_member_id", "assert_duplicate_key_tournament_team_member"),
-    "pokemon_asset": ("pokemon_asset_key", "assert_duplicate_key_pokemon_asset"),
-}
-
-# table_name -> singular test file stem
-NULL_RATE_TABLES: dict[str, str] = {
-    "pokemon": "assert_null_rate_pokemon",
-    "pokemon_stat_canonical": "assert_null_rate_pokemon_stat_canonical",
-    "pokemon_stat_champions": "assert_null_rate_pokemon_stat_champions",
-    "pokemon_stat_delta": "assert_null_rate_pokemon_stat_delta",
-    "legality_snapshot": "assert_null_rate_legality_snapshot",
-    "tournament_event": "assert_null_rate_tournament_event",
-    "tournament_team": "assert_null_rate_tournament_team",
-    "tournament_team_member": "assert_null_rate_tournament_team_member",
-    "pokemon_asset": "assert_null_rate_pokemon_asset",
-}
-
-# check_name (matches validation_report.template.json exactly) -> singular test file stem
-REFERENTIAL_INTEGRITY_CHECKS: dict[str, str] = {
-    "pokemon_stat_canonical_resolves_to_pokemon": "assert_pokemon_stat_canonical_resolves_to_pokemon",
-    "pokemon_stat_champions_resolves_to_pokemon": "assert_pokemon_stat_champions_resolves_to_pokemon",
-    "pokemon_stat_delta_resolves_to_pokemon": "assert_pokemon_stat_delta_resolves_to_pokemon",
-    "legality_snapshot_resolves_to_pokemon": "assert_legality_snapshot_resolves_to_pokemon",
-    "tournament_team_resolves_to_tournament_event": "assert_tournament_team_resolves_to_tournament_event",
-    "tournament_team_member_resolves_to_tournament_team": "assert_tournament_team_member_resolves_to_tournament_team",
-    "tournament_team_member_resolves_to_pokemon": "assert_tournament_team_member_resolves_to_pokemon",
-    "pokemon_asset_resolves_to_pokemon": "assert_pokemon_asset_resolves_to_pokemon",
-}
-
-# check_name -> (threshold, description, singular test file stem)
-COVERAGE_CHECKS: dict[str, tuple[str, str, str]] = {
-    "opgg_legal_pool_coverage": (
-        ">=0.95",
-        "Share of OP.GG legal pool rows mapped to a canonical pokemon_id",
-        "assert_opgg_legal_pool_coverage",
-    ),
-    "tournament_team_member_mapping_coverage": (
-        ">=0.90",
-        "Share of tournament roster rows mapped to normalized team tables",
-        "assert_tournament_team_member_mapping_coverage",
-    ),
-    "pokebase_legal_pool_coverage": (
-        ">=0.95",
-        "Share of PokéBase legal-pool rows mapped to a canonical pokemon_id",
-        "assert_pokebase_legal_pool_coverage",
-    ),
-    "bulbagarden_sprite_coverage": (
-        ">=0.85",
-        "Share of Bulbagarden sprite titles mapped to pokemon_asset rows",
-        "assert_bulbagarden_sprite_coverage",
-    ),
-}
-
 
 class DbtArtifactsMissing(RuntimeError):
     """Raised when dbt's target/ artifacts are absent (dbt build hasn't run)."""
@@ -119,21 +57,63 @@ def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text())
 
 
-def _test_name_to_result(
+def _test_nodes_with_results(
     manifest: dict[str, Any], run_results: dict[str, Any]
-) -> dict[str, dict[str, Any]]:
-    """Map each test's stable `name` to its run_results.json result entry."""
-    name_to_unique_id = {
-        node["name"]: unique_id
+) -> list[tuple[dict[str, Any], dict[str, Any] | None]]:
+    """Pair each test node in the manifest with its run_results.json result.
+
+    A test with no matching run_results entry (e.g. dbt build was interrupted
+    before it ran) is paired with `None` rather than dropped, so it still
+    surfaces as "skipped" instead of vanishing.
+    """
+    result_by_unique_id = {result["unique_id"]: result for result in run_results["results"]}
+    return [
+        (node, result_by_unique_id.get(unique_id))
         for unique_id, node in manifest["nodes"].items()
         if node["resource_type"] == "test"
-    }
-    result_by_unique_id = {result["unique_id"]: result for result in run_results["results"]}
-    return {
-        name: result_by_unique_id[unique_id]
-        for name, unique_id in name_to_unique_id.items()
-        if unique_id in result_by_unique_id
-    }
+    ]
+
+
+def _freshness_status(dbt_status: str) -> str:
+    """Map dbt source-freshness's own status vocabulary onto this report's
+    pass/warn/fail/skipped vocabulary. "error" (past error_after) and
+    "runtime error" (the freshness query itself failed) both block a
+    release -- an unmeasurable freshness is treated the same as a stale
+    one, not silently passed."""
+    if dbt_status in ("error", "runtime error"):
+        return "fail"
+    if dbt_status in ("pass", "warn"):
+        return dbt_status
+    return dbt_status
+
+
+def build_freshness_checks(sources_result: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Reshape `dbt source freshness`'s target/sources.json into this
+    report's freshness_checks list (backlog.md #39). `sources_result` is
+    None when freshness wasn't run at all (e.g. an older dbt, or a caller
+    that only ran `dbt build`) -- that degrades to an empty list rather
+    than raising, since freshness is an additional gate layered on top of
+    the existing build/test gates, not a replacement for them.
+    """
+    if not sources_result:
+        return []
+    checks = []
+    for result in sources_result.get("results", []):
+        source_name = result["unique_id"].rsplit(".", 1)[-1]
+        checks.append(
+            {
+                "source_name": source_name,
+                "status": _freshness_status(result["status"]),
+                "max_loaded_at": result.get("max_loaded_at"),
+                "age_hours": (
+                    round(result["max_loaded_at_time_ago_in_s"] / 3600, 1)
+                    if result.get("max_loaded_at_time_ago_in_s") is not None
+                    else None
+                ),
+            }
+        )
+    checks.sort(key=lambda c: c["source_name"])
+    return checks
 
 
 def _ratio_from_bps(result: dict[str, Any] | None) -> float | None:
@@ -157,65 +137,94 @@ def build_report(
     manifest: dict[str, Any],
     run_results: dict[str, Any],
     dataset_version: str,
+    sources_result: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Build a dict matching reports/validation/validation_report.template.json's shape."""
-    results_by_name = _test_name_to_result(manifest, run_results)
+    """Build a dict matching reports/validation/validation_report.template.json's shape.
 
+    Every singular test in the manifest is categorized by its own
+    `config.meta.category` (see this module's docstring) rather than a
+    hardcoded test-name lookup, so a new test is gated as soon as it declares
+    a category — nothing needs editing here. A test with no `meta.category`,
+    or one this module doesn't recognize, lands in `uncategorized_checks`
+    instead of being silently dropped from the report.
+
+    `sources_result` is the parsed target/sources.json from a `dbt source
+    freshness` run (backlog.md #39); omit it (or pass None) if that command
+    wasn't run, and freshness_checks is simply empty.
+    """
+    freshness_checks = build_freshness_checks(sources_result)
     coverage_checks = []
-    for check_name, (threshold, description, test_name) in COVERAGE_CHECKS.items():
-        result = results_by_name.get(test_name)
-        coverage_checks.append(
-            {
-                "check_name": check_name,
-                "description": description,
-                "threshold": threshold,
-                "metric_value": _ratio_from_bps(result),
-                "status": _status_for(result),
-            }
-        )
-
     null_rate_checks = []
-    for table_name, test_name in NULL_RATE_TABLES.items():
-        result = results_by_name.get(test_name)
-        null_rate_checks.append(
-            {
-                "table_name": table_name,
-                "metric_value": _ratio_from_bps(result),
-                "threshold": "<=0.01",
-                "status": _status_for(result),
-            }
-        )
-
     duplicate_key_checks = []
-    for table_name, (primary_key, test_name) in DUPLICATE_KEY_TABLES.items():
-        result = results_by_name.get(test_name)
-        duplicate_key_checks.append(
-            {
-                "table_name": table_name,
-                "primary_key": primary_key,
-                "duplicate_count": result["failures"] if result else None,
-                "status": _status_for(result),
-            }
-        )
-
     referential_integrity_checks = []
-    for check_name, test_name in REFERENTIAL_INTEGRITY_CHECKS.items():
-        result = results_by_name.get(test_name)
-        referential_integrity_checks.append(
-            {
-                "check_name": check_name,
-                "status": _status_for(result),
-                "violation_count": result["failures"] if result else None,
-            }
-        )
+    uncategorized_checks = []
+
+    for node, result in _test_nodes_with_results(manifest, run_results):
+        meta = node.get("config", {}).get("meta", {}) or {}
+        category = meta.get("category")
+        status = _status_for(result)
+
+        if category == "coverage" and "check_name" in meta:
+            coverage_checks.append(
+                {
+                    "check_name": meta["check_name"],
+                    "description": meta.get("description"),
+                    "threshold": meta.get("threshold"),
+                    "metric_value": _ratio_from_bps(result),
+                    "status": status,
+                }
+            )
+        elif category == "null_rate" and "table_name" in meta:
+            null_rate_checks.append(
+                {
+                    "table_name": meta["table_name"],
+                    "metric_value": _ratio_from_bps(result),
+                    "threshold": "<=0.01",
+                    "status": status,
+                }
+            )
+        elif category == "duplicate_key" and "table_name" in meta:
+            duplicate_key_checks.append(
+                {
+                    "table_name": meta["table_name"],
+                    "primary_key": meta.get("primary_key"),
+                    "duplicate_count": result["failures"] if result else None,
+                    "status": status,
+                }
+            )
+        elif category == "referential_integrity" and "check_name" in meta:
+            referential_integrity_checks.append(
+                {
+                    "check_name": meta["check_name"],
+                    "status": status,
+                    "violation_count": result["failures"] if result else None,
+                }
+            )
+        else:
+            uncategorized_checks.append(
+                {
+                    "test_name": node["name"],
+                    "status": status,
+                    "failures": result["failures"] if result else None,
+                }
+            )
+
+    coverage_checks.sort(key=lambda c: c["check_name"])
+    null_rate_checks.sort(key=lambda c: c["table_name"])
+    duplicate_key_checks.sort(key=lambda c: c["table_name"])
+    referential_integrity_checks.sort(key=lambda c: c["check_name"])
+    uncategorized_checks.sort(key=lambda c: c["test_name"])
 
     release_blocking_findings = [
-        f"{entry.get('table_name') or entry.get('check_name')}: status={entry['status']}"
+        f"{entry.get('table_name') or entry.get('check_name') or entry.get('test_name') or entry.get('source_name')}: "
+        f"status={entry['status']}"
         for entry in (
             *coverage_checks,
             *null_rate_checks,
             *duplicate_key_checks,
             *referential_integrity_checks,
+            *uncategorized_checks,
+            *freshness_checks,
         )
         if entry["status"] == "fail"
     ]
@@ -227,6 +236,8 @@ def build_report(
         "null_rate_checks": null_rate_checks,
         "duplicate_key_checks": duplicate_key_checks,
         "referential_integrity_checks": referential_integrity_checks,
+        "uncategorized_checks": uncategorized_checks,
+        "freshness_checks": freshness_checks,
         "release_blocking_findings": release_blocking_findings,
     }
 
@@ -245,11 +256,18 @@ def generate(
     `dataset_version` defaults to the latest published version (see
     pipelines/versioning.py) rather than a hardcoded placeholder, so the
     report reflects reality even as new versions are published.
+
+    target/sources.json (written by a separate `dbt source freshness` run --
+    not part of `dbt build`) is read if present; its absence doesn't raise,
+    since freshness is an additional gate layered on the existing ones, not
+    a hard prerequisite for every caller of this function.
     """
     if dataset_version is None:
         dataset_version = latest_published_version()
     manifest = _load_json(target_dir / "manifest.json")
     run_results = _load_json(target_dir / "run_results.json")
-    report = build_report(manifest, run_results, dataset_version)
+    sources_path = target_dir / "sources.json"
+    sources_result = json.loads(sources_path.read_text()) if sources_path.exists() else None
+    report = build_report(manifest, run_results, dataset_version, sources_result)
     write_report(report)
     return report

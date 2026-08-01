@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipelines.validate.report import DUPLICATE_KEY_TABLES, REPORT_PATH
+from pipelines.validate.report import REPORT_PATH
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
@@ -32,10 +32,25 @@ CHANGELOGS_DIR = REPO_ROOT / "releases" / "changelogs"
 DEFAULT_ASSET_CACHE_DIR = REPO_ROOT / "data" / "assets" / "bulbagarden"
 IMAGES_SUBDIR = "images"
 
-# table_name -> primary_key, reusing the table list report.py already
-# maintains rather than duplicating it.
+# table_name -> primary_key for the nine core release entities
+# (docs/dataset-spec.md's entity dictionary) shipped as
+# releases/data/<version>/*.csv. Kept here rather than derived from
+# report.py's test-driven categorization (backlog #37): this is "which
+# entities does the release package ship," a fixed product decision, not
+# "which dbt tests exist" -- the two happen to overlap for these nine tables
+# today, but report.py's duplicate_key_checks now also covers non-release
+# reference tables (ability_detail, item_detail, move_detail,
+# archetype_pokemon_map) that don't belong in this list.
 TABLES: dict[str, str] = {
-    name: primary_key for name, (primary_key, _) in DUPLICATE_KEY_TABLES.items()
+    "pokemon": "pokemon_key",
+    "pokemon_stat_canonical": "pokemon_stat_canonical_key",
+    "pokemon_stat_champions": "pokemon_stat_champions_key",
+    "pokemon_stat_delta": "pokemon_stat_delta_key",
+    "legality_snapshot": "legality_snapshot_key",
+    "tournament_event": "event_id",
+    "tournament_team": "team_id",
+    "tournament_team_member": "team_member_id",
+    "pokemon_asset": "pokemon_asset_key",
 }
 
 # source_name -> (source_url, staging_filename), matching

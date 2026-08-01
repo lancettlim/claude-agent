@@ -336,6 +336,23 @@ lookup, still used by `pipelines/render/`'s team-card renderer) via
 path was deleted from the dashboard build entirely — `app.js` reads
 `row.move_type` straight off the mart row.
 
+### Default selection, not an empty state (Pokémon Profile)
+
+The Pokémon Profile picker defaults to the highest-`usage_share` Pokémon on
+tab open (`setupPokemonProfile()` in `app.js` sets `select.value` to
+`sortedProfiles[0]` before its first `render()` call) rather than opening
+on an empty "select a Pokémon" state. Decided, not an oversight
+(backlog.md #34, which flagged this as an open call): every other tab in
+this dashboard shows ranked content immediately on open — Overview's Top
+12, Usage's leaderboard, Team Builder's legal-pool picker sorted by usage
+— matching the "Ordering convention" section's descending-by-relevance
+default throughout. A blank Profile panel on first load would be the one
+tab that asks a visitor to act before showing them anything, breaking that
+pattern for no real benefit. `.empty-state` still covers the case an
+empty state actually serves: `render()` shows it if `chosenName` somehow
+resolves to no matching profile row (e.g. a stale selection after the
+underlying marts changed), not as the tab's default.
+
 ### Type badge
 
 Pokémon type display (`pokemon.type_1`/`type_2`, sourced from PokéAPI —
