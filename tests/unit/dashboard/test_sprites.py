@@ -107,3 +107,34 @@ def test_copy_sprites_clears_stale_files_across_rebuilds(tmp_path):
     assert set(second) == {"pikachu"}
     assert not (output_dir / "images" / "raichu.png").exists()
     assert (output_dir / "images" / "pikachu.png").exists()
+
+
+def test_copy_sprites_does_not_clobber_sibling_asset_subdirectories(tmp_path):
+    """backlog.md #47: copy_sprites used to rmtree the whole images/
+    directory, which would wipe out images/icons/ or
+    images/reference_teams/ if this ran after those steps instead of
+    before. It now prunes only its own top-level *.png files, so unrelated
+    subdirectories survive regardless of call order."""
+    normalized_dir = tmp_path / "normalized"
+    asset_cache_dir = tmp_path / "asset_cache"
+    output_dir = tmp_path / "out"
+    _write_csv(
+        normalized_dir / "pokemon_asset.csv",
+        [{"pokemon_key": "pikachu", "local_cache_path": "0025.png"}],
+    )
+    (asset_cache_dir / "0025.png").parent.mkdir(parents=True, exist_ok=True)
+    (asset_cache_dir / "0025.png").write_bytes(b"sprite-bytes")
+
+    icons_dir = output_dir / "images" / "icons" / "types"
+    icons_dir.mkdir(parents=True, exist_ok=True)
+    (icons_dir / "fire.png").write_bytes(b"icon-bytes")
+
+    resolved = sprites.copy_sprites(
+        {"pikachu"},
+        output_dir=output_dir,
+        normalized_dir=normalized_dir,
+        asset_cache_dir=asset_cache_dir,
+    )
+
+    assert resolved == {"pikachu": "images/pikachu.png"}
+    assert (icons_dir / "fire.png").read_bytes() == b"icon-bytes"

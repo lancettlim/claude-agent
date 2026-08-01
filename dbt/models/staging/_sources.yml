@@ -13,19 +13,59 @@ sources:
       # build on (backlog.md #2).
       external_location: "../data/staging/{name}/*.csv"
     tables:
+      # backlog.md #39: freshness thresholds mirror docs/dataset-spec.md's
+      # "Refresh policy" cadences (PokéAPI weekly, everything else daily),
+      # doubled for warn_after/error_after so one missed scheduled run warns
+      # rather than errors -- error_after is meant to catch a genuinely
+      # stalled pipeline, not routine schedule jitter. loaded_at_field casts
+      # extracted_at_utc (a plain ISO-8601 string column, per
+      # data/staging/*.schema.json) to a timestamp, since dbt's freshness
+      # macro needs a real datetime value, not a string, to diff against
+      # the current time. Bulbagarden has no freshness block: it's
+      # deliberately on-demand-only (pipelines/extract/bulbagarden.py's
+      # docstring), not on a schedule a staleness threshold could measure
+      # against.
       - name: pokeapi
         description: "Raw PokéAPI identity + base stat rows. See data/staging/pokeapi.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 14, period: day}
+          error_after: {count: 21, period: day}
       - name: pokeapi_move
         description: "Raw PokéAPI move detail rows, scoped to moves seen in tournament rosters. See data/staging/pokeapi_move.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 14, period: day}
+          error_after: {count: 21, period: day}
       - name: pokeapi_ability
         description: "Raw PokéAPI ability effect-text rows, scoped to abilities seen in tournament rosters. See data/staging/pokeapi_ability.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 14, period: day}
+          error_after: {count: 21, period: day}
       - name: pokeapi_item
         description: "Raw PokéAPI held-item effect-text rows, scoped to items seen in tournament rosters. See data/staging/pokeapi_item.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 14, period: day}
+          error_after: {count: 21, period: day}
       - name: opgg_champions
         description: "Raw OP.GG Pokémon Champions legal pool + rebalanced stats. See data/staging/opgg_champions.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 4, period: day}
       - name: munchstats
         description: "Raw MunchStats tournament/team/roster rows. See data/staging/munchstats.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 4, period: day}
       - name: pokebase
         description: "Raw PokéBase per-regulation Champions legal-pool membership. See data/staging/pokebase.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 4, period: day}
       - name: bulbagarden
         description: "Raw Bulbagarden Champions-menu-sprite image manifest. See data/staging/bulbagarden.schema.json."

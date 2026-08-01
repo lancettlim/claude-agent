@@ -10,7 +10,7 @@
 -- fail_calc must resolve to an integer (dbt's run-results schema requires it), so this
 -- reports coverage in basis points (100% = 10000 bps); pipelines/validate/report.py
 -- divides by 10000 to recover the ratio for the report's metric_value.
-{{ config(fail_calc='max(coverage_bps)', error_if='<9500', warn_if='<9500') }}
+{{ config(fail_calc='max(coverage_bps)', error_if='<9500', warn_if='<9500', meta={'category': 'coverage', 'check_name': 'pokebase_legal_pool_coverage', 'description': 'Share of PokéBase legal-pool rows mapped to a canonical pokemon_id', 'threshold': '>=0.95'}) }}
 select
   case
     when total.row_count = 0 then 0

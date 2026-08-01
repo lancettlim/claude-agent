@@ -180,6 +180,27 @@ def _run_validate() -> int:
             file=sys.stderr,
         )
         return 1
+
+    # backlog.md #39: a separate `dbt source freshness` invocation (not part
+    # of `dbt build`) checks each source's extracted_at_utc against the
+    # per-source thresholds in dbt/models/staging/_sources.yml. Its own exit
+    # code isn't gating here -- a stale source reports "error" status in
+    # target/sources.json, which report.generate() below folds into
+    # release_blocking_findings the same way any other failing check is.
+    # This step only guards against the command not running at all (e.g. a
+    # compile error), in which case sources.json is stale or absent and
+    # report.generate() degrades to an empty freshness_checks list rather
+    # than blocking the whole validate run over a best-effort extra gate.
+    sources_path = DBT_PROJECT_DIR / "target" / "sources.json"
+    freshness_started_at = time.time()
+    subprocess.run(["uv", "run", "dbt", "source", "freshness"], cwd=DBT_PROJECT_DIR)
+    if not sources_path.exists() or sources_path.stat().st_mtime < freshness_started_at:
+        print(
+            "`dbt source freshness` did not produce a fresh target/sources.json -- "
+            "proceeding without freshness data",
+            file=sys.stderr,
+        )
+
     generated = report.generate()
     failing = generated["release_blocking_findings"]
     if failing:

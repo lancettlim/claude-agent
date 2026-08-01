@@ -3,8 +3,12 @@ import json
 from pipelines.validate import report
 
 
-def _manifest_node(name: str) -> dict:
-    return {"resource_type": "test", "name": name}
+def _manifest_node(name: str, meta: dict | None = None) -> dict:
+    return {
+        "resource_type": "test",
+        "name": name,
+        "config": {"meta": meta or {}},
+    }
 
 
 def _run_result(unique_id: str, status: str, failures) -> dict:
@@ -20,16 +24,33 @@ def test_build_report_matches_template_shape():
     manifest = {
         "nodes": {
             "test.pokemon_champions.assert_duplicate_key_pokemon.abc123": _manifest_node(
-                "assert_duplicate_key_pokemon"
+                "assert_duplicate_key_pokemon",
+                {
+                    "category": "duplicate_key",
+                    "table_name": "pokemon",
+                    "primary_key": "pokemon_key",
+                },
             ),
             "test.pokemon_champions.assert_null_rate_pokemon.def456": _manifest_node(
-                "assert_null_rate_pokemon"
+                "assert_null_rate_pokemon", {"category": "null_rate", "table_name": "pokemon"}
             ),
             "test.pokemon_champions.assert_pokemon_stat_canonical_resolves_to_pokemon.ghi789": (
-                _manifest_node("assert_pokemon_stat_canonical_resolves_to_pokemon")
+                _manifest_node(
+                    "assert_pokemon_stat_canonical_resolves_to_pokemon",
+                    {
+                        "category": "referential_integrity",
+                        "check_name": "pokemon_stat_canonical_resolves_to_pokemon",
+                    },
+                )
             ),
             "test.pokemon_champions.assert_opgg_legal_pool_coverage.jkl012": _manifest_node(
-                "assert_opgg_legal_pool_coverage"
+                "assert_opgg_legal_pool_coverage",
+                {
+                    "category": "coverage",
+                    "check_name": "opgg_legal_pool_coverage",
+                    "description": "Share of OP.GG legal pool rows mapped to a canonical pokemon_id",
+                    "threshold": ">=0.95",
+                },
             ),
             "model.pokemon_champions.pokemon": {"resource_type": "model", "name": "pokemon"},
         }
@@ -54,24 +75,12 @@ def test_build_report_matches_template_shape():
 
     assert set(result) == set(template)
 
-    assert {c["table_name"] for c in result["duplicate_key_checks"]} == {
-        c["table_name"] for c in template["duplicate_key_checks"]
-    }
-    assert {c["table_name"] for c in result["null_rate_checks"]} == {
-        c["table_name"] for c in template["null_rate_checks"]
-    }
-    assert {c["check_name"] for c in result["referential_integrity_checks"]} == {
-        c["check_name"] for c in template["referential_integrity_checks"]
-    }
-    assert {c["check_name"] for c in result["coverage_checks"]} == {
-        c["check_name"] for c in template["coverage_checks"]
-    }
-
     pokemon_dup_check = next(
         c for c in result["duplicate_key_checks"] if c["table_name"] == "pokemon"
     )
     assert pokemon_dup_check["status"] == "pass"
     assert pokemon_dup_check["duplicate_count"] == 0
+    assert pokemon_dup_check["primary_key"] == "pokemon_key"
 
     pokemon_null_check = next(c for c in result["null_rate_checks"] if c["table_name"] == "pokemon")
     assert pokemon_null_check["status"] == "fail"
@@ -82,15 +91,120 @@ def test_build_report_matches_template_shape():
     )
     assert opgg_coverage_check["metric_value"] == 1.0
 
+    assert result["uncategorized_checks"] == []
     assert "pokemon: status=fail" in result["release_blocking_findings"]
 
 
-def test_build_report_marks_missing_tests_as_skipped():
-    result = report.build_report({"nodes": {}}, {"results": []}, dataset_version="0.1.0")
+def test_build_report_marks_unresulted_tests_as_skipped():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_duplicate_key_pokemon.abc123": _manifest_node(
+                "assert_duplicate_key_pokemon",
+                {
+                    "category": "duplicate_key",
+                    "table_name": "pokemon",
+                    "primary_key": "pokemon_key",
+                },
+            ),
+        }
+    }
+    result = report.build_report(manifest, {"results": []}, dataset_version="0.1.0")
 
-    assert all(c["status"] == "skipped" for c in result["duplicate_key_checks"])
-    assert all(c["duplicate_count"] is None for c in result["duplicate_key_checks"])
-    assert all(c["metric_value"] is None for c in result["null_rate_checks"])
-    assert all(c["metric_value"] is None for c in result["coverage_checks"])
-    assert all(c["violation_count"] is None for c in result["referential_integrity_checks"])
+    assert len(result["duplicate_key_checks"]) == 1
+    check = result["duplicate_key_checks"][0]
+    assert check["status"] == "skipped"
+    assert check["duplicate_count"] is None
     assert result["release_blocking_findings"] == []
+
+
+def test_build_freshness_checks_returns_empty_list_when_not_run():
+    assert report.build_freshness_checks(None) == []
+
+
+def test_build_freshness_checks_reshapes_sources_json():
+    sources_result = {
+        "results": [
+            {
+                "unique_id": "source.pokemon_champions.staging.opgg_champions",
+                "status": "pass",
+                "max_loaded_at": "2026-08-01T00:00:00+00:00",
+                "max_loaded_at_time_ago_in_s": 3600.0,
+            },
+            {
+                "unique_id": "source.pokemon_champions.staging.munchstats",
+                "status": "error",
+                "max_loaded_at": "2026-07-20T00:00:00+00:00",
+                "max_loaded_at_time_ago_in_s": 999999.0,
+            },
+        ]
+    }
+
+    checks = report.build_freshness_checks(sources_result)
+
+    assert checks == [
+        {
+            "source_name": "munchstats",
+            "status": "fail",
+            "max_loaded_at": "2026-07-20T00:00:00+00:00",
+            "age_hours": round(999999.0 / 3600, 1),
+        },
+        {
+            "source_name": "opgg_champions",
+            "status": "pass",
+            "max_loaded_at": "2026-08-01T00:00:00+00:00",
+            "age_hours": 1.0,
+        },
+    ]
+
+
+def test_build_report_folds_freshness_failures_into_release_blocking_findings():
+    sources_result = {
+        "results": [
+            {
+                "unique_id": "source.pokemon_champions.staging.munchstats",
+                "status": "error",
+                "max_loaded_at": None,
+                "max_loaded_at_time_ago_in_s": None,
+            },
+        ]
+    }
+
+    result = report.build_report(
+        {"nodes": {}}, {"results": []}, dataset_version="0.1.0", sources_result=sources_result
+    )
+
+    assert result["freshness_checks"] == [
+        {
+            "source_name": "munchstats",
+            "status": "fail",
+            "max_loaded_at": None,
+            "age_hours": None,
+        }
+    ]
+    assert "munchstats: status=fail" in result["release_blocking_findings"]
+
+
+def test_build_report_routes_unrecognized_test_to_uncategorized():
+    """A test with no meta.category (e.g. a newly-added test nobody tagged
+    yet) must still surface and be able to block a release -- it must not
+    silently vanish from the report the way five real tests once did
+    (docs/backlog.md #37)."""
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_something_new.abc123": _manifest_node(
+                "assert_something_new"
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result("test.pokemon_champions.assert_something_new.abc123", "fail", 3),
+        ]
+    }
+
+    result = report.build_report(manifest, run_results, dataset_version="0.1.0")
+
+    assert result["uncategorized_checks"] == [
+        {"test_name": "assert_something_new", "status": "fail", "failures": 3}
+    ]
+    assert "assert_something_new: status=fail" in result["release_blocking_findings"]

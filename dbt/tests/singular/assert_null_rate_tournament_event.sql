@@ -1,5 +1,5 @@
 -- Gate: required-field null rate must be <=1% (docs/dataset-spec.md).
-{{ config(fail_calc='max(null_rate_bps)', error_if='>100', warn_if='>100') }}
+{{ config(fail_calc='max(null_rate_bps)', error_if='>100', warn_if='>100', meta={'category': 'null_rate', 'table_name': 'tournament_event'}) }}
 select
   case when count(*) = 0 then 0 else round((
     sum(case when event_id is null then 1 else 0 end) +

@@ -141,6 +141,30 @@
       "primary_key": "pokemon_asset_key",
       "duplicate_count": null,
       "status": "pending"
+    },
+    {
+      "table_name": "ability_detail",
+      "primary_key": "ability_name",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "item_detail",
+      "primary_key": "item_name",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "move_detail",
+      "primary_key": "move_name",
+      "duplicate_count": null,
+      "status": "pending"
+    },
+    {
+      "table_name": "archetype_pokemon_map",
+      "primary_key": "archetype_key, pokemon_key",
+      "duplicate_count": null,
+      "status": "pending"
     }
   ],
   "referential_integrity_checks": [
@@ -183,7 +207,22 @@
       "check_name": "pokemon_asset_resolves_to_pokemon",
       "status": "pending",
       "violation_count": null
+    },
+    {
+      "check_name": "archetype_pokemon_map_resolves_to_pokemon",
+      "status": "pending",
+      "violation_count": null
     }
+  ],
+  "uncategorized_checks": [],
+  "freshness_checks": [
+    {"source_name": "pokeapi", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "pokeapi_move", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "pokeapi_ability", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "pokeapi_item", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "opgg_champions", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "munchstats", "status": "pending", "max_loaded_at": null, "age_hours": null},
+    {"source_name": "pokebase", "status": "pending", "max_loaded_at": null, "age_hours": null}
   ],
   "release_blocking_findings": []
 }

@@ -23,10 +23,10 @@ are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 21 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #32, #35, #36, #38, #46 |
+| **Done** | 25 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #32, #35, #36, #37, #38, #39, #46, #47 |
 | **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
-| **Resolved, no build needed** | 1 | #17 — deliberately left unwired, not an oversight; see its entry |
-| **Open, buildable now** | 16 | No blocker, just not started: #15, #16, #28, #29, #30, #33, #34, #37, #39-#44, #47, #48 |
+| **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
+| **Open, buildable now** | 11 | No blocker, just not started: #15, #16, #29, #30, #33, #40, #41, #42, #43, #44, #48 |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
@@ -38,19 +38,21 @@ By section:
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
-| 2 — Consumption surfaces (#28-#34) | 1 | 0 | 5 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#48) | 4 | 1 | 9 | 0 | 14 |
-| **Total** | **21** | **3** | **16** | **8** | **48** |
+| 2 — Consumption surfaces (#28-#34) | 2 | 1 | 3 | 1 | 7 |
+| 3 — Platform, quality, and ops (#35-#48) | 7 | 1 | 6 | 0 | 14 |
+| **Total** | **25** | **4** | **11** | **8** | **48** |
 
 Takeaways: every item in Section 0 and every "buildable today, no new data
 required" item that isn't genuinely open (#15, #16) or a judgment call
-(#17) is done — that bucket is close to exhausted. The remaining open work
-skews toward Section 3 (platform/quality hardening, 9 open items) and
-Section 2 (dashboard consumption surfaces, 5 open items). The 8 blocked
-items aren't neglect — 4 are waiting on real-world time/events (Blocker A's
-snapshot history, Blocker B's rebalance, #31's snapshot-dependent hosting
-justification) and 4 need a source this repo doesn't have and, in #26/#27's
-case, may not exist in scriptable form at all.
+(#17) is done — that bucket is close to exhausted. This pass closed five
+more items (#28, #34, #37, #39, #47), all quick correctness/consumption
+wins with no blocker. The remaining open work now skews toward Section 3
+(platform/quality hardening, 6 open items: #40-#44, #48) and Section 2
+(#29, #30, #33). The 8 blocked items aren't neglect — 4 are waiting on
+real-world time/events (Blocker A's snapshot history, Blocker B's
+rebalance, #31's snapshot-dependent hosting justification) and 4 need a
+source this repo doesn't have and, in #26/#27's case, may not exist in
+scriptable form at all.
 
 ## Entry format
 
@@ -602,7 +604,7 @@ does, and no amount of frontend work substitutes for the missing data.
 Deliberately thin: with a single user, query ergonomics matter more than
 distribution.
 
-### 28. Local query and notebook quickstart
+### 28. Local query and notebook quickstart — DONE
 
 - **Size**: S
 - **Value**: Probably the highest-value consumption item for a single user.
@@ -611,6 +613,16 @@ distribution.
   dashboard work for ad-hoc questions.
 - **Blocked by**: nothing
 - **Touches**: new doc or `notebooks/`, `dbt/analyses/`
+
+Shipped as `docs/local-queries.md`: how to open the warehouse (DuckDB CLI or
+Python, both from `dbt/`, since external tables resolve paths relative to
+that working directory), how to list every queryable table, and seven
+starter queries — each run against a real, freshly-extracted snapshot to
+confirm non-degenerate output, not just checked for syntax. Several of the
+queries (tera type usage, team synergy lift, placement-weighted usage,
+build concentration) surface marts that still aren't wired into the
+dashboard UI at all, so this doc is currently the only way to see their
+output.
 
 ### 29. Trend and line charts in the dashboard — data half unblocked, UI still open
 
@@ -678,7 +690,7 @@ of the same value with none of the hosting cost.
 - **Blocked by**: nothing (pairs naturally with #35)
 - **Touches**: `pipelines/release/build.py`, `.github/workflows/`
 
-### 34. Pokémon Profile empty state
+### 34. Pokémon Profile empty state — RESOLVED, current behavior kept
 
 - **Size**: S
 - **Value**: The third open `docs/todo.md` M6 backlog item.
@@ -688,6 +700,17 @@ of the same value with none of the hosting cost.
 The existing item notes the current behavior — defaulting to the
 highest-usage Pokémon — may actually be preferable to an empty state.
 Decide before building.
+
+Decided: keep defaulting to the highest-usage Pokémon, no code change.
+Every other tab in this dashboard shows ranked content immediately on
+open (Overview's Top 12, Usage's leaderboard, Team Builder's legal-pool
+picker) per the "Ordering convention" — a blank Profile panel on first
+load would be the one tab asking a visitor to act before showing them
+anything. `.empty-state` is still used for the genuine empty case (a
+stale selection resolving to no matching row). Documented in
+`docs/design-system.md`'s new "Default selection, not an empty state
+(Pokémon Profile)" subsection so this reads as a decision, not an
+unaddressed gap.
 
 ---
 
@@ -741,7 +764,7 @@ before the query runs at all — so this doesn't newly break a fresh clone
 with no extraction yet, only a real "extraction ran and returned nothing"
 outage. Pairs with #40, which is still open.
 
-### 37. Derive the validation report from dbt's manifest
+### 37. Derive the validation report from dbt's manifest — DONE
 
 - **Size**: M
 - **Value**: `pipelines/validate/report.py` maps tests via four hardcoded
@@ -754,6 +777,24 @@ outage. Pairs with #40, which is still open.
 - **Blocked by**: nothing
 - **Touches**: `pipelines/validate/report.py`,
   `reports/validation/validation_report.template.json`
+
+The real gap was larger than the two named tests: `ability_detail`,
+`item_detail`, and `move_detail`'s duplicate-key tests were invisible too
+(five tests total, all added after the four dicts were last touched) —
+exactly the "any new test is invisible until someone remembers to edit
+report.py" failure mode this item describes, caught in the wild rather
+than hypothetically. Fixed by removing the four dicts entirely: every
+singular test SQL file now declares its own `{{ config(meta={category:
+..., ...}) }}` (`dbt/tests/singular/*.sql`), and `report.py`'s
+`build_report` iterates every test node in the manifest and buckets it by
+`meta.category` instead of a name lookup. A test with no recognized
+category lands in a new `uncategorized_checks` section (still eligible to
+block a release on failure) rather than disappearing — closing the gap
+for good, not just for these five tests. Verified against a real `dbt
+build` + `extract all` pass: all 13 duplicate-key tables (the previously
+-invisible four included) and all 9 referential-integrity checks now
+appear in `validation_report.json` with real pass/fail status, and
+`uncategorized_checks` is empty.
 
 ### 38. Don't swallow the `dbt build` return code — DONE
 
@@ -776,7 +817,7 @@ nits noted here: the subprocess call is now `uv run dbt build` (matches the
 Makefile), and the no-op list copy is gone. See `docs/todo.md`'s "Platform
 hardening" section.
 
-### 39. Source freshness gate
+### 39. Source freshness gate — DONE
 
 - **Size**: S
 - **Value**: Nothing checks whether a snapshot is stale. The pipeline will
@@ -787,6 +828,22 @@ hardening" section.
 
 No `loaded_at_field` or `freshness:` block is configured anywhere, though
 every row already carries `extracted_at_utc`.
+
+Shipped: `_sources.yml`'s seven scheduled sources (PokéAPI + its three
+detail feeds, OP.GG, MunchStats, PokéBase — Bulbagarden stays exempt,
+it's deliberately on-demand-only) each gained a `freshness:` block
+(`warn_after`/`error_after` mirroring `docs/dataset-spec.md`'s weekly/daily
+cadences, doubled so one missed scheduled run warns rather than errors)
+and a `loaded_at_field` casting `extracted_at_utc` to a timestamp (dbt's
+freshness macro needs a real datetime, not the plain ISO-8601 string the
+column actually is). `pipelines/cli.py`'s `_run_validate` now also runs
+`dbt source freshness` (a separate command from `dbt build`) before
+generating the report; `report.py`'s new `build_freshness_checks` reshapes
+`target/sources.json` into a `freshness_checks` section, folding dbt's
+"error" status into `release_blocking_findings` the same way any other
+failing check is, while "warn" stays non-blocking. Verified against a real
+`extract all` + `dbt source freshness` run: all seven sources report
+`pass` with real `max_loaded_at`/age values in `validation_report.json`.
 
 ### 40. Row-count anomaly detection
 
@@ -896,7 +953,7 @@ republished, so the live GitHub Pages dashboard was missing real, already
 -built UI features. Fixed by rerunning `make dashboard` and committing the
 regenerated `docs/dashboard/`, which now passes the new test.
 
-### 47. `sprites.py` rebuild ordering constraint
+### 47. `sprites.py` rebuild ordering constraint — DONE
 
 - **Size**: S
 - **Value**: `copy_sprites` deliberately `rmtree`s the output `images/`
@@ -909,6 +966,18 @@ regenerated `docs/dashboard/`, which now passes the new test.
 
 Prune stale files by name rather than nuking the directory, or make the
 ordering constraint explicit and tested.
+
+Took the first option: `copy_sprites` no longer `rmtree`s `images/` at
+all. It now only unlinks the top-level `*.png` files it itself owns
+(sprites live flat as `images/<pokemon_key>.png`), leaving sibling
+subdirectories (`images/icons/`, `images/reference_teams/`, populated by
+other `build.py` steps) untouched regardless of call order — the ordering
+constraint is now moot rather than merely documented. New regression test
+(`test_copy_sprites_does_not_clobber_sibling_asset_subdirectories`)
+pre-populates an icons subdirectory before calling `copy_sprites` and
+asserts it survives; the existing stale-sprite-cleanup test
+(`test_copy_sprites_clears_stale_files_across_rebuilds`) still passes
+unchanged.
 
 ### 48. Extraction run metadata and structured logging
 
