@@ -33,8 +33,8 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         (),
     ),
     "pokemon_win_rate_summary": (
-        ("total_wins", "total_losses", "record_count"),
-        ("win_rate",),
+        ("total_wins", "total_losses", "record_count", "wilson_rank"),
+        ("win_rate", "wilson_lower_bound"),
     ),
     "pokemon_item_usage": (("usage_count", "usage_rank"), ("item_share",)),
     "pokemon_ability_usage": (("usage_count", "usage_rank"), ("ability_share",)),
@@ -164,12 +164,12 @@ def compute_kpis(marts: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
 
     top_used = min(usage_rows, key=lambda r: r["usage_rank"], default=None)
 
-    # Prefer a win-rate leader with a reasonable sample size, so a 1-0
-    # record doesn't outrank a well-established Pokémon.
-    RECORD_COUNT_FLOOR = 5
-    qualified_win_rates = [r for r in win_rate_rows if r["record_count"] >= RECORD_COUNT_FLOOR]
-    top_win_rate_pool = qualified_win_rates or win_rate_rows
-    top_win_rate = max(top_win_rate_pool, key=lambda r: r["win_rate"], default=None)
+    # Ranked by wilson_rank (pokemon_win_rate_summary's Wilson score lower
+    # bound, backlog.md #13) rather than raw win_rate, so a 1-0 record
+    # doesn't outrank a well-established Pokémon's real win rate -- the
+    # confidence interval accounts for sample size directly instead of
+    # relying on an arbitrary record_count cutoff.
+    top_win_rate = min(win_rate_rows, key=lambda r: r["wilson_rank"], default=None)
 
     # Overview tab spotlight grid (docs/design-system.md's "3-tier tab
     # layout convention"): drawn from the overall usage ranking, sliced to

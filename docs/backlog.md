@@ -171,7 +171,7 @@ it as an available date dimension (`schema.yml:91`). Note the semantic
 difference from snapshot trends: this shows how usage shifted across
 tournaments, which is arguably the more interesting axis anyway.
 
-#### 7. Player and country dimension mart
+#### 7. Player and country dimension mart — PARTIALLY DONE
 
 - **Size**: S
 - **Value**: Answers "who plays what," "which regions favor which
@@ -179,12 +179,17 @@ tournaments, which is arguably the more interesting axis anyway.
 - **Blocked by**: nothing
 - **Touches**: new mart, `tournament_team`
 
-`player_name` and `player_country` are normalized in `tournament_team` and
-never surface in any mart. Related polish: `docs/dashboard.md` notes country
-codes render as plain two-letter text because no flag-emoji/ISO lookup
-exists yet.
+`player_name`/`player_country` now surface in `top_tournament_teams`
+(`dbt/models/marts/top_tournament_teams.sql`, shipped as part of the M6
+Top Teams tab work), answering "who plays what" for the top 100 teams by
+win rate. Still open: a dedicated country/player-aggregate dimension mart
+("which regions favor which archetypes," "does this player have a
+signature Pokémon" across their full history rather than one team row) —
+`top_tournament_teams` is team-grain, not player- or country-grain.
+Related polish still open too: `docs/dashboard.md` notes country codes
+render as plain two-letter text because no flag-emoji/ISO lookup exists.
 
-#### 8. Placement-weighted usage
+#### 8. Placement-weighted usage — DONE
 
 - **Size**: M
 - **Value**: Distinguishes "popular" from "successful." Raw usage counts
@@ -194,7 +199,16 @@ exists yet.
 - **Touches**: new mart, `tournament_team.placement`,
   `record_wins`/`record_losses`
 
-Consider both a top-cut cutoff view and a continuously weighted one.
+Shipped as `dbt/models/marts/pokemon_placement_weighted_usage.sql`: both
+views this entry asked for. `top_cut_usage_count`/`top_cut_usage_share`
+use a hard top-8 cutoff (the standard VGC/Champions bracket size);
+`placement_weighted_score`/`weighted_usage_share` use a continuous
+inverse-placement (`1/placement`) weight per appearance instead, so a
+1st-place finish counts far more than a 200th with no cutoff
+discontinuity. Not yet wired into the dashboard UI — the mart is real,
+queryable output (verified against real MunchStats data: Incineroar leads
+both views), but surfacing it as a dashboard tab/section is separate,
+undone follow-up work.
 
 #### 9. Team synergy beyond raw co-occurrence
 
@@ -210,7 +224,7 @@ Consider both a top-cut cutoff view and a continuously weighted one.
 Probably the single most interesting analysis in this section. Worth
 extending past pairs to triples for real "core" detection.
 
-#### 10. Tera type usage mart
+#### 10. Tera type usage mart — DONE
 
 - **Size**: S
 - **Value**: Tera type is a defining format mechanic and is entirely absent
@@ -219,10 +233,12 @@ extending past pairs to triples for real "core" detection.
   `dbt/models/marts/schema.yml:123-127` — coverage is partial)
 - **Touches**: new mart, `tournament_team_member.tera_type`
 
-`tera_type` is captured through extraction and normalization, then used by
-nothing.
+Shipped as `dbt/models/marts/pokemon_tera_type_usage.sql`, mirroring
+`pokemon_item_usage`/`pokemon_ability_usage`'s share-of-own-total pattern.
+Not yet wired into the dashboard UI (real, queryable mart output; a Tera
+Types drill-down section is separate, undone follow-up work).
 
-#### 11. Move-type coverage analysis
+#### 11. Move-type coverage analysis — SUPERSEDED, mostly resolved
 
 - **Size**: M
 - **Value**: Answers "what types can this team actually hit" and "what's the
@@ -231,9 +247,37 @@ nothing.
 - **Touches**: `dbt/seeds/pokeapi_move_types.csv`,
   `dbt/models/marts/pokemon_move_usage.sql`, new mart
 
-The `pokeapi_move_types` seed already holds 937 rows mapping moves to types,
-and currently exists only to resolve dashboard icons. Joining it to
-`pokemon_move_usage` is nearly free.
+This entry's originally-described path (`pokeapi_move_types` seed ->
+`pokemon_move_usage`) shipped, and then went further: `pokemon_move_usage`
+now joins real PokéAPI `move_detail` (not the static seed) for
+`move_type`/`power`/`accuracy`/`category`/`priority`/`pp` per move, and the
+dashboard's Matchup tab computes real type effectiveness and a
+stats/setup/weather-aware damage calculator client-side from it (see the
+Competitive-UX redesign pass in `docs/todo.md`'s M6 section). What's
+genuinely still open, and belongs to backlog #23/#27 rather than here: a
+*team-level* offensive coverage score (e.g. "what fraction of types can
+this specific 6-Pokémon team hit super-effectively") — today's Matchup tab
+answers per-move/per-Pokémon matchups, not a precomputed team-composition
+coverage metric.
+
+#### 12. Usage × regulation cross-tab — DONE
+
+- **Size**: S
+- **Value**: Usage is currently sliced by `event_tier` but never scoped to a
+  regulation, so a Pokémon's usage number silently mixes regulations with
+  different legal pools.
+- **Blocked by**: nothing
+- **Touches**: `dbt/models/marts/pokemon_usage_summary.sql`,
+  `legality_snapshot`
+
+Shipped as a new sibling mart, `dbt/models/marts/pokemon_usage_by_
+regulation.sql`, rather than a modification to `pokemon_usage_summary`
+itself: `tournament_event` carries no `regulation_code` of its own (no
+temporal "usage during regulation X" signal exists to slice by), so this
+cross-joins the existing overall `usage_count` against
+`legality_snapshot`'s regulation membership at the latest `snapshot_date`,
+with `usage_share`/`usage_rank` recomputed within each `regulation_code`
+partition. Not yet wired into the dashboard UI.
 
 #### 12. Usage × regulation cross-tab
 
@@ -245,7 +289,7 @@ and currently exists only to resolve dashboard icons. Joining it to
 - **Touches**: `dbt/models/marts/pokemon_usage_summary.sql`,
   `legality_snapshot`
 
-#### 13. Win-rate confidence intervals
+#### 13. Win-rate confidence intervals — DONE
 
 - **Size**: S
 - **Value**: A 100% win rate over 3 recorded matches currently outranks 62%
@@ -255,9 +299,19 @@ and currently exists only to resolve dashboard icons. Joining it to
 - **Touches**: `dbt/models/marts/pokemon_win_rate_summary.sql`,
   `pipelines/dashboard/data.py:169`
 
-The dashboard hardcodes `RECORD_COUNT_FLOOR = 5` as a crude substitute.
+`pokemon_win_rate_summary.sql` now computes `wilson_lower_bound` (a 95%
+Wilson score confidence interval lower bound) and `wilson_rank` per
+Pokémon; `pipelines/dashboard/data.py`'s `compute_kpis` now picks the KPI
+card's `top_win_rate_pokemon` by `wilson_rank` instead of the old
+`RECORD_COUNT_FLOOR = 5` filter-then-max-by-`win_rate` heuristic, which is
+now removed. Verified against real data: the old logic's top pick was
+Victreebel-Mega at 63% over 3 matches; the new logic correctly picks
+Kingambit at 50.6% over 2,384 matches. The Usage tab's Win rate leaders
+table still uses its own user-selectable min-record-count filter
+(unrelated UI control, left as-is) — only the KPI card's single "top"
+pick and the underlying mart changed.
 
-#### 14. Item and build concentration metrics
+#### 14. Item and build concentration metrics — DONE
 
 - **Size**: S
 - **Value**: Distinguishes Pokémon with one locked-in optimal build from
@@ -266,7 +320,14 @@ The dashboard hardcodes `RECORD_COUNT_FLOOR = 5` as a crude substitute.
 - **Blocked by**: nothing
 - **Touches**: `dbt/models/marts/pokemon_build_usage.sql`
 
-Entropy or a Herfindahl index over `build_share` per Pokémon.
+`pokemon_build_usage` itself no longer exists (split into
+`pokemon_item_usage`/`pokemon_ability_usage` by the M6 broadcast redesign,
+before this item was picked up). Shipped as a new sibling mart,
+`dbt/models/marts/pokemon_build_concentration.sql`: a Herfindahl-Hirschman
+Index (sum of squared shares) over each of `pokemon_item_usage.item_share`
+and `pokemon_ability_usage.ability_share` per Pokémon, plus how many
+distinct items/abilities were observed at all. Not yet wired into the
+dashboard UI.
 
 #### 15. Data-derived archetype clustering
 
@@ -295,7 +356,7 @@ when its members drift far from observed clusters.
 Needs EV/nature assumptions to be exact; a documented "max speed investment"
 convention is the honest simplification. Item #25 would make it precise.
 
-#### 17. Wire up `stat_change_leaderboard`
+#### 17. Wire up `stat_change_leaderboard` — RESOLVED, staying unwired on purpose
 
 - **Size**: S
 - **Value**: The mart is built by every `dbt build` and consumed by nothing.
@@ -305,8 +366,21 @@ convention is the honest simplification. Item #25 would make it precise.
 - **Touches**: `pipelines/dashboard/data.py:29-64`,
   `dbt/models/marts/stat_change_leaderboard.sql`
 
-`MART_FIELDS` lists nine marts; dbt builds ten. Note this only becomes
-*visible* work when Blocker B resolves — see #21.
+This entry's "connect it or drop it" framing predates a decision that
+already answers it: `docs/todo.md`'s M6 section records that a stat-change
+leaderboard dashboard section was built, then deliberately **removed**
+(see `docs/dashboard.md`'s "Removed sections" note) specifically because
+Blocker B makes every row a `stat_total_delta` of 0 — a permanently empty
+state is worse than no section. So the mart stays deliberately unwired,
+not accidentally: recorded here so it doesn't read as an open gap.
+Revisit only alongside #21, when Blocker B actually resolves.
+
+Mart-count note, corrected: `MART_FIELDS` lists nine marts; `dbt build`
+now produces fifteen (five shipped by this pass — #8, #10, #12, #14, plus
+`pokemon_win_rate_summary`'s new Wilson columns — landed as new marts not
+wired into `MART_FIELDS` either, for the same "real output, dashboard
+surfacing is separate work" reason, not the Blocker-B reason this item
+covers).
 
 ### Blocked on snapshot history (Blocker A)
 

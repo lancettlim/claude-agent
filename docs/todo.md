@@ -397,6 +397,52 @@ All five are now shipped.
   `tests/unit/test_cli.py` cover the clean-pass, gate-failure,
   unexpected-crash-code, and stale-run_results cases.
 
+## Analytics depth (backlog Section 1, "buildable today")
+
+Five of the "no new data required" items from `docs/backlog.md`'s Section 1
+— the highest value-to-effort ratio in the backlog since every input
+already existed in the normalized layer. Verified against a real,
+freshly-run `extract all` + `dbt build` pass (not just synthetic
+fixtures); all 89 dbt nodes (28 external models, 6 seeds, 35 data tests, 20
+view models) pass, and `reports/validation/validation_report.json` reports
+zero `release_blocking_findings`. None of the five are wired into the
+dashboard UI yet (`pipelines/dashboard/data.py`'s `MART_FIELDS` and
+`docs/dashboard.md`) — that's separate, still-open follow-up work; see each
+item's `docs/backlog.md` entry.
+
+- [x] Backlog #10: Tera type usage mart — new
+  `dbt/models/marts/pokemon_tera_type_usage.sql`, mirroring
+  `pokemon_item_usage`/`pokemon_ability_usage`'s usage-count-and-
+  share-of-own-total pattern for `tournament_team_member.tera_type`.
+- [x] Backlog #12: Usage × regulation cross-tab — new
+  `dbt/models/marts/pokemon_usage_by_regulation.sql`. `tournament_event`
+  carries no `regulation_code` of its own, so this isn't a temporal "usage
+  during regulation X" slice; it cross-joins `pokemon_usage_summary`'s
+  overall `usage_count` against `legality_snapshot`'s regulation membership
+  at the latest `snapshot_date`, with `usage_share`/`usage_rank`
+  recomputed within each `regulation_code` partition.
+- [x] Backlog #14: Item and build concentration metrics — new
+  `dbt/models/marts/pokemon_build_concentration.sql`: a
+  Herfindahl-Hirschman Index (sum of squared shares) over
+  `pokemon_item_usage.item_share`/`pokemon_ability_usage.ability_share`
+  per Pokémon, plus how many distinct items/abilities were observed.
+- [x] Backlog #13: Win-rate confidence intervals —
+  `dbt/models/marts/pokemon_win_rate_summary.sql` gained
+  `wilson_lower_bound` (95% Wilson score CI lower bound) and `wilson_rank`
+  columns; `pipelines/dashboard/data.py`'s `compute_kpis` now picks the
+  KPI card's `top_win_rate_pokemon` by `wilson_rank` instead of the old
+  `RECORD_COUNT_FLOOR = 5`-filter-then-max-`win_rate` heuristic (removed).
+  Verified against real data: the old logic picked a 63%-over-3-matches
+  outlier; the new logic correctly picks a 50.6%-over-2,384-matches
+  Pokémon instead.
+- [x] Backlog #8: Placement-weighted usage — new
+  `dbt/models/marts/pokemon_placement_weighted_usage.sql`, using
+  `tournament_team.placement` (lower is better): a hard top-8-cutoff view
+  (`top_cut_usage_count`/`top_cut_usage_share`) and a continuous
+  inverse-placement-weighted view (`placement_weighted_score`/
+  `weighted_usage_share`), so "successful" and "popular" are both
+  answerable, not just the latter.
+
 ## Release readiness (v1 definition of done)
 
 All release gates pass as of this writing (see

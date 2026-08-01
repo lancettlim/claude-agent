@@ -44,6 +44,8 @@ def _populate_marts(marts_dir, normalized_dir):
                 "total_losses": "5",
                 "win_rate": "0.6667",
                 "record_count": "15",
+                "wilson_lower_bound": "0.41",
+                "wilson_rank": "1",
             }
         ],
     )

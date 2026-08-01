@@ -29,7 +29,11 @@ models:
       Win-rate-proxy KPI per Pokémon: total wins/losses and win_rate
       aggregated from tournament_team's reported record_wins/record_losses
       across every roster slot that included the Pokémon, restricted to
-      the current legal pool and to teams with a reported record. Written
+      the current legal pool and to teams with a reported record.
+      wilson_lower_bound/wilson_rank (backlog.md #13) are a 95% Wilson
+      score confidence interval lower bound and its rank, which order
+      small-sample win rates more honestly than raw win_rate does (a 100%
+      win rate over 3 matches no longer outranks 62% over 200). Written
       to data/marts/pokemon_win_rate_summary.csv.
   - name: pokemon_item_usage
     description: >
@@ -101,6 +105,43 @@ models:
       its Champions-format base stats (including speed) plus nullable
       overall usage_count/usage_share/win_rate/record_count. Written to
       data/marts/pokemon_champions_profile.csv.
+  - name: pokemon_tera_type_usage
+    description: >
+      Tera type drill-down (backlog.md #10): usage count and tera_share
+      (that count's fraction of the Pokémon's own total tera-type rows)
+      per Pokémon x tera_type, restricted to the current legal pool,
+      ranked within each Pokémon. Coverage is partial -- MunchStats
+      doesn't report tera_type for every roster slot. Written to
+      data/marts/pokemon_tera_type_usage.csv.
+  - name: pokemon_usage_by_regulation
+    description: >
+      Usage x regulation cross-tab (backlog.md #12): pokemon_usage_summary's
+      overall usage_count cross-joined against legality_snapshot's
+      regulation membership at the latest snapshot_date, with usage_share/
+      usage_rank recomputed within each regulation_code partition. Not a
+      temporal "usage during regulation X" slice -- tournament_event
+      carries no regulation_code of its own -- but a way to filter/rank the
+      existing usage numbers down to a single regulation's legal pool
+      instead of the union across all regulations. Written to
+      data/marts/pokemon_usage_by_regulation.csv.
+  - name: pokemon_build_concentration
+    description: >
+      Item and ability build concentration (backlog.md #14): a
+      Herfindahl-Hirschman Index (sum of squared shares) over
+      pokemon_item_usage.item_share and pokemon_ability_usage.ability_share
+      per Pokémon -- HHI near 1 means usage is concentrated on a single
+      locked-in item/ability, near 0 means usage is spread across several
+      contested choices. item_count/ability_count is how many distinct
+      items/abilities were observed at all. Written to
+      data/marts/pokemon_build_concentration.csv.
+  - name: pokemon_placement_weighted_usage
+    description: >
+      Placement-weighted usage (backlog.md #8): distinguishes "popular"
+      from "successful" using tournament_team.placement (lower is better).
+      top_cut_usage_count/top_cut_usage_share use a hard top-8 cutoff;
+      placement_weighted_score/weighted_usage_share use a continuous
+      inverse-placement (1/placement) weight per appearance instead.
+      Written to data/marts/pokemon_placement_weighted_usage.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
