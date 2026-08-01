@@ -1,5 +1,10 @@
 -- Gate: >=85% of Bulbagarden sprite titles mapped to pokemon_asset rows (docs/dataset-spec.md).
--- With zero staged rows this is vacuously not failed (pending Bulbagarden extraction).
+-- Zero staged rows reports 0 coverage (fails the gate) rather than passing
+-- vacuously: the source's external_location glob (_sources.yml) errors out
+-- before this query ever runs if no snapshot file exists at all, so a
+-- zero-row result here only happens when a snapshot file exists but is
+-- empty -- exactly the total-upstream-outage case this gate exists to catch
+-- (docs/backlog.md #36).
 -- Threshold is lower than OP.GG's 95%/MunchStats's 90% because pokemon_asset's
 -- primary key is pokemon_key, not bulbagarden_title: several species (Vivillon's
 -- wing patterns, Florges's colors, Furfrou's trims, Alcremie's cream flavors,
@@ -15,7 +20,7 @@
 {{ config(fail_calc='max(coverage_bps)', error_if='<8500', warn_if='<8500') }}
 select
   case
-    when total.title_count = 0 then 10000
+    when total.title_count = 0 then 0
     else round(mapped.asset_count::double / total.title_count * 10000)::integer
   end as coverage_bps
 from (

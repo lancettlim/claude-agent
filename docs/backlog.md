@@ -547,8 +547,8 @@ Decide before building.
 ## Section 3 — Platform, quality, and ops
 
 Separated from the analytics list so it doesn't dilute it. These are
-verified gaps, not speculative hardening. Items #36 and #38 are the two with
-real correctness consequences.
+verified gaps, not speculative hardening. Items #36 and #38 were the two
+with real correctness consequences; both are now done.
 
 ### 35. CI workflow
 
@@ -558,7 +558,7 @@ real correctness consequences.
 - **Blocked by**: nothing
 - **Touches**: new `.github/workflows/`
 
-### 36. Fix vacuously-passing coverage tests
+### 36. Fix vacuously-passing coverage tests — DONE
 
 - **Size**: S
 - **Value**: A correctness hole in the release gate. All four
@@ -568,9 +568,13 @@ real correctness consequences.
 - **Blocked by**: nothing
 - **Touches**: `dbt/tests/singular/assert_*_coverage.sql`
 
-The comments explain the intent honestly ("vacuously not failed (pending
-Phase 1 extraction)") — it was scaffolding for a pre-extraction repo and has
-outlived its reason. Pairs with #40.
+Each test's zero-row branch now reports `0` bps instead of `10000`, so an
+empty source fails the gate instead of passing it vacuously. Verified the
+branch can only trigger for a genuinely empty (but present) snapshot file —
+a missing one makes DuckDB's external-source glob raise an `IO Error`
+before the query runs at all — so this doesn't newly break a fresh clone
+with no extraction yet, only a real "extraction ran and returned nothing"
+outage. Pairs with #40, which is still open.
 
 ### 37. Derive the validation report from dbt's manifest
 

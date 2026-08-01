@@ -1,5 +1,10 @@
 -- Gate: >=95% of OP.GG legal pool mapped to canonical pokemon_id (docs/dataset-spec.md).
--- With zero staged rows this is vacuously not failed (pending Phase 1 OP.GG extraction).
+-- Zero staged rows reports 0 coverage (fails the gate) rather than passing
+-- vacuously: the source's external_location glob (_sources.yml) errors out
+-- before this query ever runs if no snapshot file exists at all, so a
+-- zero-row result here only happens when a snapshot file exists but is
+-- empty -- exactly the total-upstream-outage case this gate exists to catch
+-- (docs/backlog.md #36).
 -- Measures real mapped coverage (rows int_opgg_champions_mapped resolved to a
 -- pokemon_key, via direct id or the opgg_key_to_pokeapi_form seed fallback), not
 -- just staging's raw pokemon_id nullness — the seed fallback maps many
@@ -10,7 +15,7 @@
 {{ config(fail_calc='max(coverage_bps)', error_if='<9500', warn_if='<9500') }}
 select
   case
-    when total.legal_count = 0 then 10000
+    when total.legal_count = 0 then 0
     else round(mapped.mapped_count::double / total.legal_count * 10000)::integer
   end as coverage_bps
 from (

@@ -368,6 +368,19 @@ All five are now shipped.
 
 ## Platform hardening (backlog Section 3)
 
+- [x] Backlog #36: Fix vacuously-passing coverage tests — the four
+  `dbt/tests/singular/assert_*_coverage.sql` gates (OP.GG legal pool,
+  PokéBase legal pool, Bulbagarden sprite, tournament-team-member mapping)
+  each had a `when total_count = 0 then 10000` branch that reported 100%
+  coverage whenever their source had zero rows, so a total upstream outage
+  yielding an empty staging CSV passed every gate and could be released.
+  Changed each to report `0` (not `10000`) in that branch instead, so an
+  empty source now fails its coverage gate. Confirmed the zero-row branch
+  can only be reached by a genuinely empty (but present) snapshot file, not
+  a missing one — DuckDB's external-source glob (`_sources.yml`'s
+  `external_location`) raises an `IO Error` before the query ever runs if
+  no file matches the pattern, verified directly against `duckdb.connect()`
+  with a nonexistent vs. an empty (header-only) CSV.
 - [x] Backlog #38: Don't swallow the `dbt build` return code —
   `pipelines/cli.py`'s `_run_validate` now captures `dbt build`'s exit code
   instead of discarding it, and treats an exit code outside `{0, 1}` as an
