@@ -33,7 +33,7 @@
 
   // Icon-size tokens (docs/design-system.md's "Icon size scale") — mirrors
   // the --icon-sm/md/lg/xl CSS custom properties in index.html.jinja.
-  var ICON_SIZES = { sm: 32, md: 48, lg: 72, xl: 96 };
+  var ICON_SIZES = { sm: 40, md: 64, lg: 96, xl: 128 };
 
   var ALL_TYPES = [
     "normal", "fire", "water", "electric", "grass", "ice", "fighting",
@@ -244,17 +244,30 @@
     );
   }
 
+  // The committed type-icon PNGs (static/icons/types/) are wide 200x40
+  // "icon + type name" badges (a PokéAPI/sprites generation-ix asset), not
+  // bare square icons — the symbol always sits in a fixed-width square on
+  // the left edge, with the type name filling the rest. Squishing the
+  // whole 5:1 image into a square (the old approach) stretched the text
+  // into an illegible blob; instead this crops to just that left square
+  // (an overflow:hidden window sized to `size`, holding a height:`size`
+  // image scaled to its natural ~5:1 aspect so only the icon shows) —
+  // a real icon-only emblem, not a squished text badge.
   function typeIconImg(typeName, sizePx) {
     var src = typeIcons[typeName];
     if (!src) return "";
     var size = sizePx || 18;
     return (
-      '<img src="' + src + '" alt="' + escapeHtml(typeName) + '" style="width:' + size +
-      "px;height:" + size + 'px;vertical-align:-3px">'
+      '<span class="type-icon-crop" style="width:' + size + "px;height:" + size +
+      'px" title="' + escapeHtml(typeName) + '">' +
+      '<img src="' + src + '" alt="' + escapeHtml(typeName) + '" style="height:' + size + 'px">' +
+      "</span>"
     );
   }
 
-  // Renders a Pokémon's type_1/type_2 into `container` as a type-badge row.
+  // Renders a Pokémon's type_1/type_2 into `container` as a type-badge row
+  // of icon-only emblems (no visible text label — the type name is exposed
+  // via each pill's aria-label and the icon's title attribute instead).
   // large=true switches to the Profile header's --icon-xl dual-type
   // display (docs/design-system.md's "Larger type badge"); otherwise it's
   // the compact pill used in the Matchup tab's picker panels.
@@ -269,14 +282,16 @@
       container.className = "type-badge-row type-badge-lg";
       container.innerHTML = types
         .map(function (t) {
-          return '<div class="type-pill-lg">' + typeIconImg(t, ICON_SIZES.xl) + "<span>" + escapeHtml(t) + "</span></div>";
+          return '<div class="type-pill-lg" role="img" aria-label="' + escapeHtml(t) + ' type">' +
+            typeIconImg(t, ICON_SIZES.xl) + "</div>";
         })
         .join("");
     } else {
       container.className = "type-badge-row";
       container.innerHTML = types
         .map(function (t) {
-          return '<span class="type-pill">' + typeIconImg(t, 18) + escapeHtml(t) + "</span>";
+          return '<span class="type-pill" role="img" aria-label="' + escapeHtml(t) + ' type">' +
+            typeIconImg(t, 18) + "</span>";
         })
         .join("");
     }
@@ -434,6 +449,34 @@
     activate("overview");
   }
 
+  // ---------- sub-tabs ----------
+
+  // A pill row nested inside one top-level tab/section (docs/design-
+  // system.md's "Sub-tabs" component) — e.g. Usage's Usage-leaders/Win-
+  // rate-leaders, Pokémon Profile's Items/Ability/Moves/Team Cores.
+  // buttons/panels are NodeLists or arrays; buttons carry data-subtab,
+  // panels carry data-subpanel, matched by that id. Defaults to the first
+  // button. Distinct from setupTabs (the page's seven top-level tabs).
+  function setupSubTabs(buttons, panels, onActivate) {
+    buttons = Array.prototype.slice.call(buttons);
+    panels = Array.prototype.slice.call(panels);
+    function activate(id) {
+      buttons.forEach(function (btn) {
+        btn.setAttribute("aria-selected", btn.getAttribute("data-subtab") === id ? "true" : "false");
+      });
+      panels.forEach(function (panel) {
+        panel.hidden = panel.getAttribute("data-subpanel") !== id;
+      });
+      if (onActivate) onActivate(id);
+    }
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        activate(btn.getAttribute("data-subtab"));
+      });
+    });
+    if (buttons.length) activate(buttons[0].getAttribute("data-subtab"));
+  }
+
   // ---------- per-tab setup (each called once, on first activation) ----------
 
   function setupOverview() {
@@ -577,6 +620,11 @@
     }
     if (minRecordSelect) minRecordSelect.addEventListener("change", updateWinRows);
     updateWinRows();
+
+    setupSubTabs(
+      document.querySelectorAll('.tab-panel[data-panel="usage"] .subtab-btn'),
+      document.querySelectorAll('.tab-panel[data-panel="usage"] .subtab-panel')
+    );
   }
 
   // Pokémon Profile: one Pokémon-centric view combining base stats + type,
@@ -607,7 +655,26 @@
     var statsEl = document.getElementById("pokemon-profile-stats");
     var itemGrid = document.getElementById("profile-item-grid");
     var abilityGrid = document.getElementById("profile-ability-grid");
-    var moveGrid = document.getElementById("profile-move-grid");
+    var moveTable = document.getElementById("profile-move-table");
+    var moveTableSortable = moveTable
+      ? makeSortableTable(
+          moveTable,
+          [],
+          function (r) {
+            return (
+              "<td>" + typeIconImg(r.move_type, 18) + " " + escapeHtml(r.move_name) + "</td>" +
+              "<td>" + formatPercent(r.move_share) + "</td>" +
+              "<td>" + escapeHtml(r.category || "—") + "</td>" +
+              "<td>" + (r.power != null ? r.power : "—") + "</td>" +
+              "<td>" + (r.accuracy != null ? r.accuracy + "%" : "—") + "</td>" +
+              "<td>" + (r.pp != null ? r.pp : "—") + "</td>" +
+              "<td>" + (r.priority || 0) + "</td>" +
+              "<td>" + escapeHtml(r.short_effect || "") + "</td>"
+            );
+          },
+          { defaultKey: "usage_rank", defaultDir: "asc" }
+        )
+      : null;
     var coreGrid = document.getElementById("profile-team-core-grid");
 
     function render(chosenName) {
@@ -693,20 +760,7 @@
             })
             .slice(0, 15)
         : [];
-      renderGrid6xn(moveGrid, moves, {
-        iconFn: function (r) {
-          return typeIcons[r.move_type];
-        },
-        labelFn: function (r) {
-          return r.move_name;
-        },
-        displayFn: function (r) {
-          return formatPercent(r.move_share);
-        },
-        subFn: function (r) {
-          return r.short_effect || (r.power ? "Power " + r.power : "");
-        },
-      });
+      if (moveTableSortable) moveTableSortable.setRows(moves);
 
       var cores = chosenName
         ? coreRows
@@ -736,6 +790,11 @@
     });
     if (sortedProfiles.length) select.value = sortedProfiles[0].pokemon_name;
     render(select.value);
+
+    setupSubTabs(
+      document.querySelectorAll('.tab-panel[data-panel="pokemon-profile"] .subtab-btn'),
+      document.querySelectorAll('.tab-panel[data-panel="pokemon-profile"] .subtab-panel')
+    );
   }
 
   function setupSpeedTiers() {
@@ -850,5 +909,6 @@
     renderGrid6xn: renderGrid6xn,
     makeSortableTable: makeSortableTable,
     registerTab: registerTab,
+    setupSubTabs: setupSubTabs,
   };
 })();

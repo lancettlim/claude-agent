@@ -14,6 +14,44 @@ source of truth for v1 scope; nothing here changes it until it's promoted.
 Items are numbered so dependencies can reference each other. **Numbers are
 stable and never reused** — a completed or dropped item keeps its number.
 
+## Progress overview
+
+*Last updated 2026-08-01.* 48 numbered items exist (#1-#48, none dropped).
+This table is maintained by hand alongside each grooming/implementation
+pass — if it drifts from the per-item statuses below, the per-item entries
+are the source of truth.
+
+| Status | Count | Meaning |
+|---|---|---|
+| **Done** | 21 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #32, #35, #36, #38, #46 |
+| **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
+| **Resolved, no build needed** | 1 | #17 — deliberately left unwired, not an oversight; see its entry |
+| **Open, buildable now** | 16 | No blocker, just not started: #15, #16, #28, #29, #30, #33, #34, #37, #39-#44, #47, #48 |
+| **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
+
+By section:
+
+| Section | Done | Partial/Resolved | Open | Blocked | Total |
+|---|---|---|---|---|---|
+| 0 — Foundational enablers | 5 | 0 | 0 | 0 | 5 |
+| 1 — Buildable today (#6-#17) | 8 | 2 | 2 | 0 | 12 |
+| 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
+| 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
+| 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
+| 2 — Consumption surfaces (#28-#34) | 1 | 0 | 5 | 1 | 7 |
+| 3 — Platform, quality, and ops (#35-#48) | 4 | 1 | 9 | 0 | 14 |
+| **Total** | **21** | **3** | **16** | **8** | **48** |
+
+Takeaways: every item in Section 0 and every "buildable today, no new data
+required" item that isn't genuinely open (#15, #16) or a judgment call
+(#17) is done — that bucket is close to exhausted. The remaining open work
+skews toward Section 3 (platform/quality hardening, 9 open items) and
+Section 2 (dashboard consumption surfaces, 5 open items). The 8 blocked
+items aren't neglect — 4 are waiting on real-world time/events (Blocker A's
+snapshot history, Blocker B's rebalance, #31's snapshot-dependent hosting
+justification) and 4 need a source this repo doesn't have and, in #26/#27's
+case, may not exist in scriptable form at all.
+
 ## Entry format
 
 - **Size**: `S` an afternoon · `M` a day or two · `L` a week-ish ·
@@ -154,7 +192,7 @@ distinction matters more than the feature descriptions do.
 These need only SQL and a mart. Every input already exists in the normalized
 layer. This is the highest ratio of value to effort in the file.
 
-#### 6. Usage over time from `tournament_event.event_date`
+#### 6. Usage over time from `tournament_event.event_date` — DONE
 
 - **Size**: M
 - **Value**: Real meta-over-time **without waiting on Blocker A**. Events
@@ -165,11 +203,13 @@ layer. This is the highest ratio of value to effort in the file.
 - **Touches**: new `dbt/models/marts/pokemon_usage_trend.sql`,
   `tournament_event`, `tournament_team_member`
 
-`event_date` is normalized in `tournament_event` and **no mart references
-it** — the only mention anywhere in `dbt/models/marts/` is a comment listing
-it as an available date dimension (`schema.yml:91`). Note the semantic
-difference from snapshot trends: this shows how usage shifted across
-tournaments, which is arguably the more interesting axis anyway.
+Shipped as `dbt/models/marts/pokemon_usage_by_event_date.sql` (named to
+match its grain rather than the originally-proposed `pokemon_usage_trend`):
+usage count/share/rank per Pokémon x event_date, partitioned by
+event_date. Verified against real data: 2,073 rows across the real
+MunchStats event-date history. Not yet wired into the dashboard UI (#29's
+trend/line charts are the natural consumer, but that item is bigger scope
+than this mart alone).
 
 #### 7. Player and country dimension mart — PARTIALLY DONE
 
@@ -210,7 +250,7 @@ queryable output (verified against real MunchStats data: Incineroar leads
 both views), but surfacing it as a dashboard tab/section is separate,
 undone follow-up work.
 
-#### 9. Team synergy beyond raw co-occurrence
+#### 9. Team synergy beyond raw co-occurrence — DONE (pairs; triples still open)
 
 - **Size**: M
 - **Value**: `pokemon_team_core_usage` reports how often two Pokémon appear
@@ -221,8 +261,17 @@ undone follow-up work.
 - **Touches**: `dbt/models/marts/pokemon_team_core_usage.sql` or a sibling
   mart
 
-Probably the single most interesting analysis in this section. Worth
-extending past pairs to triples for real "core" detection.
+Shipped as a sibling mart, `dbt/models/marts/pokemon_team_synergy.sql`,
+built on top of `pokemon_team_core_usage`'s already-mirrored pairs: lift
+per pair (`P(A,B) / (P(A) x P(B))`, using distinct-team membership as the
+probability space), with `pair_team_count` exposed alongside it since lift
+is noisy at low pair counts. Verified against real data: 10,336 pair rows;
+spot-checked Incineroar's top partners by lift (Vileplume, Slowking,
+Steelix, Hawlucha-Mega, Sceptile) against its top partners by raw
+co-occurrence and confirmed they're a different, less-generically-popular
+set, as intended. Still open: extending past pairs to triples for real
+"core" detection, as this entry originally suggested — a bigger
+combinatorial problem than the pairwise case, left for a follow-up.
 
 #### 10. Tera type usage mart — DONE
 
@@ -278,16 +327,6 @@ cross-joins the existing overall `usage_count` against
 `legality_snapshot`'s regulation membership at the latest `snapshot_date`,
 with `usage_share`/`usage_rank` recomputed within each `regulation_code`
 partition. Not yet wired into the dashboard UI.
-
-#### 12. Usage × regulation cross-tab
-
-- **Size**: S
-- **Value**: Usage is currently sliced by `event_tier` but never scoped to a
-  regulation, so a Pokémon's usage number silently mixes regulations with
-  different legal pools.
-- **Blocked by**: nothing
-- **Touches**: `dbt/models/marts/pokemon_usage_summary.sql`,
-  `legality_snapshot`
 
 #### 13. Win-rate confidence intervals — DONE
 
@@ -445,7 +484,7 @@ names the real path to provenance rather than proposing a hardcoded,
 unsourced table — that would violate the mandatory-provenance convention in
 `CLAUDE.md`, which is the reason these gaps still exist.
 
-#### 22. `pokemon_type` entity via PokéAPI `/type`
+#### 22. `pokemon_type` entity via PokéAPI `/type` — DONE, via a lighter path
 
 - **Size**: M
 - **Value**: The cleanest unblock in this file. Type is the most fundamental
@@ -456,10 +495,15 @@ unsourced table — that would violate the mandatory-provenance convention in
 - **Touches**: `pipelines/extract/pokeapi.py`, new normalized entity,
   `docs/dataset-spec.md` entity dictionary
 
-Adds a tenth core entity, so it's a `MINOR` version bump and a
-`dataset-spec.md` update, not just a mart.
+Shipped by the Competitive-UX redesign pass (`docs/todo.md`'s M6 section),
+via a lighter path than this entry proposed: `type_1`/`type_2` landed as
+new columns on the existing `pokemon` entity (real PokéAPI data, full
+provenance) rather than a standalone `pokemon_type` dimension entity — no
+`MINOR` version bump needed, since it extended an existing entity instead
+of adding a tenth one. `docs/dataset-spec.md`'s entity dictionary already
+documents `pokemon.type_1`/`type_2`, so that update isn't owed either.
 
-#### 23. Type-effectiveness matrix
+#### 23. Type-effectiveness matrix — DONE, via a lighter path
 
 - **Size**: M
 - **Value**: Closes the type half of the long-standing matchup gap recorded
@@ -470,10 +514,19 @@ Adds a tenth core entity, so it's a `MINOR` version bump and a
 - **Touches**: `pipelines/extract/pokeapi.py`, new normalized entity, new
   mart
 
-Enables defensive/offensive coverage scoring per team, which combined with
-#11 is a genuinely strong teambuilding surface.
+Shipped as a client-side `TYPE_CHART` constant in
+`pipelines/dashboard/static/matchup.js`, not a new normalized entity/mart
+fed by PokéAPI's `damage_relations` as originally proposed. Deliberate,
+documented divergence, not a provenance shortcut: type effectiveness is a
+fixed game-mechanics fact, not a per-record extracted fact, so it gets the
+same treatment `pokemon_champions_profile`'s schema.yml entry already
+gives `app.js`'s `SPEED_TIERS` bucketing constant and weather-boost
+multipliers. Powers the Matchup tab's type-effectiveness view and damage
+calculator against real `pokemon.type_1`/`type_2` and `move_detail` data.
+Still the real open half of the matchup gap, unrelated to this item: real
+head-to-head battle-outcome data (#27) — no source provides it.
 
-#### 24. Ability and move metadata from PokéAPI
+#### 24. Ability and move metadata from PokéAPI — DONE
 
 - **Size**: M
 - **Value**: Move power, accuracy, damage class, and ability effects unlock
@@ -482,9 +535,16 @@ Enables defensive/offensive coverage scoring per team, which combined with
 - **Blocked by**: nothing (same in-scope source)
 - **Touches**: `pipelines/extract/pokeapi.py`, new normalized entities
 
-Note the Champions format rebalances stats; whether it also rebalances moves
-is unverified, so canonical move data may need its own Champions-side
-counterpart eventually.
+Shipped exactly as described, by the Competitive-UX redesign pass: three
+new normalized entities with real PokéAPI provenance —
+`dbt/models/normalized/move_detail.sql` (type/power/accuracy/category/
+priority/pp/short_effect), `ability_detail.sql`, and `item_detail.sql` —
+scoped to names actually seen in real tournament rosters rather than
+PokéAPI's full catalog. All three are documented in `docs/dataset-spec.md`'s
+entity dictionary and joined into `pokemon_move_usage`/
+`pokemon_ability_usage`/`pokemon_item_usage`. The Champions-move-rebalance
+question this entry flagged is still unresolved, but unverifiable from any
+in-scope source, not a gap in this item's own scope.
 
 #### 25. EV spreads and verified movesets via Victory Road
 
@@ -552,23 +612,30 @@ distribution.
 - **Blocked by**: nothing
 - **Touches**: new doc or `notebooks/`, `dbt/analyses/`
 
-### 29. Trend and line charts in the dashboard
+### 29. Trend and line charts in the dashboard — data half unblocked, UI still open
 
 - **Size**: M
 - **Value**: The trend views `docs/prd.md` describes and the dashboard has
   never been able to show.
-- **Blocked by**: real multi-snapshot history accumulating (#1-#3 are live; or #6 for the event-date variant)
+- **Blocked by**: ~~real multi-snapshot history accumulating (#1-#3 are
+  live; or #6 for the event-date variant)~~ #6 shipped
+  `pokemon_usage_by_event_date`, so the event-date variant's data
+  dependency is resolved — this item is no longer blocked, just not yet
+  built. The snapshot-date variant still needs #1-#3's history to actually
+  accumulate multiple snapshots in production.
 - **Touches**: `pipelines/dashboard/templates/`, `static/app.js`
 
 Note the broadcast redesign removed the charting library entirely, so this
 means either reintroducing a dependency or extending the dependency-free
 ranked-list components.
 
-### 30. Tournament and date filter
+### 30. Tournament and date filter — data half unblocked, UI still open
 
 - **Size**: S
 - **Value**: One of the three open `docs/todo.md` M6 backlog items.
-- **Blocked by**: real multi-snapshot history accumulating (#1-#3 are live) or #6
+- **Blocked by**: ~~real multi-snapshot history accumulating (#1-#3 are
+  live) or #6~~ #6 shipped; a real `event_date` dimension exists to filter
+  by now (`pokemon_usage_by_event_date`). Not yet built.
 - **Touches**: `pipelines/dashboard/static/app.js`
 
 ### 31. Dynamic Streamlit dashboard
@@ -586,7 +653,7 @@ ranked-list components.
 Worth weighing against #28: for a single user, a notebook may deliver most
 of the same value with none of the hosting cost.
 
-### 32. JSON feed alongside the baked-in dashboard data
+### 32. JSON feed alongside the baked-in dashboard data — DONE
 
 - **Size**: S
 - **Value**: Dashboard data is inlined into `index.html` as
@@ -595,6 +662,12 @@ of the same value with none of the hosting cost.
   dbt.
 - **Blocked by**: nothing
 - **Touches**: `pipelines/dashboard/build.py`
+
+`build()` now also writes `data.json` (the exact same payload
+`json.dumps`'d, not reparsed from the escaped inline script) alongside
+`index.html`. `index.html` stays the inline-data version — not switched to
+`fetch()`-ing `data.json` — so it keeps working opened directly via
+`file://`, per this module's own docstring.
 
 ### 33. GitHub Releases with packaged artifacts
 
@@ -624,13 +697,31 @@ Separated from the analytics list so it doesn't dilute it. These are
 verified gaps, not speculative hardening. Items #36 and #38 were the two
 with real correctness consequences; both are now done.
 
-### 35. CI workflow
+### 35. CI workflow — DONE
 
 - **Size**: M
 - **Value**: `make check` (lint + test + dbt build + validate) exists and
   nothing runs it automatically. There is no `.github/` directory at all.
 - **Blocked by**: nothing
 - **Touches**: new `.github/workflows/`
+
+("No `.github/` directory at all" was already stale by the time this was
+picked up — `scheduled-extraction.yml`/`deploy-dashboard.yml` exist — but
+neither ran lint/test/dbt-build/validate on a push or PR, so the core gap
+this item describes was real.) Shipped as new `.github/workflows/ci.yml`,
+triggered on every PR and push to `main`. `lint`/`test` always run (pure
+Python, no network dependency). `dbt-build`/`validate` need
+`data/staging/*.csv`, which is gitignored and not committed — rather than
+re-running extraction on every push (hitting OP.GG/PokéBase/MunchStats
+repeatedly, which the extractors' own docstrings already flag an
+unverified rate-limit/ToS posture for under `scheduled-extraction.yml`'s
+daily cadence, let alone per-push), CI restores the same `actions/cache`
+entry `scheduled-extraction.yml` populates (read-only, via
+`actions/cache/restore`) and runs `dbt-build`/`validate` against that; on
+a fresh fork with no scheduled run yet, that step degrades to a skipped
+no-op rather than failing the job. This was caught firsthand: PR #40 (the
+one that shipped backlog items #8/#10/#12/#13/#14) had zero CI checks run
+against it before this item existed.
 
 ### 36. Fix vacuously-passing coverage tests — DONE
 
@@ -760,7 +851,7 @@ Bulbagarden's sha1-based `skip_existing` is the existing pattern to follow.
 Conditional requests (ETag / If-Modified-Since) would help the two scraped
 sources.
 
-### 45. `pipelines/cli.py` test coverage
+### 45. `pipelines/cli.py` test coverage — PARTIALLY DONE, stale "zero tests" claim
 
 - **Size**: S
 - **Value**: 74 unit tests cover the extractors, release, render, dashboard,
@@ -770,10 +861,20 @@ sources.
 - **Blocked by**: nothing
 - **Touches**: new `tests/unit/test_cli.py`
 
-Related: there is no `conftest.py` or shared fixture module anywhere under
-`tests/`, so each file re-declares its own helpers.
+`tests/unit/test_cli.py` already exists (added alongside backlog #38's
+fix) and isn't zero: 16 tests cover the snapshot-path helpers, `extract`
+orchestration (including `all`), `dataset_version` defaulting/override, and
+all four `validate` exit-code paths (clean pass, gate failure, unexpected
+crash, stale `run_results.json`). Still genuinely uncovered: `main()`'s
+argument-parsing/dispatch for the `release`, `render-card`, and
+`build-dashboard` subcommands (e.g. `render-card`'s `--team-id`/`--spec`
+mutual-exclusivity, `release`'s required `--version`) — narrower than this
+entry originally described, but real.
 
-### 46. Dashboard JS duplication check
+Related, still true: there is no `conftest.py` or shared fixture module
+anywhere under `tests/`, so each file re-declares its own helpers.
+
+### 46. Dashboard JS duplication check — DONE, and it immediately caught a real bug
 
 - **Size**: S
 - **Value**: `pipelines/dashboard/static/app.js` and the committed
@@ -782,6 +883,18 @@ Related: there is no `conftest.py` or shared fixture module anywhere under
   disagrees with its source.
 - **Blocked by**: nothing
 - **Touches**: `tests/`, or a `make` target
+
+Shipped as `tests/unit/dashboard/test_static_duplication.py`, comparing
+the three static scripts (`app.js`/`matchup.js`/`teams.js`) directly
+against their committed `docs/dashboard/` copies (independent of
+`build()`'s own copy step, so it also catches a hand-edit of the published
+copy). This was not a hypothetical: the first run **failed for real** —
+`pipelines/dashboard/static/app.js` had moved on through two more commits
+(`00ef4d2`, `313acd2` — sub-tabs, icon-only type badges, a sortable moves
+table) past the last time `docs/dashboard/app.js` was actually
+republished, so the live GitHub Pages dashboard was missing real, already
+-built UI features. Fixed by rerunning `make dashboard` and committing the
+regenerated `docs/dashboard/`, which now passes the new test.
 
 ### 47. `sprites.py` rebuild ordering constraint
 

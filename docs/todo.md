@@ -396,16 +396,39 @@ All five are now shipped.
   copy (`[f for f in ...]` -> the list itself). New tests in
   `tests/unit/test_cli.py` cover the clean-pass, gate-failure,
   unexpected-crash-code, and stale-run_results cases.
+- [x] Backlog #35: CI workflow — new `.github/workflows/ci.yml`, triggered
+  on every PR and push to `main`. `lint`/`test` always run (offline, no
+  network dependency). `dbt-build`/`validate` restore the same
+  `actions/cache` entry `scheduled-extraction.yml` already populates
+  (read-only, via `actions/cache/restore`, so CI never re-extracts or hits
+  any external source itself) and run against that; degrades to a skipped
+  no-op on a fresh fork with no scheduled run yet, rather than failing.
+  Caught firsthand: PR #40 (backlog #8/#10/#12/#13/#14) had zero CI checks
+  run against it before this existed.
+- [x] Backlog #32: JSON feed alongside the baked-in dashboard data —
+  `pipelines/dashboard/build.py`'s `build()` now also writes `data.json`
+  (the same payload) alongside `index.html`, which stays the inline-data
+  version so it keeps working opened directly via `file://`.
+- [x] Backlog #46: Dashboard JS duplication check — new
+  `tests/unit/dashboard/test_static_duplication.py`, comparing
+  `pipelines/dashboard/static/{app,matchup,teams}.js` directly against
+  their committed `docs/dashboard/` copies. Its first run **failed for
+  real**: `app.js` had moved on through two more commits (sub-tabs,
+  icon-only type badges, a sortable moves table) past the last time
+  `docs/dashboard/app.js` was actually republished, so the live GitHub
+  Pages dashboard was missing real, already-built UI features. Fixed by
+  rerunning `make dashboard` and committing the regenerated
+  `docs/dashboard/`.
 
 ## Analytics depth (backlog Section 1, "buildable today")
 
-Five of the "no new data required" items from `docs/backlog.md`'s Section 1
-— the highest value-to-effort ratio in the backlog since every input
+Seven of the "no new data required" items from `docs/backlog.md`'s Section
+1 — the highest value-to-effort ratio in the backlog since every input
 already existed in the normalized layer. Verified against a real,
 freshly-run `extract all` + `dbt build` pass (not just synthetic
-fixtures); all 89 dbt nodes (28 external models, 6 seeds, 35 data tests, 20
+fixtures); all 91 dbt nodes (30 external models, 6 seeds, 35 data tests, 20
 view models) pass, and `reports/validation/validation_report.json` reports
-zero `release_blocking_findings`. None of the five are wired into the
+zero `release_blocking_findings`. None of the seven are wired into the
 dashboard UI yet (`pipelines/dashboard/data.py`'s `MART_FIELDS` and
 `docs/dashboard.md`) — that's separate, still-open follow-up work; see each
 item's `docs/backlog.md` entry.
@@ -442,6 +465,19 @@ item's `docs/backlog.md` entry.
   inverse-placement-weighted view (`placement_weighted_score`/
   `weighted_usage_share`), so "successful" and "popular" are both
   answerable, not just the latter.
+- [x] Backlog #6: Usage over time from `tournament_event.event_date` — new
+  `dbt/models/marts/pokemon_usage_by_event_date.sql`: usage count/share/
+  rank per Pokémon x event_date, a real meta-over-time view that doesn't
+  need multiple extraction snapshots (Blocker A). Verified against real
+  data: 2,073 rows across the real MunchStats event-date history.
+- [x] Backlog #9: Team synergy beyond raw co-occurrence — new
+  `dbt/models/marts/pokemon_team_synergy.sql`: lift per Pokémon x partner
+  pair (`P(A,B) / (P(A) x P(B))`) built on top of
+  `pokemon_team_core_usage`'s mirrored pairs, with `pair_team_count`
+  exposed since lift is noisy at low counts. Verified against real data
+  (10,336 pair rows) that lift surfaces a genuinely different, less
+  generically-popular partner set than raw co-occurrence does. Extending
+  past pairs to triples stays open, as the backlog entry itself flags.
 
 ## Release readiness (v1 definition of done)
 

@@ -142,6 +142,24 @@ models:
       placement_weighted_score/weighted_usage_share use a continuous
       inverse-placement (1/placement) weight per appearance instead.
       Written to data/marts/pokemon_placement_weighted_usage.csv.
+  - name: pokemon_usage_by_event_date
+    description: >
+      Usage over time from tournament_event.event_date (backlog.md #6):
+      usage count/share/rank per Pokémon x event_date, partitioned by
+      event_date -- a real meta-over-time view that doesn't need multiple
+      extraction snapshots (Blocker A), since it trends across tournaments
+      actually played instead of across re-extraction dates. Written to
+      data/marts/pokemon_usage_by_event_date.csv.
+  - name: pokemon_team_synergy
+    description: >
+      Team synergy beyond raw co-occurrence (backlog.md #9): lift per
+      Pokémon x partner Pokémon pair -- the ratio of a pair's observed
+      team co-occurrence rate to the rate expected if the two Pokémon
+      were paired independently of their individual popularity. lift > 1
+      is a genuine pairing; lift < 1 is paired less than chance. Built on
+      top of pokemon_team_core_usage's mirrored pairs. pair_team_count is
+      exposed alongside lift since lift is noisy at low pair counts.
+      Written to data/marts/pokemon_team_synergy.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
