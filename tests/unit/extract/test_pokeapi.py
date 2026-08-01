@@ -368,9 +368,7 @@ def test_extract_abilities_writes_ability_detail_rows(tmp_path):
     session = _FakeSession(payloads)
     output_path = tmp_path / "pokeapi_ability.csv"
 
-    pokeapi.extract_abilities(
-        output_path, ["Intimidate"], dataset_version="0.1.0", session=session
-    )
+    pokeapi.extract_abilities(output_path, ["Intimidate"], dataset_version="0.1.0", session=session)
 
     with output_path.open(newline="", encoding="utf-8") as fh:
         row = next(csv.DictReader(fh))
@@ -449,9 +447,7 @@ def test_extract_abilities_skips_unresolvable_ability_name(tmp_path):
     session = _FakeSession(payloads, missing_names={"not-a-real-ability"})
     output_path = tmp_path / "pokeapi_ability.csv"
 
-    pokeapi.extract_abilities(
-        output_path, ["Not A Real Ability", "Intimidate"], session=session
-    )
+    pokeapi.extract_abilities(output_path, ["Not A Real Ability", "Intimidate"], session=session)
 
     with output_path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))

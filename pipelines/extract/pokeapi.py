@@ -223,13 +223,7 @@ def _slugify(display_name: str) -> str:
     byte sequence PokéAPI's router 400s on, rather than resolving the same
     as the straight-apostrophe form.
     """
-    return (
-        display_name.lower()
-        .replace("'", "")
-        .replace("’", "")
-        .replace("‘", "")
-        .replace(" ", "-")
-    )
+    return display_name.lower().replace("'", "").replace("’", "").replace("‘", "").replace(" ", "-")
 
 
 def _english_short_effect(payload: dict) -> str | None:
