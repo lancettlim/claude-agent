@@ -308,31 +308,63 @@ not yet committed to.
 
 The five items below are mirrored in `docs/backlog.md`'s "Section 0 — Foundational
 enablers" (items #1-#5); restating them here per `.claude/loop.md`'s backlog-grooming
-loop. Item #1 is the highest-leverage: it unblocks eight other backlog entries.
+loop. Item #1 was the highest-leverage: it unblocked eight other backlog entries.
+All five are now shipped.
 
-- [ ] Backlog: Append-only staging snapshot history — rewrite all five
-  `pipelines/extract/*.py` modules (currently `open(..., "w")`, overwriting each run)
-  to write date-partitioned snapshots (e.g. `data/staging/<source>/<date>.csv`);
-  update `dbt/models/staging/_sources.yml` to read the partition set; decide a
-  retention policy and format (CSV vs. Parquet) given `munchstats.csv` alone is
-  ~37MB (`docs/backlog.md` #1)
-- [ ] Backlog: Snapshot-aware dbt layer — make `snapshot_date` a groupable
-  dimension across `dbt/models/staging/`, `intermediate/`, and `normalized/`;
-  decide whether normalized entities become snapshot-scoped or a parallel history
-  layer sits alongside them (`legality_snapshot` is the model to follow); blocked
-  by the item above (`docs/backlog.md` #2)
-- [ ] Backlog: Scheduled refresh automation — add a `.github/workflows/` job plus
-  `pipelines/cli.py` support to run extraction on the cadences
-  `docs/dataset-spec.md` already specifies per source, leaving Bulbagarden
-  on-demand per its rate-limit caveat (`docs/backlog.md` #3)
-- [ ] Backlog: Plumb `dataset_version` through extraction — pass a real
-  `dataset_version` from `pipelines/cli.py:36-39` into each extractor instead of
-  the `"0.0.0-dev"` default, and fix `pipelines/validate/report.py:237`'s
-  hardcoded `"0.1.0"` default so the validation report reflects the actual
-  published version (`docs/backlog.md` #4)
-- [ ] Backlog: Orchestration entry point — add an `extract all` command and chain
-  extract → dbt build → validate → release in `pipelines/cli.py`/`Makefile`,
-  matching the existing `make dashboard` chaining pattern (`docs/backlog.md` #5)
+- [x] Backlog: Append-only staging snapshot history — `pipelines/cli.py`'s
+  `extract` subcommand now writes each run to a date-partitioned
+  `data/staging/<source>/<date>.csv` (one file per UTC day) instead of the
+  extractors overwriting a single file; the extractors themselves (`extract()`
+  in each `pipelines/extract/*.py` module) were left untouched since they
+  already just write to whatever `output_path` they're given — the
+  partitioning lives in the caller. Pruned per source after every write via
+  `_RETENTION_COUNTS` (12 weekly PokéAPI snapshots, 14 daily OP.GG/PokéBase,
+  7 daily MunchStats given its ~37MB/run size, 10 on-demand Bulbagarden).
+  Format stays CSV, not Parquet — matches the existing
+  `data/staging/*.schema.json` contracts and needs no new dependency.
+  `dbt/models/staging/_sources.yml`'s `external_location` now globs each
+  source's directory. `.gitignore` updated to match (`docs/backlog.md` #1)
+- [x] Backlog: Snapshot-aware dbt layer — every `dbt/models/staging/stg_*.sql`
+  now unions all retained snapshots with a `cast(extracted_at_utc as date) as
+  snapshot_date` column (matching `legality_snapshot`'s existing convention),
+  making the full extraction history queryable directly from staging. A new
+  `dbt/models/intermediate/int_*_latest.sql` selector per source (8 total)
+  filters back down to the current point-in-time snapshot; the models that
+  used to reference `stg_*` directly (`pokemon`, `pokemon_stat_canonical`,
+  `move_detail`, `ability_detail`, `item_detail`, and the four `int_*_mapped`
+  models) now reference the corresponding `int_*_latest` model instead — a
+  parallel history layer alongside the normalized entities, per the lower-
+  disruption option `docs/backlog.md` #2 itself suggested, rather than making
+  the normalized layer snapshot-scoped. Verified end-to-end against a
+  synthetic two-snapshot PokéAPI fixture (older snapshot with a deliberately
+  wrong stat value, newer with the real one): `stg_pokeapi` correctly showed
+  both dates, `int_pokeapi_latest` correctly kept only the newer one, and
+  `pokemon_stat_canonical.csv` was unaffected — one row per Pokémon, no new
+  columns leaked into the normalized CSV output (`docs/backlog.md` #2)
+- [x] Backlog: Scheduled refresh automation — new
+  `.github/workflows/scheduled-extraction.yml`: daily cron for OP.GG/
+  MunchStats/PokéBase, weekly cron for PokéAPI, `workflow_dispatch` for
+  ad-hoc runs, Bulbagarden left on-demand-only per its unverified rate-limit
+  posture. Since `data/staging/` is intentionally gitignored (see item #1),
+  runner-to-runner persistence goes through `actions/cache` (unique key per
+  run plus a `restore-keys` prefix fallback, since a cache entry is immutable
+  once created) rather than committing snapshots to the repo (`docs/backlog.md` #3)
+- [x] Backlog: Plumb `dataset_version` through extraction — new
+  `pipelines/versioning.py`'s `latest_published_version()` reads the highest
+  version under `releases/manifests/manifest-*.json`; `extract`'s new
+  `--dataset-version` flag defaults to it (a routine refresh is staged toward
+  a patch bump of the currently-published version unless told otherwise) and
+  is threaded through to every extractor call. `pipelines/validate/report.py`'s
+  `generate()` uses the same default instead of a hardcoded `"0.1.0"`
+  (`docs/backlog.md` #4)
+- [x] Backlog: Orchestration entry point — `extract` gained an `all` source
+  choice that runs every extractor in dependency order (munchstats before
+  pokeapi, so pokeapi's move/ability/item detail fetch has roster names to
+  scope to); new Makefile targets `extract-all`, `refresh` (`extract-all` →
+  `dbt-build` → `validate`), and `release` (`refresh` → `pipelines.cli
+  release`, gated on an explicit `VERSION=X.Y.Z` since picking the next
+  dataset version is a human call), chained the same way `dashboard` already
+  chains `dbt-build` → `build-dashboard` (`docs/backlog.md` #5)
 
 ## Release readiness (v1 definition of done)
 

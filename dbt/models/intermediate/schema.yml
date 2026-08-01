@@ -2,8 +2,24 @@ version: 2
 
 models:
   - name: int_opgg_champions_mapped
-    description: "stg_opgg_champions rows resolved to pokemon_key/pokemon_id. Used by pokemon_stat_champions."
+    description: "int_opgg_champions_latest rows resolved to pokemon_key/pokemon_id. Used by pokemon_stat_champions."
   - name: int_munchstats_deduped
-    description: "stg_munchstats rows with upstream team/placement duplicates collapsed. Shared by tournament_event, tournament_team, and tournament_team_member."
+    description: "int_munchstats_latest rows with upstream team/placement duplicates collapsed. Shared by tournament_event, tournament_team, and tournament_team_member."
   - name: int_pokebase_mapped
-    description: "stg_pokebase rows resolved to pokemon_key/pokemon_id. Used by legality_snapshot."
+    description: "int_pokebase_latest rows resolved to pokemon_key/pokemon_id. Used by legality_snapshot."
+  - name: int_pokeapi_latest
+    description: "stg_pokeapi filtered to its most recent snapshot_date. Used by pokemon and pokemon_stat_canonical. See backlog.md #2 for the staging-history-vs-normalized-latest design."
+  - name: int_pokeapi_move_latest
+    description: "stg_pokeapi_move filtered to its most recent snapshot_date. Used by move_detail."
+  - name: int_pokeapi_ability_latest
+    description: "stg_pokeapi_ability filtered to its most recent snapshot_date. Used by ability_detail."
+  - name: int_pokeapi_item_latest
+    description: "stg_pokeapi_item filtered to its most recent snapshot_date. Used by item_detail."
+  - name: int_opgg_champions_latest
+    description: "stg_opgg_champions filtered to its most recent snapshot_date. Feeds int_opgg_champions_mapped."
+  - name: int_munchstats_latest
+    description: "stg_munchstats filtered to its most recent snapshot_date. Feeds int_munchstats_deduped."
+  - name: int_pokebase_latest
+    description: "stg_pokebase filtered to its most recent snapshot_date. Feeds int_pokebase_mapped."
+  - name: int_bulbagarden_latest
+    description: "stg_bulbagarden filtered to its most recent snapshot_date. Feeds int_bulbagarden_mapped."

@@ -14,6 +14,6 @@ from (
       partition by team_id, slot_number
       order by placement asc, event_id asc
     ) as _dedup_rank
-  from {{ ref('stg_munchstats') }}
+  from {{ ref('int_munchstats_latest') }}
 )
 where _dedup_rank = 1

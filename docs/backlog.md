@@ -29,13 +29,19 @@ Most of the analytics ambition in this repo is gated behind one of two
 things. Individual entries below reference these rather than re-explaining
 them:
 
-**Blocker A — only one `snapshot_date` has ever existed.** Every extractor
-opens its staging CSV with `open(..., "w")` (`pipelines/extract/pokeapi.py:139`
-and the same line in the other four), so each run overwrites the last. There
-is no history to diff against. This is the root cause behind the degenerate
-`dbt/analyses/largest_legal_pool_changes_by_regulation.sql`, the two
-dashboard sections that were cut for permanently showing an empty state, and
-every trend view in `docs/prd.md`'s dashboard ambition. Item #1 fixes it.
+**Blocker A — only one `snapshot_date` has ever existed.** ~~Every extractor
+opens its staging CSV with `open(..., "w")`~~ **Fixed by items #1-#3** (all
+shipped): `pipelines/cli.py`'s `extract` now writes date-partitioned
+snapshots and a `.github/workflows/scheduled-extraction.yml` cron keeps them
+accumulating on the cadences `docs/dataset-spec.md` specifies, and
+`snapshot_date` is a real, queryable dbt dimension (see Section 0 below for
+the full writeup). The blocker's *symptoms* — the degenerate
+`dbt/analyses/largest_legal_pool_changes_by_regulation.sql`, the two cut
+dashboard sections, every trend view in `docs/prd.md`'s ambition — still
+need real multiple-snapshot history to accumulate in production before they
+resolve; the engineering blocker is gone, but the calendar time to build up
+that history isn't. Item #19 revisits the legal-pool-change query once
+enough snapshots exist.
 
 **Blocker B — no Champions rebalance has happened yet.** Every mapped
 Pokémon currently has a `stat_total_delta` of exactly `0` (see
@@ -51,29 +57,29 @@ blocked on the other.
 
 ## Section 0 — Foundational enablers
 
-Small section, outsized leverage. Item #1 in particular unblocks eight other
-entries; almost nothing in the "trend" family is worth starting before it.
+**All five items in this section are shipped** — see `docs/todo.md`'s
+"Foundational enablers (backlog Section 0)" for the implementation writeup.
+Entries kept below per "numbers are stable and never reused."
 
-### 1. Append-only staging snapshot history
+### 1. Append-only staging snapshot history — DONE
 
 - **Size**: XL
 - **Value**: The single highest-leverage item in this file. Turns a
   point-in-time dataset into a time series, which is the difference between
   "what is the meta" and "how is the meta changing."
 - **Blocked by**: nothing
-- **Touches**: all five `pipelines/extract/*.py` modules, `data/staging/`
-  layout, `dbt/models/staging/_sources.yml`, `.gitignore`
+- **Touches**: `pipelines/cli.py` (the extractors' own `extract()` functions
+  didn't need to change — they already just write to whatever `output_path`
+  they're given), `data/staging/` layout, `dbt/models/staging/_sources.yml`,
+  `.gitignore`
 
-Write date-partitioned snapshots (e.g. `data/staging/<source>/<date>.csv`)
-instead of a single overwritten file, and have the dbt staging sources read
-the partition set rather than one path. The staging tree is gitignored and
-`munchstats.csv` alone is ~37MB, so decide a retention policy at the same
-time — `docs/dataset-spec.md`'s refresh policy implies daily checks for
-three of five sources, which accumulates fast. Consider Parquet over CSV for
-the archive, and per-source cadence (PokéAPI weekly, Bulbagarden on-demand)
-rather than snapshotting everything daily.
+Shipped as date-partitioned `data/staging/<source>/<date>.csv` snapshots,
+pruned per source by `pipelines/cli.py`'s `_RETENTION_COUNTS` (12 weekly
+PokéAPI, 14 daily OP.GG/PokéBase, 7 daily MunchStats given its ~37MB/run
+size, 10 on-demand Bulbagarden). Stayed CSV, not Parquet — matches the
+existing schema contracts, no new dependency.
 
-### 2. Snapshot-aware dbt layer
+### 2. Snapshot-aware dbt layer — DONE
 
 - **Size**: L
 - **Value**: Makes `snapshot_date` a real dimension you can group by rather
@@ -82,13 +88,14 @@ rather than snapshotting everything daily.
 - **Touches**: `dbt/models/staging/`, `dbt/models/intermediate/`,
   `dbt/models/normalized/`, `data/normalized/*.schema.json`
 
-Decide the grain question explicitly: do the normalized entities become
-snapshot-scoped (breaking their current primary keys and every referential
-integrity test), or does a parallel history layer sit alongside them? The
-second is far less disruptive. `legality_snapshot` already carries
-`snapshot_date` in its key and is the natural model to follow.
+Went with the parallel-history-layer option this entry flagged as less
+disruptive: `stg_*.sql` now exposes the full unioned history with
+`snapshot_date`, a new `int_*_latest.sql` per source selects the current
+point-in-time snapshot, and the normalized layer's primary keys/referential-
+integrity tests are untouched. Verified against a synthetic two-snapshot
+fixture — see `docs/todo.md` for the walkthrough.
 
-### 3. Scheduled refresh automation
+### 3. Scheduled refresh automation — DONE
 
 - **Size**: M
 - **Value**: `docs/dataset-spec.md` specifies daily/weekly refresh cadences
@@ -99,27 +106,29 @@ second is far less disruptive. `legality_snapshot` already carries
   extractor accumulates nothing)
 - **Touches**: new `.github/workflows/`, `pipelines/cli.py`
 
-Note the caveat already recorded at `pipelines/extract/bulbagarden.py:39-42`:
-Bulbagarden's rate-limiting and ToS posture for sustained automated access
-has never been verified beyond a one-off extract. Sprite art doesn't change
-once posted, so leave that one on-demand.
+Shipped as `.github/workflows/scheduled-extraction.yml`: daily cron for
+OP.GG/MunchStats/PokéBase, weekly for PokéAPI. Bulbagarden stays on-demand
+per the caveat at `pipelines/extract/bulbagarden.py:39-42` (rate-limiting/
+ToS posture for sustained automated access never independently verified).
+`data/staging/` being gitignored (see #1) meant runner-to-runner
+persistence needed `actions/cache` rather than committing snapshots.
 
-### 4. Plumb `dataset_version` through extraction
+### 4. Plumb `dataset_version` through extraction — DONE
 
 - **Size**: S
 - **Value**: Fixes a provenance hole that contradicts the repo's own
   mandatory-provenance convention. Every staging row ever written carries
   `dataset_version = "0.0.0-dev"`.
 - **Blocked by**: nothing
-- **Touches**: `pipelines/cli.py:36-39`, `pipelines/validate/report.py:237`
+- **Touches**: `pipelines/cli.py`, `pipelines/validate/report.py`, new
+  `pipelines/versioning.py`
 
-All five extractors accept a `dataset_version=` kwarg defaulting to
-`"0.0.0-dev"`; `_run_extract` never passes one. Separately,
-`report.generate()` defaults to `dataset_version: str = "0.1.0"` and the CLI
-calls it with no argument, so the validation report is permanently stamped
-`0.1.0` even though `0.2.0` is published.
+Both defaults now resolve via `pipelines/versioning.py`'s
+`latest_published_version()` (highest version under
+`releases/manifests/manifest-*.json`) instead of hardcoded placeholders;
+`extract` also takes an explicit `--dataset-version` override.
 
-### 5. Orchestration entry point
+### 5. Orchestration entry point — DONE
 
 - **Size**: S
 - **Value**: A full refresh is currently five separate commands plus a build
@@ -128,9 +137,10 @@ calls it with no argument, so the validation report is permanently stamped
 - **Blocked by**: nothing
 - **Touches**: `pipelines/cli.py`, `Makefile`
 
-There is no `extract all` and nothing chains extract → dbt build → validate
-→ release. `make dashboard` (dbt-build then build-dashboard) is the only
-chaining that exists today.
+`extract all` runs every source in dependency order; new `make extract-all`,
+`make refresh` (extract-all → dbt-build → validate), and `make release
+VERSION=X.Y.Z` (refresh → release) chain the rest, mirroring `dashboard`'s
+existing `dbt-build` → `build-dashboard` chain.
 
 ---
 
@@ -300,12 +310,18 @@ convention is the honest simplification. Item #25 would make it precise.
 
 ### Blocked on snapshot history (Blocker A)
 
+Items #1-#3 shipped (see Section 0), so the mechanism for this history now
+exists — `data/staging/` accumulates real dated snapshots on a schedule. The
+items below stay "blocked" in practice, not in mechanism: each needs actual
+elapsed time in production for multiple real snapshots to accumulate before
+it has non-degenerate data to work with.
+
 #### 18. Meta-shift and movers view
 
 - **Size**: M
 - **Value**: "What's rising, what's falling, what's new this week" — the
   headline view of any competitive meta report.
-- **Blocked by**: #1, #2
+- **Blocked by**: real multi-snapshot history accumulating now that #1-#3 are live
 - **Touches**: new mart, `pokemon_usage_summary`
 
 Partially approximable today via #6's event-date axis.
@@ -315,7 +331,7 @@ Partially approximable today via #6's event-date axis.
 - **Size**: S once unblocked
 - **Value**: Revives an analysis that already exists and has never returned
   a non-degenerate row.
-- **Blocked by**: #1
+- **Blocked by**: real multi-snapshot history accumulating now that #1-#3 are live
 - **Touches**: `dbt/analyses/largest_legal_pool_changes_by_regulation.sql`,
   `dbt/models/marts/legality_summary_by_regulation.sql`
 
@@ -331,7 +347,7 @@ explicit ban signals would be the real fix.
   an empty state; `docs/dashboard.md` describes re-adding it as "a small,
   self-contained addition" with the removed code recoverable from git
   history.
-- **Blocked by**: #1, #19
+- **Blocked by**: #19
 - **Touches**: `pipelines/dashboard/`, `docs/dashboard/`
 
 ### Blocked on a Champions rebalance (Blocker B)
@@ -467,7 +483,7 @@ distribution.
 - **Size**: M
 - **Value**: The trend views `docs/prd.md` describes and the dashboard has
   never been able to show.
-- **Blocked by**: #1 (or #6 for the event-date variant)
+- **Blocked by**: real multi-snapshot history accumulating (#1-#3 are live; or #6 for the event-date variant)
 - **Touches**: `pipelines/dashboard/templates/`, `static/app.js`
 
 Note the broadcast redesign removed the charting library entirely, so this
@@ -478,7 +494,7 @@ ranked-list components.
 
 - **Size**: S
 - **Value**: One of the three open `docs/todo.md` M6 backlog items.
-- **Blocked by**: #1 or #6
+- **Blocked by**: real multi-snapshot history accumulating (#1-#3 are live) or #6
 - **Touches**: `pipelines/dashboard/static/app.js`
 
 ### 31. Dynamic Streamlit dashboard
@@ -487,8 +503,10 @@ ranked-list components.
 - **Value**: Mirrors the existing `docs/todo.md` M6 backlog item. Would
   build on `pipelines/dashboard/data.py`'s existing mart-loading and KPI
   logic.
-- **Blocked by**: #1 — the item's own stated condition is "once the dataset
-  has enough snapshots/trend data to justify the added hosting complexity"
+- **Blocked by**: real multi-snapshot history accumulating — the item's own
+  stated condition is "once the dataset has enough snapshots/trend data to
+  justify the added hosting complexity"; #1-#3 shipped the mechanism, not
+  the elapsed time
 - **Touches**: new package, `pipelines/dashboard/data.py`
 
 Worth weighing against #28: for a single user, a notebook may deliver most

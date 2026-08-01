@@ -32,6 +32,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pipelines.versioning import latest_published_version
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_TARGET_DIR = REPO_ROOT / "dbt" / "target"
 REPORT_PATH = REPO_ROOT / "reports" / "validation" / "validation_report.json"
@@ -234,9 +236,18 @@ def write_report(report: dict[str, Any], path: Path = REPORT_PATH) -> None:
     path.write_text(json.dumps(report, indent=2) + "\n")
 
 
-def generate(dataset_version: str = "0.1.0", target_dir: Path = DBT_TARGET_DIR) -> dict[str, Any]:
+def generate(
+    dataset_version: str | None = None, target_dir: Path = DBT_TARGET_DIR
+) -> dict[str, Any]:
     """Load dbt's artifacts from a completed `dbt build`/`dbt test` run and
-    write reports/validation/validation_report.json."""
+    write reports/validation/validation_report.json.
+
+    `dataset_version` defaults to the latest published version (see
+    pipelines/versioning.py) rather than a hardcoded placeholder, so the
+    report reflects reality even as new versions are published.
+    """
+    if dataset_version is None:
+        dataset_version = latest_published_version()
     manifest = _load_json(target_dir / "manifest.json")
     run_results = _load_json(target_dir / "run_results.json")
     report = build_report(manifest, run_results, dataset_version)

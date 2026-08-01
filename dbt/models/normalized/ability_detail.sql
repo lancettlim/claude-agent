@@ -10,4 +10,4 @@ select
   source_record_id,
   extracted_at_utc,
   dataset_version
-from {{ ref('stg_pokeapi_ability') }}
+from {{ ref('int_pokeapi_ability_latest') }}

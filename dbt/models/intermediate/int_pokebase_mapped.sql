@@ -12,7 +12,7 @@ select
   source.*,
   pokemon.pokemon_key as resolved_pokemon_key,
   pokemon.pokemon_id as resolved_pokemon_id
-from {{ ref('stg_pokebase') }} source
+from {{ ref('int_pokebase_latest') }} source
 inner join {{ ref('pokebase_slug_to_pokeapi_form') }} seed_map
   on seed_map.pokebase_slug = source.form_name
 inner join {{ ref('pokemon') }} pokemon
