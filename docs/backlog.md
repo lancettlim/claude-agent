@@ -586,7 +586,7 @@ outlived its reason. Pairs with #40.
 - **Touches**: `pipelines/validate/report.py`,
   `reports/validation/validation_report.template.json`
 
-### 38. Don't swallow the `dbt build` return code
+### 38. Don't swallow the `dbt build` return code — DONE
 
 - **Size**: S
 - **Value**: The other correctness hole. `subprocess.run(["dbt", "build"])`
@@ -598,10 +598,14 @@ outlived its reason. Pairs with #40.
 - **Blocked by**: nothing
 - **Touches**: `pipelines/cli.py:41-52`
 
-Distinguish test-failure exits from crash exits, and assert artifact
-freshness before reshaping. Two small nits in the same function: it invokes
-bare `dbt` rather than `uv run dbt` (inconsistent with the Makefile), and
-line 48 is a no-op list copy.
+`_run_validate` now captures the exit code, treats anything outside
+`{0, 1}` as a crash it returns directly (no report generated), and — even
+within `{0, 1}` — refuses to reshape `run_results.json` unless its mtime
+shows it was actually rewritten by this invocation, catching the compile/
+connection-error case the ratio-based gates couldn't see. Also fixed the two
+nits noted here: the subprocess call is now `uv run dbt build` (matches the
+Makefile), and the no-op list copy is gone. See `docs/todo.md`'s "Platform
+hardening" section.
 
 ### 39. Source freshness gate
 

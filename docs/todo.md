@@ -366,6 +366,24 @@ All five are now shipped.
   dataset version is a human call), chained the same way `dashboard` already
   chains `dbt-build` → `build-dashboard` (`docs/backlog.md` #5)
 
+## Platform hardening (backlog Section 3)
+
+- [x] Backlog #38: Don't swallow the `dbt build` return code —
+  `pipelines/cli.py`'s `_run_validate` now captures `dbt build`'s exit code
+  instead of discarding it, and treats an exit code outside `{0, 1}` as an
+  unexpected crash (returned directly, without generating a report). Even
+  for the expected `0`/`1` range, it no longer assumes a `1` means "tests
+  ran and some failed" — it now checks that `dbt/target/run_results.json`
+  was actually rewritten during this invocation (mtime at or after the
+  subprocess call started) before reshaping it into a report, so a compile
+  or connection error that exits non-zero without producing fresh results
+  is refused rather than silently reshaping a stale prior run's artifacts
+  into a false pass. Also switched the subprocess call from bare `dbt` to
+  `uv run dbt` to match the Makefile's invocation, and dropped a no-op list
+  copy (`[f for f in ...]` -> the list itself). New tests in
+  `tests/unit/test_cli.py` cover the clean-pass, gate-failure,
+  unexpected-crash-code, and stale-run_results cases.
+
 ## Release readiness (v1 definition of done)
 
 All release gates pass as of this writing (see
