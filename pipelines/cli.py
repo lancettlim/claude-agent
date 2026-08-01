@@ -24,6 +24,7 @@ import argparse
 import csv
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -159,12 +160,28 @@ def _run_extract(source: str, dataset_version: str) -> int:
 
 
 def _run_validate() -> int:
-    # dbt build exits non-zero when a data test fails, which is an expected
-    # outcome here (a release gate catching bad data) rather than a crash;
-    # the report generated below is what surfaces that failure to the caller.
-    subprocess.run(["dbt", "build"], cwd=DBT_PROJECT_DIR)
+    # dbt build exits non-zero both when a data test fails (an expected
+    # outcome here -- a release gate catching bad data) and when a compile
+    # or connection error aborts the run before writing a fresh
+    # run_results.json. Those two cases must not be treated the same: only
+    # the first one has real results worth reshaping into a report. Guard
+    # against the second by checking that run_results.json was actually
+    # rewritten by this invocation before reading it.
+    run_results_path = DBT_PROJECT_DIR / "target" / "run_results.json"
+    started_at = time.time()
+    result = subprocess.run(["uv", "run", "dbt", "build"], cwd=DBT_PROJECT_DIR)
+    if result.returncode not in (0, 1):
+        print(f"dbt build crashed unexpectedly (exit {result.returncode})", file=sys.stderr)
+        return result.returncode
+    if not run_results_path.exists() or run_results_path.stat().st_mtime < started_at:
+        print(
+            "dbt build did not produce a fresh run_results.json (likely a compile "
+            "or connection error) -- refusing to validate against stale results",
+            file=sys.stderr,
+        )
+        return 1
     generated = report.generate()
-    failing = [f for f in generated["release_blocking_findings"]]
+    failing = generated["release_blocking_findings"]
     if failing:
         print(f"Validation gates failing: {failing}", file=sys.stderr)
         return 1

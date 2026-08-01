@@ -1,4 +1,7 @@
 import csv
+import os
+import subprocess
+import time
 
 from pipelines import cli
 
@@ -166,6 +169,75 @@ def test_main_extract_dataset_version_override(monkeypatch):
 
     assert exit_code == 0
     assert captured == {"source": "opgg", "dataset_version": "9.9.9"}
+
+
+def _run_results_path(dbt_project_dir):
+    return dbt_project_dir / "target" / "run_results.json"
+
+
+def test_run_validate_passes_when_gates_clean(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+
+    def fake_run(cmd, cwd):
+        _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+        _run_results_path(tmp_path).write_text("{}")
+        return subprocess.CompletedProcess(cmd, returncode=0)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.report, "generate", lambda: {"release_blocking_findings": []})
+
+    assert cli._run_validate() == 0
+
+
+def test_run_validate_fails_when_gates_report_findings(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+
+    def fake_run(cmd, cwd):
+        _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
+        _run_results_path(tmp_path).write_text("{}")
+        return subprocess.CompletedProcess(cmd, returncode=1)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(
+        cli.report, "generate", lambda: {"release_blocking_findings": ["pokemon: status=fail"]}
+    )
+
+    assert cli._run_validate() == 1
+
+
+def test_run_validate_propagates_unexpected_dbt_crash_code(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+    calls = []
+
+    def fake_run(cmd, cwd):
+        return subprocess.CompletedProcess(cmd, returncode=2)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.report, "generate", lambda: calls.append("called"))
+
+    assert cli._run_validate() == 2
+    assert calls == []
+
+
+def test_run_validate_refuses_stale_run_results_after_compile_error(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
+    stale_path = _run_results_path(tmp_path)
+    stale_path.parent.mkdir(parents=True, exist_ok=True)
+    stale_path.write_text("{}")
+    # Back-date the stale artifact so it predates _run_validate's start time,
+    # simulating a compile/connection error that exits 1 without rewriting it.
+    old_time = time.time() - 3600
+    os.utime(stale_path, (old_time, old_time))
+    calls = []
+
+    def fake_run(cmd, cwd):
+        return subprocess.CompletedProcess(cmd, returncode=1)
+
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    monkeypatch.setattr(cli.report, "generate", lambda: calls.append("called"))
+
+    assert cli._run_validate() == 1
+    assert calls == []
 
 
 def test_main_extract_accepts_all_choice(monkeypatch):
