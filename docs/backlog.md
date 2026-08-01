@@ -23,10 +23,10 @@ are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 25 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #32, #35, #36, #37, #38, #39, #46, #47 |
+| **Done** | 27 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47 |
 | **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 11 | No blocker, just not started: #15, #16, #29, #30, #33, #40, #41, #42, #43, #44, #48 |
+| **Open, buildable now** | 9 | No blocker, just not started: #15, #16, #29, #30, #41, #42, #43, #44, #48 |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
@@ -38,21 +38,23 @@ By section:
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
-| 2 — Consumption surfaces (#28-#34) | 2 | 1 | 3 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#48) | 7 | 1 | 6 | 0 | 14 |
-| **Total** | **25** | **4** | **11** | **8** | **48** |
+| 2 — Consumption surfaces (#28-#34) | 3 | 1 | 2 | 1 | 7 |
+| 3 — Platform, quality, and ops (#35-#48) | 8 | 1 | 5 | 0 | 14 |
+| **Total** | **27** | **4** | **9** | **8** | **48** |
 
 Takeaways: every item in Section 0 and every "buildable today, no new data
 required" item that isn't genuinely open (#15, #16) or a judgment call
-(#17) is done — that bucket is close to exhausted. This pass closed five
-more items (#28, #34, #37, #39, #47), all quick correctness/consumption
-wins with no blocker. The remaining open work now skews toward Section 3
-(platform/quality hardening, 6 open items: #40-#44, #48) and Section 2
-(#29, #30, #33). The 8 blocked items aren't neglect — 4 are waiting on
-real-world time/events (Blocker A's snapshot history, Blocker B's
-rebalance, #31's snapshot-dependent hosting justification) and 4 need a
-source this repo doesn't have and, in #26/#27's case, may not exist in
-scriptable form at all.
+(#17) is done — that bucket is close to exhausted. This pass closed two
+more items (#33, #40): the GitHub Releases packaging item and the first
+volume-baseline gate the validation report has had, both quick,
+no-blocker wins, one of them (#40) shipping this project's first dbt
+*generic* test in the process. The remaining open work now skews toward
+Section 3 (platform/quality hardening, 5 open items: #41-#44, #48) and
+Section 2 (#29, #30 — both data-unblocked, UI-only). The 8 blocked items
+aren't neglect — 4 are waiting on real-world time/events (Blocker A's
+snapshot history, Blocker B's rebalance, #31's snapshot-dependent hosting
+justification) and 4 need a source this repo doesn't have and, in
+#26/#27's case, may not exist in scriptable form at all.
 
 ## Entry format
 
@@ -681,7 +683,7 @@ of the same value with none of the hosting cost.
 `fetch()`-ing `data.json` — so it keeps working opened directly via
 `file://`, per this module's own docstring.
 
-### 33. GitHub Releases with packaged artifacts
+### 33. GitHub Releases with packaged artifacts — DONE
 
 - **Size**: S
 - **Value**: Consumption today is `git clone` or raw URLs. A zipped release
@@ -689,6 +691,26 @@ of the same value with none of the hosting cost.
   `releases/` already has everything needed.
 - **Blocked by**: nothing (pairs naturally with #35)
 - **Touches**: `pipelines/release/build.py`, `.github/workflows/`
+
+Shipped as new `.github/workflows/publish-release.yml`, triggered by the
+commit that adds a new `releases/manifests/manifest-<version>.json` to
+`main` (diffing `github.event.before`/`after` for added manifest files)
+rather than a git-tag push — this repo has never tagged dataset versions,
+and inventing that convention just to satisfy a workflow trigger would
+have been a bigger change than this item asked for. For each new version
+it zips `releases/data/<version>/` (CSVs + `images/`) together with
+`manifest.json` and `CHANGELOG.md` — matching `CLAUDE.md`'s "Release
+package" contents exactly — writes a `sha256sum` checksum file, and
+publishes both as a GitHub Release tagged `data-v<version>` via `gh
+release create` (no third-party action needed; `gh` is preinstalled on
+GitHub-hosted runners). Also exposed as `workflow_dispatch` with a
+`version` input, to (re-)publish a specific version on demand — deletes
+and recreates the release/tag first for idempotency on rerun. Verified
+end-to-end against the real `releases/data/0.2.0/` (330 files, 11MB zip)
+with a stubbed `gh`: the zip contents and computed checksum both came out
+correct; a synthetic git-history test also confirmed the added-manifest
+diff logic picks up exactly the new version(s) in a push, not
+already-published ones.
 
 ### 34. Pokémon Profile empty state — RESOLVED, current behavior kept
 
@@ -845,7 +867,7 @@ failing check is, while "warn" stays non-blocking. Verified against a real
 `extract all` + `dbt source freshness` run: all seven sources report
 `pass` with real `max_loaded_at`/age values in `validation_report.json`.
 
-### 40. Row-count anomaly detection
+### 40. Row-count anomaly detection — DONE
 
 - **Size**: M
 - **Value**: Every current gate is a ratio or a duplicate count, so a source
@@ -854,6 +876,26 @@ failing check is, while "warn" stays non-blocking. Verified against a real
   case.
 - **Blocked by**: nothing, though #1's history makes baselines far easier
 - **Touches**: `dbt/tests/singular/`, `pipelines/validate/report.py`
+
+Shipped as a new dbt *generic* test — this project's first, per #42's own
+observation that none existed — `dbt/macros/test_row_count_anomaly.sql`,
+applied to each of the seven scheduled sources' `data_tests:` in
+`_sources.yml` (same set freshness already covers; Bulbagarden stays
+exempt for the same on-demand reason). It compares the latest
+`snapshot_date`'s row count against the immediately preceding one (using
+the append-only history #1/#2 already shipped) and fails below 50% of that
+baseline; fewer than two snapshots (fresh clone, or a source extracted
+only once) passes rather than failing vacuously, since there's no baseline
+yet to call an anomaly against — a different case from #36's "present but
+empty" fix, not a regression of it. Wired into
+`pipelines/validate/report.py` as a new `row_count_anomaly_checks`
+category (no hardcoded dict, following #37's meta.category pattern) and
+`reports/validation/validation_report.template.json`. Verified against a
+synthetic two-snapshot fixture (`dbt test -s
+source_row_count_anomaly_staging_pokeapi_`): a 300→50 row drop fails at
+1667bps, a 300→280 normal fluctuation passes, and a single-snapshot source
+passes vacuously — plus a new `test_report.py` unit test for the
+report-shaping side.
 
 ### 41. Schema-drift enforcement
 

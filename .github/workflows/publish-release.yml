@@ -1,0 +1,111 @@
+name: Publish dataset release
+
+# backlog.md #33: releases/data/<version>/ + releases/manifests/
+# manifest-<version>.json + releases/changelogs/CHANGELOG-<version>.md
+# already have everything a release package needs -- consumption today is
+# still just `git clone` or raw file URLs. This workflow zips that trio
+# (matching CLAUDE.md's "Release package" contents: one CSV per core
+# entity, images/, manifest.json, CHANGELOG.md) with a sha256 checksum and
+# publishes it as a citable, verifiable GitHub Release.
+#
+# Triggered by the commit that actually adds a new
+# releases/manifests/manifest-<version>.json (i.e. after `make release
+# VERSION=X.Y.Z` has run, been reviewed, and merged to main) rather than a
+# separate git-tag push -- this repo has never tagged dataset versions, and
+# inventing that convention just to satisfy a workflow trigger would be a
+# bigger change than this item asked for. `gh release create` still mints a
+# real `data-v<version>` tag as part of publishing; the manifest commit is
+# what decides the version, not a human remembering to tag it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "releases/manifests/manifest-*.json"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Dataset version to (re-)publish as a GitHub Release, e.g. 0.2.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine versions to publish
+        id: versions
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.event.after }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            versions="$INPUT_VERSION"
+          elif [ "$BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            echo "::warning::New branch push (no 'before' SHA to diff against) -- skipping. Use workflow_dispatch to publish a specific version."
+            versions=""
+          else
+            versions=$(git diff --name-only --diff-filter=A "$BEFORE_SHA" "$AFTER_SHA" -- 'releases/manifests/manifest-*.json' \
+              | sed -E 's#releases/manifests/manifest-(.*)\.json#\1#' | sort -u)
+          fi
+          {
+            echo "versions<<EOF"
+            echo "$versions"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Package and publish each new version
+        if: steps.versions.outputs.versions != ''
+        env:
+          VERSIONS: ${{ steps.versions.outputs.versions }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r version; do
+            [ -z "$version" ] && continue
+
+            data_dir="releases/data/$version"
+            manifest="releases/manifests/manifest-$version.json"
+            changelog="releases/changelogs/CHANGELOG-$version.md"
+
+            if [ ! -d "$data_dir" ] || [ ! -f "$manifest" ]; then
+              echo "::warning::releases/data/$version or $manifest missing, skipping."
+              continue
+            fi
+
+            work=$(mktemp -d)
+            pkg="pokemon-champions-dataset-$version"
+            mkdir -p "$work/$pkg"
+            cp -r "$data_dir"/. "$work/$pkg/"
+            cp "$manifest" "$work/$pkg/manifest.json"
+            if [ -f "$changelog" ]; then
+              cp "$changelog" "$work/$pkg/CHANGELOG.md"
+            fi
+
+            (cd "$work" && zip -rq "$pkg.zip" "$pkg")
+            (cd "$work" && sha256sum "$pkg.zip" > "$pkg.sha256")
+
+            tag="data-v$version"
+            gh release delete "$tag" --yes --cleanup-tag 2>/dev/null || true
+            notes_args=()
+            if [ -f "$changelog" ]; then
+              notes_args=(--notes-file "$changelog")
+            else
+              notes_args=(--notes "Dataset version $version. See releases/manifests/manifest-$version.json for details.")
+            fi
+            gh release create "$tag" \
+              "$work/$pkg.zip" \
+              "$work/$pkg.sha256" \
+              --title "Dataset v$version" \
+              --target "$GITHUB_SHA" \
+              "${notes_args[@]}"
+
+            rm -rf "$work"
+          done <<< "$VERSIONS"

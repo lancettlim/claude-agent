@@ -157,6 +157,7 @@ def build_report(
     null_rate_checks = []
     duplicate_key_checks = []
     referential_integrity_checks = []
+    row_count_anomaly_checks = []
     uncategorized_checks = []
 
     for node, result in _test_nodes_with_results(manifest, run_results):
@@ -200,6 +201,15 @@ def build_report(
                     "violation_count": result["failures"] if result else None,
                 }
             )
+        elif category == "row_count_anomaly" and "source_name" in meta:
+            row_count_anomaly_checks.append(
+                {
+                    "source_name": meta["source_name"],
+                    "metric_value": _ratio_from_bps(result),
+                    "threshold": ">=0.5x previous snapshot",
+                    "status": status,
+                }
+            )
         else:
             uncategorized_checks.append(
                 {
@@ -213,6 +223,7 @@ def build_report(
     null_rate_checks.sort(key=lambda c: c["table_name"])
     duplicate_key_checks.sort(key=lambda c: c["table_name"])
     referential_integrity_checks.sort(key=lambda c: c["check_name"])
+    row_count_anomaly_checks.sort(key=lambda c: c["source_name"])
     uncategorized_checks.sort(key=lambda c: c["test_name"])
 
     release_blocking_findings = [
@@ -223,6 +234,7 @@ def build_report(
             *null_rate_checks,
             *duplicate_key_checks,
             *referential_integrity_checks,
+            *row_count_anomaly_checks,
             *uncategorized_checks,
             *freshness_checks,
         )
@@ -236,6 +248,7 @@ def build_report(
         "null_rate_checks": null_rate_checks,
         "duplicate_key_checks": duplicate_key_checks,
         "referential_integrity_checks": referential_integrity_checks,
+        "row_count_anomaly_checks": row_count_anomaly_checks,
         "uncategorized_checks": uncategorized_checks,
         "freshness_checks": freshness_checks,
         "release_blocking_findings": release_blocking_findings,

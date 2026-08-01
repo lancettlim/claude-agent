@@ -184,6 +184,42 @@ def test_build_report_folds_freshness_failures_into_release_blocking_findings():
     assert "munchstats: status=fail" in result["release_blocking_findings"]
 
 
+def test_build_report_categorizes_row_count_anomaly_checks():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.source_row_count_anomaly_staging_munchstats.abc123": (
+                _manifest_node(
+                    "source_row_count_anomaly_staging_munchstats",
+                    {"category": "row_count_anomaly", "source_name": "munchstats"},
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.source_row_count_anomaly_staging_munchstats.abc123",
+                "fail",
+                2000,
+            ),
+        ]
+    }
+
+    result = report.build_report(manifest, run_results, dataset_version="0.1.0")
+    template = _template()
+
+    assert set(result) == set(template)
+    assert result["row_count_anomaly_checks"] == [
+        {
+            "source_name": "munchstats",
+            "metric_value": 0.2,
+            "threshold": ">=0.5x previous snapshot",
+            "status": "fail",
+        }
+    ]
+    assert "munchstats: status=fail" in result["release_blocking_findings"]
+
+
 def test_build_report_routes_unrecognized_test_to_uncategorized():
     """A test with no meta.category (e.g. a newly-added test nobody tagged
     yet) must still surface and be able to block a release -- it must not
