@@ -44,6 +44,8 @@ def _populate_marts(marts_dir, normalized_dir):
                 "total_losses": "5",
                 "win_rate": "0.6667",
                 "record_count": "15",
+                "wilson_lower_bound": "0.41",
+                "wilson_rank": "1",
             }
         ],
     )
@@ -125,11 +127,31 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     assert (output_dir / "index.html").exists()
     for script_name in ("app.js", "matchup.js", "teams.js"):
         assert (output_dir / script_name).exists()
-        assert (output_dir / script_name).read_bytes() == (build.STATIC_DIR / script_name).read_bytes()
+        assert (output_dir / script_name).read_bytes() == (
+            build.STATIC_DIR / script_name
+        ).read_bytes()
 
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     embedded = _embedded_payload(html)
     assert embedded["kpis"]["distinct_pokemon_used"] == payload["kpis"]["distinct_pokemon_used"]
+
+
+def test_build_writes_json_feed_matching_embedded_payload(tmp_path):
+    # backlog.md #32: data.json is a sibling of the same payload baked into
+    # index.html's window.DASHBOARD_DATA, so the data is scriptable without
+    # re-running dbt or scraping the HTML.
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    output_dir = tmp_path / "out"
+    _populate_marts(marts_dir, normalized_dir)
+
+    payload = _build(marts_dir, normalized_dir, output_dir)
+
+    assert (output_dir / "data.json").exists()
+    from_json = json.loads((output_dir / "data.json").read_text(encoding="utf-8"))
+    html = (output_dir / "index.html").read_text(encoding="utf-8")
+    embedded = _embedded_payload(html)
+    assert from_json == embedded == payload
     assert "Pikachu" in html
 
 

@@ -211,5 +211,12 @@ def build(
     (output_dir / "index.html").write_text(html, encoding="utf-8")
     for script_name in ("app.js", "matchup.js", "teams.js"):
         shutil.copyfile(STATIC_DIR / script_name, output_dir / script_name)
+    # backlog.md #32: a sibling JSON feed of the same payload baked into
+    # index.html's window.DASHBOARD_DATA, so the data is scriptable (e.g.
+    # `curl | jq`, a notebook) without re-running dbt or scraping the HTML.
+    # index.html stays the inline-data version (not a fetch() of this file)
+    # so it keeps working opened directly via file://, per this module's
+    # docstring.
+    (output_dir / "data.json").write_text(json.dumps(payload, default=str), encoding="utf-8")
 
     return payload

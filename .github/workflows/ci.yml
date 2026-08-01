@@ -1,0 +1,59 @@
+name: CI
+
+# backlog.md #35: `make check` (lint + test + dbt build + validate) existed
+# but nothing ran it automatically -- this is the first workflow to do so.
+#
+# lint/test are pure Python and always run: no network, no dependency on
+# any prior extraction. dbt-build/validate need data/staging/*.csv, which
+# is gitignored (backlog.md #1) and not committed, so this workflow
+# restores the same actions/cache scheduled-extraction.yml populates
+# (read-only, via actions/cache/restore -- CI doesn't run extraction
+# itself, so it never adds a new cache entry or hits any external source)
+# instead of re-extracting on every push. On a fresh repo/fork with no
+# scheduled-extraction run yet, the cache restore is a no-op and the
+# dbt-build/validate step is skipped rather than failing the whole job.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint
+        run: make lint
+
+      - name: Test
+        run: make test
+
+      - name: Restore staging snapshot history
+        uses: actions/cache/restore@v4
+        with:
+          path: data/staging
+          key: staging-snapshots-ci-noop
+          restore-keys: |
+            staging-snapshots-
+
+      - name: dbt build + validate (if cached staging snapshots exist)
+        run: |
+          set -euo pipefail
+          if find data/staging -mindepth 2 -name '*.csv' -print -quit | grep -q .; then
+            make dbt-build
+            make validate
+          else
+            echo "No cached staging snapshots restored (fresh repo/fork, or scheduled-extraction hasn't run yet) -- skipping dbt-build/validate."
+          fi

@@ -26,6 +26,8 @@ def test_load_mart_coerces_numeric_fields(tmp_path):
                 "total_losses": "5",
                 "win_rate": "0.6667",
                 "record_count": "15",
+                "wilson_lower_bound": "0.4",
+                "wilson_rank": "1",
             }
         ],
     )
@@ -37,6 +39,8 @@ def test_load_mart_coerces_numeric_fields(tmp_path):
             "total_losses": 5,
             "win_rate": 0.6667,
             "record_count": 15,
+            "wilson_lower_bound": 0.4,
+            "wilson_rank": 1,
         }
     ]
 
