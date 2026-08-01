@@ -544,10 +544,33 @@ user-adjustable), the competitive-UX redesign pass added:
   `App.inRange(value, minEl, maxEl)`): usage % and Speed on Usage; Speed on
   Speed Tiers. An empty min or max on either side means unbounded on that
   side.
+- **Tournament date filter** (Usage tab's Trends subtab,
+  `#usage-trend-date-filter`, backlog #30): a plain `<select>` of every
+  distinct `pokemon_usage_by_event_date.event_date`, most recent first and
+  selected by default — not routed through `fillSelect()`'s usual "All"
+  option, since an unfiltered/all-dates view doesn't make sense for a
+  single-date usage snapshot.
 
 The Archetype/Regulation-as-tabs pattern this section used to describe no
 longer applies — both tabs were removed (see "Removed tabs and
 components" above).
+
+### Trend delta badge (Usage tab's Trends subtab)
+
+Backlog #29's dependency-free stand-in for a line chart: rather than
+reintroducing Chart.js (removed in the broadcast redesign, see "6-wide
+grid" above), each Pokémon's row shows its `usage_share` change versus the
+*previous* tournament date in `pokemon_usage_by_event_date` (not a fixed
+time window) as a `.badge-positive`/`.badge-negative` pill (`▲ +2.1pp` /
+`▼ -0.8pp`, reusing the existing `--positive`/`--danger` tokens — no new
+color pair needed) or `.badge-new` (`--warning`-toned) when the Pokémon
+has no row on the previous date at all. `.grid-6xn`'s `subFn` shows the
+same label as plain text (escaped, so no colored badge there — grids only
+support the two-line label/value/sub structure); the leaderboard table's
+`Change` column renders the full colored badge. A Pokémon with no
+*earlier* date to compare against (the very first tournament date on
+record) shows neither — `usage_share_delta` and `is_new` are both
+unset/false, which renders as `—`.
 
 ## Team Builder
 

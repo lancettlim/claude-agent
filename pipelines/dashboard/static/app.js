@@ -621,10 +621,123 @@
     if (minRecordSelect) minRecordSelect.addEventListener("change", updateWinRows);
     updateWinRows();
 
+    setupUsageTrends();
+
     setupSubTabs(
       document.querySelectorAll('.tab-panel[data-panel="usage"] .subtab-btn'),
       document.querySelectorAll('.tab-panel[data-panel="usage"] .subtab-panel')
     );
+  }
+
+  // Usage-by-tournament-date subtab (backlog #6's data half; #29/#30's UI
+  // half): a date filter (#30) plus a "vs. the previous tournament date"
+  // delta per Pokémon (#29's dependency-free stand-in for a line chart —
+  // this dashboard has no charting library, see the module docstring
+  // above). event_date is a tournament date, not an extraction
+  // snapshot_date, so this trend is real even with only one snapshot's
+  // worth of staging history.
+  function trendDeltaLabel(row) {
+    if (row.is_new) return "NEW";
+    if (row.usage_share_delta === null || row.usage_share_delta === undefined) return "";
+    var points = row.usage_share_delta * 100;
+    var arrow = points > 0 ? "▲" : points < 0 ? "▼" : "";
+    var sign = points > 0 ? "+" : "";
+    return arrow + " " + sign + points.toFixed(1) + "pp";
+  }
+
+  function trendDeltaBadgeHtml(row) {
+    if (row.is_new) return '<span class="badge badge-new">NEW</span>';
+    if (row.usage_share_delta === null || row.usage_share_delta === undefined) return "—";
+    var points = row.usage_share_delta * 100;
+    var cls = points > 0 ? "badge-positive" : points < 0 ? "badge-negative" : "badge-rank";
+    return '<span class="badge ' + cls + '">' + escapeHtml(trendDeltaLabel(row)) + "</span>";
+  }
+
+  function setupUsageTrends() {
+    var trendRows = marts.pokemon_usage_by_event_date || [];
+    var dateSelect = document.getElementById("usage-trend-date-filter");
+    var grid = document.getElementById("usage-trend-grid");
+    var table = document.getElementById("usage-trend-table");
+    var dates = distinctSorted(trendRows, "event_date").slice().reverse(); // most recent first
+
+    var tableSortable = table
+      ? makeSortableTable(
+          table,
+          [],
+          function (r) {
+            return (
+              '<td><span class="badge badge-rank">#' + r.usage_rank + "</span></td>" +
+              "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
+              "<td>" + formatPercent(r.usage_share) + "</td>" +
+              "<td>" + trendDeltaBadgeHtml(r) + "</td>"
+            );
+          },
+          { defaultKey: "usage_rank", defaultDir: "asc" }
+        )
+      : null;
+
+    function rowsForDate(date) {
+      var dateIndex = dates.indexOf(date);
+      var prevDate = dateIndex >= 0 && dateIndex < dates.length - 1 ? dates[dateIndex + 1] : null;
+      var prevByKey = {};
+      if (prevDate) {
+        trendRows.forEach(function (r) {
+          if (r.event_date === prevDate) prevByKey[r.pokemon_key] = r;
+        });
+      }
+      // No prevDate at all (the earliest tournament date on record) means
+      // there is nothing to compare against, full stop -- distinct from a
+      // specific Pokémon genuinely being new as of `date`, which only
+      // applies once a prevDate exists to have been absent from.
+      return trendRows
+        .filter(function (r) {
+          return r.event_date === date;
+        })
+        .map(function (r) {
+          var prev = prevByKey[r.pokemon_key];
+          return {
+            pokemon_key: r.pokemon_key,
+            pokemon_name: r.pokemon_name,
+            usage_rank: r.usage_rank,
+            usage_share: r.usage_share,
+            usage_share_delta: prev ? r.usage_share - prev.usage_share : null,
+            is_new: !!prevDate && !prev,
+          };
+        })
+        .sort(function (a, b) {
+          return a.usage_rank - b.usage_rank;
+        });
+    }
+
+    function drawTrend() {
+      var date = dateSelect ? dateSelect.value : dates[0];
+      var rows = rowsForDate(date);
+      renderGrid6xn(grid, rows.slice(0, 18), {
+        keyFn: function (r) {
+          return r.pokemon_key;
+        },
+        labelFn: function (r) {
+          return r.pokemon_name;
+        },
+        displayFn: function (r) {
+          return formatPercent(r.usage_share);
+        },
+        subFn: trendDeltaLabel,
+      });
+      if (tableSortable) tableSortable.setRows(rows.slice(0, 30));
+    }
+
+    if (dateSelect) {
+      dateSelect.innerHTML = "";
+      dates.forEach(function (date) {
+        var opt = document.createElement("option");
+        opt.value = date;
+        opt.textContent = date;
+        dateSelect.appendChild(opt);
+      });
+      dateSelect.addEventListener("change", drawTrend);
+    }
+    drawTrend();
   }
 
   // Pokémon Profile: one Pokémon-centric view combining base stats + type,

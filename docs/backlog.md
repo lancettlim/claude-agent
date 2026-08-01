@@ -16,17 +16,17 @@ stable and never reused** — a completed or dropped item keeps its number.
 
 ## Progress overview
 
-*Last updated 2026-08-01.* 48 numbered items exist (#1-#48, none dropped).
+*Last updated 2026-08-01.* 49 numbered items exist (#1-#49, none dropped).
 This table is maintained by hand alongside each grooming/implementation
 pass — if it drifts from the per-item statuses below, the per-item entries
 are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 27 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47 |
+| **Done** | 29 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47 |
 | **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 9 | No blocker, just not started: #15, #16, #29, #30, #41, #42, #43, #44, #48 |
+| **Open, buildable now** | 8 | No blocker, just not started: #15, #16, #41, #42, #43, #44, #48, #49 |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
@@ -38,22 +38,23 @@ By section:
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
-| 2 — Consumption surfaces (#28-#34) | 3 | 1 | 2 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#48) | 8 | 1 | 5 | 0 | 14 |
-| **Total** | **27** | **4** | **9** | **8** | **48** |
+| 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
+| 3 — Platform, quality, and ops (#35-#49) | 8 | 1 | 6 | 0 | 15 |
+| **Total** | **29** | **4** | **8** | **8** | **49** |
 
 Takeaways: every item in Section 0 and every "buildable today, no new data
 required" item that isn't genuinely open (#15, #16) or a judgment call
-(#17) is done — that bucket is close to exhausted. This pass closed two
-more items (#33, #40): the GitHub Releases packaging item and the first
-volume-baseline gate the validation report has had, both quick,
-no-blocker wins, one of them (#40) shipping this project's first dbt
-*generic* test in the process. The remaining open work now skews toward
-Section 3 (platform/quality hardening, 5 open items: #41-#44, #48) and
-Section 2 (#29, #30 — both data-unblocked, UI-only). The 8 blocked items
-aren't neglect — 4 are waiting on real-world time/events (Blocker A's
-snapshot history, Blocker B's rebalance, #31's snapshot-dependent hosting
-justification) and 4 need a source this repo doesn't have and, in
+(#17) is done — that bucket is close to exhausted. Section 2 (Consumption
+surfaces) is now fully closed out except the one genuinely blocked item
+(#31). This pass closed four more items (#29, #30, #33, #40) and added
+one new, precisely-scoped item (#49 — a real correctness gap in the
+validation report's bps-based metrics, discovered while verifying #29/#30
+against a real data run, not shipped-but-hidden). The remaining open work
+now skews toward Section 3 (platform/quality hardening, 6 open items:
+#41-#44, #48, #49). The 8 blocked items aren't neglect — 4 are waiting on
+real-world time/events (Blocker A's snapshot history, Blocker B's
+rebalance, #31's snapshot-dependent hosting justification) and 4 need a
+source this repo doesn't have and, in
 #26/#27's case, may not exist in scriptable form at all.
 
 ## Entry format
@@ -626,7 +627,7 @@ build concentration) surface marts that still aren't wired into the
 dashboard UI at all, so this doc is currently the only way to see their
 output.
 
-### 29. Trend and line charts in the dashboard — data half unblocked, UI still open
+### 29. Trend and line charts in the dashboard — DONE, event-date variant
 
 - **Size**: M
 - **Value**: The trend views `docs/prd.md` describes and the dashboard has
@@ -643,7 +644,26 @@ Note the broadcast redesign removed the charting library entirely, so this
 means either reintroducing a dependency or extending the dependency-free
 ranked-list components.
 
-### 30. Tournament and date filter — data half unblocked, UI still open
+Shipped the event-date variant as the Usage tab's new **Trends** subtab
+(combined with #30 below, since both landed in the same date-filtered
+view): took the "extend the dependency-free components" branch rather
+than reintroducing a charting dependency, per this entry's own note. Each
+Pokémon's row shows its `usage_share` *change* versus the immediately
+preceding tournament date (not a fixed time window) as a colored `▲/▼
+Npp` badge, or a `NEW` badge for a Pokémon absent from that previous
+date — new `.badge-positive`/`.badge-negative`/`.badge-new` variants
+reusing the already-defined `--positive`/`--danger`/`--warning` tokens (no
+new color pair needed). A Pokémon on the *very first* tournament date on
+record shows neither (no prior date exists at all, a different case from
+a specific Pokémon being new) — see `docs/design-system.md`'s new "Trend
+delta badge" entry. Verified against a real `extract all` + `dbt build` +
+`build-dashboard` run: 26 real tournament dates, correct deltas/NEW badges
+at a mid-range date, and all "—" (no false NEW badges) at the earliest
+date, with zero browser console errors. The snapshot-date variant (real
+multi-extraction history, not tournament dates) is still open, gated on
+Blocker A's elapsed time as before.
+
+### 30. Tournament and date filter — DONE
 
 - **Size**: S
 - **Value**: One of the three open `docs/todo.md` M6 backlog items.
@@ -651,6 +671,13 @@ ranked-list components.
   live) or #6~~ #6 shipped; a real `event_date` dimension exists to filter
   by now (`pokemon_usage_by_event_date`). Not yet built.
 - **Touches**: `pipelines/dashboard/static/app.js`
+
+Shipped as `#usage-trend-date-filter` in the same Trends subtab #29 added:
+a plain `<select>` of every distinct `pokemon_usage_by_event_date.
+event_date`, most recent first and selected by default. Deliberately not
+routed through the shared `fillSelect()` helper (which always prepends an
+"All" option) — an unfiltered/all-dates view doesn't mean anything for a
+per-date usage snapshot, so the select only ever offers real dates.
 
 ### 31. Dynamic Streamlit dashboard
 
@@ -1033,6 +1060,48 @@ unchanged.
 - **Touches**: `pipelines/extract/`, `reports/validation/`
 
 Prerequisite for any real monitoring, and directly supports #40's baselines.
+
+### 49. Bps-based validation-report metrics read as 0 on a passing check
+
+- **Size**: S
+- **Value**: A real, previously-undetected correctness gap in the
+  validation report and every release manifest's `quality_checks` block —
+  discovered in this pass while verifying #29/#30 against a real
+  `extract all` + `dbt build` + `validate` run, not a hypothetical.
+- **Blocked by**: nothing
+- **Touches**: `pipelines/validate/report.py` (`_ratio_from_bps`),
+  `dbt/tests/singular/*.sql`'s `fail_calc`-based tests
+
+Every coverage/null-rate/row-count-anomaly check reports its ratio via a
+`fail_calc` override in basis points (the `assert_opgg_legal_pool_coverage.
+sql`-style pattern documented in `report.py`'s own module docstring).
+`_ratio_from_bps` assumes dbt's `run_results.json` always carries that
+computed value in `failures`, regardless of pass/fail — true when a check
+fails, **false when it passes**: dbt-core's `TestRunner.build_test_run_
+result` (`dbt/task/test.py`) hardcodes `failures = 0` on the `TestStatus.
+Pass` branch and only assigns `result.failures` (the real fail_calc value)
+on the `Fail`/`Warn` branches. Confirmed directly against a real run: every
+passing coverage/null-rate/row-count-anomaly check in a real `validation_
+report.json` shows `metric_value: 0.0` (e.g. `opgg_legal_pool_coverage`
+status `pass` but metric `0.0`, not the real ~0.95+), even though the
+gating decision itself (`status`) is unaffected and correctly computed
+dbt-side — **no release has ever shipped on a false pass**, but every
+published manifest's `quality_checks` numbers for these checks have been
+wrong since the ratio pattern was introduced.
+
+Not a one-line fix: dbt gives no way to recover the real fail_calc value
+on the passing path through `run_results.json` alone (confirmed by reading
+`build_test_run_result`'s source directly, not assumed). The real fix has
+to re-derive the value independently of dbt's pass/fail bookkeeping —
+e.g. re-executing each bps test's already-compiled SQL (`run_results.json`
+results already carry `compiled_code` per test) directly against
+`dbt/data/warehouse.duckdb` from `report.py`, since that query is
+deterministic and re-running it recovers the true ratio regardless of
+status. Left as an open, precisely-scoped item rather than attempted
+in-place, since it needs a DuckDB read path `report.py` doesn't have today
+and careful handling of `compiled_code`'s relative `external_location`
+paths (resolved relative to dbt's own working directory) — a rushed fix
+risked getting those subtly wrong.
 
 ---
 

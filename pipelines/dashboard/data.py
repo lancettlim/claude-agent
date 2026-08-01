@@ -61,6 +61,7 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("record_wins", "record_losses", "placement", "team_rank"),
         ("win_rate",),
     ),
+    "pokemon_usage_by_event_date": (("usage_count", "usage_rank"), ("usage_share",)),
 }
 
 

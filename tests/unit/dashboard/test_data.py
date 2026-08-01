@@ -186,6 +186,31 @@ def test_load_mart_coerces_team_core_usage_fields(tmp_path):
     ]
 
 
+def test_load_mart_coerces_usage_by_event_date_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_usage_by_event_date.csv",
+        [
+            {
+                "pokemon_key": "incineroar",
+                "event_date": "2026-07-01",
+                "usage_count": "40",
+                "usage_share": "0.4",
+                "usage_rank": "1",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_usage_by_event_date")
+    assert rows == [
+        {
+            "pokemon_key": "incineroar",
+            "event_date": "2026-07-01",
+            "usage_count": 40,
+            "usage_share": 0.4,
+            "usage_rank": 1,
+        }
+    ]
+
+
 def test_load_mart_coerces_legality_cumulative_field(tmp_path):
     _write_csv(
         tmp_path / "legality_summary_by_regulation.csv",
