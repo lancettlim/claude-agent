@@ -214,6 +214,15 @@
       "violation_count": null
     }
   ],
+  "row_count_anomaly_checks": [
+    {"source_name": "munchstats", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "opgg_champions", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "pokeapi", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "pokeapi_ability", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "pokeapi_item", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "pokeapi_move", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"},
+    {"source_name": "pokebase", "metric_value": null, "threshold": ">=0.5x previous snapshot", "status": "pending"}
+  ],
   "uncategorized_checks": [],
   "freshness_checks": [
     {"source_name": "pokeapi", "status": "pending", "max_loaded_at": null, "age_hours": null},

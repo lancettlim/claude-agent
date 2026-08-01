@@ -448,6 +448,20 @@ All five are now shipped.
   top-level `*.png` files it owns, leaving sibling subdirectories alone
   regardless of call order. New regression test confirms a pre-populated
   icons subdirectory survives a `copy_sprites` call.
+- [x] Backlog #40: Row-count anomaly detection — new dbt *generic* test
+  (this project's first — see backlog #42's own "not a single generic
+  test" observation), `dbt/macros/test_row_count_anomaly.sql`, applied to
+  each of the seven scheduled sources in `_sources.yml`'s `data_tests:`.
+  Compares the latest `snapshot_date`'s row count against the immediately
+  preceding one and fails below 50% of that baseline — the volume-drop
+  case (e.g. 106,000 rows to 500) that #36's zero-row gate can't see.
+  Fewer than two snapshots passes rather than failing vacuously, since
+  there's no baseline yet, not an outage. Wired into
+  `pipelines/validate/report.py` as a new `row_count_anomaly_checks`
+  category via the same `meta.category` mechanism #37 introduced. Verified
+  against a synthetic two-snapshot fixture: a 300→50 drop fails at
+  1667bps, a 300→280 fluctuation passes, and a single-snapshot source
+  passes.
 
 ## Consumption surfaces (backlog Section 2)
 
@@ -463,6 +477,19 @@ All five are now shipped.
   state, matching every other tab's "show ranked content immediately"
   convention. Documented in `docs/design-system.md`'s new "Default
   selection, not an empty state (Pokémon Profile)" subsection.
+- [x] Backlog #33: GitHub Releases with packaged artifacts — new
+  `.github/workflows/publish-release.yml`, triggered by the commit that
+  adds a new `releases/manifests/manifest-<version>.json` to `main` (not a
+  separate git-tag push, which this repo has never used for dataset
+  versions). Zips `releases/data/<version>/` (CSVs + `images/`) with
+  `manifest.json` and `CHANGELOG.md` — matching `CLAUDE.md`'s "Release
+  package" contents — writes a `sha256sum` checksum file, and publishes
+  both as a `data-v<version>`-tagged GitHub Release via `gh release
+  create` (preinstalled on GitHub-hosted runners, no third-party action).
+  Also runnable via `workflow_dispatch` to (re-)publish a specific
+  version. Verified end-to-end against the real `releases/data/0.2.0/`
+  (330 files, 11MB zip) with a stubbed `gh` binary, and the added-manifest
+  diff logic against a synthetic git history.
 
 ## Analytics depth (backlog Section 1, "buildable today")
 
