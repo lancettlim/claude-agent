@@ -33,6 +33,8 @@ from pathlib import Path
 
 import requests
 
+from pipelines.extract.http import get_with_retry
+
 SOURCE_NAME = "OP.GG Pokémon Champions"
 PAGE_URL = "https://op.gg/pokemon-champions/pokedex"
 DEFAULT_DATASET_VERSION = "0.0.0-dev"
@@ -66,8 +68,7 @@ _ARRAY_MARKER = '\\"pokemon\\":['
 
 
 def _fetch_page_html(session: requests.Session) -> str:
-    response = session.get(PAGE_URL, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, PAGE_URL, timeout=30)
     return response.text
 
 

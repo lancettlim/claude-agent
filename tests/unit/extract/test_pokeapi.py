@@ -3,6 +3,7 @@ import csv
 import requests
 
 from pipelines.extract import pokeapi
+from pipelines.extract import http as extract_http
 
 
 class _FakeResponse:
@@ -457,7 +458,7 @@ def test_extract_abilities_skips_unresolvable_ability_name(tmp_path):
 
 
 def test_extract_moves_retries_transient_error_then_succeeds(tmp_path, monkeypatch):
-    monkeypatch.setattr(pokeapi.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
     payloads = {"thunderbolt": _move_payload(85, "thunderbolt")}
     session = _FakeSession(payloads, flaky_names={"thunderbolt": 2})
     output_path = tmp_path / "pokeapi_move.csv"
@@ -472,7 +473,7 @@ def test_extract_moves_retries_transient_error_then_succeeds(tmp_path, monkeypat
 
 
 def test_extract_moves_gives_up_after_persistent_transient_error(tmp_path, monkeypatch):
-    monkeypatch.setattr(pokeapi.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
     payloads = {"thunderbolt": _move_payload(85, "thunderbolt")}
     # Always fails (more failures than retry attempts) — should be skipped,
     # not crash the whole extraction.

@@ -23,10 +23,10 @@ are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 30 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47, #49 |
+| **Done** | 31 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #43, #46, #47, #49 |
 | **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 7 | No blocker, just not started: #15, #16, #41, #42, #43, #44, #48 |
+| **Open, buildable now** | 6 | No blocker, just not started: #15, #16, #41, #42, #44, #48 |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
@@ -39,21 +39,25 @@ By section:
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
 | 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#49) | 9 | 1 | 5 | 0 | 15 |
-| **Total** | **30** | **4** | **7** | **8** | **49** |
+| 3 — Platform, quality, and ops (#35-#49) | 10 | 1 | 4 | 0 | 15 |
+| **Total** | **31** | **4** | **6** | **8** | **49** |
 
 Takeaways: every item in Section 0 and every "buildable today, no new data
 required" item that isn't genuinely open (#15, #16) or a judgment call
 (#17) is done — that bucket is close to exhausted. Section 2 (Consumption
 surfaces) is now fully closed out except the one genuinely blocked item
-(#31). This pass closed #49 — the real correctness gap in the validation
-report's bps-based metrics found while verifying #29/#30 in the previous
-pass — by re-executing each bps test's own compiled SQL against the built
-warehouse instead of trusting dbt-core's `run_results.json`, which
+(#31). This pass closed #43 — a shared retry-with-exponential-backoff
+helper (`pipelines/extract/http.py`) applied to every raw HTTP call across
+all five extractors, so a single transient failure (a 5xx, a dropped
+connection, a timeout) no longer aborts an entire extraction run with no
+output at all; a prior pass had already closed #49, the real correctness
+gap in the validation report's bps-based metrics found while verifying
+#29/#30, by re-executing each bps test's own compiled SQL against the
+built warehouse instead of trusting dbt-core's `run_results.json`, which
 (confirmed directly against a real `extract all` + `dbt build` + `validate`
 run) only reports the true value on the failing path. The remaining open
-work now skews toward Section 3 (platform/quality hardening, 5 open items:
-#41-#44, #48). The 8 blocked items aren't neglect — 4 are waiting on
+work now skews toward Section 3 (platform/quality hardening, 4 open items:
+#41, #42, #44, #48). The 8 blocked items aren't neglect — 4 are waiting on
 real-world time/events (Blocker A's snapshot history, Blocker B's
 rebalance, #31's snapshot-dependent hosting justification) and 4 need a
 source this repo doesn't have and, in
@@ -956,7 +960,7 @@ no `unique`, `not_null`, `relationships`, or `accepted_values` anywhere.
 Everything is bespoke SQL, which is a lot of surface for tests that generics
 would cover in one line.
 
-### 43. Extractor resilience
+### 43. Extractor resilience — DONE (retry/backoff; rate limiting still open)
 
 - **Size**: M
 - **Value**: No retry, backoff, or rate limiting anywhere. `pokeapi.py`
@@ -965,6 +969,30 @@ would cover in one line.
   Becomes materially more important once #3 runs extraction unattended.
 - **Blocked by**: nothing
 - **Touches**: all five `pipelines/extract/*.py`
+
+Shipped as a new shared `pipelines/extract/http.py`, `get_with_retry`:
+retries a transient failure (connection error, timeout, or a 5xx response)
+up to three times with exponential backoff (2s, 4s), and fails immediately
+on a 4xx — retrying a client error just burns the backoff window on a
+request that will never succeed. Applied to every raw `session.get(...)`
+call in all five extractors, including the two that had none at all
+before this pass: `pokeapi.py`'s `_fetch_pokemon_list`/`_fetch_pokemon`
+(the ~1,350-sequential-request path this entry specifically named) and
+`opgg.py`/`pokebase.py`'s page-scrape fetch, `munchstats.py`'s JSON fetch,
+and `bulbagarden.py`'s API calls and binary image download. `pokeapi.py`'s
+move/ability/item detail lookups (`_fetch_resource_or_none`) already had a
+bespoke, near-identical retry loop from an earlier pass; that loop is now
+deleted in favor of calling the shared helper, so there's exactly one
+retry implementation instead of two. New `tests/unit/extract/test_http.py`
+covers the helper directly (retry-then-succeed, exhausts-then-raises,
+fails-fast on 4xx, exponential delay sequence), and each of the five
+extractors' existing test suites gained one retry-then-succeed regression
+test using the same flaky-response pattern the pre-existing PokéAPI
+move/ability/item tests already used. What this entry's value statement
+also named but this pass didn't build: proactive rate limiting (throttling
+request *cadence*, not just reacting to failures after the fact) — a
+distinct, smaller follow-up, not folded in here since retry/backoff was
+the change with the real "whole run aborts" failure mode behind it.
 
 ### 44. Incremental extraction
 

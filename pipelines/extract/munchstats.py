@@ -39,6 +39,8 @@ from pathlib import Path
 
 import requests
 
+from pipelines.extract.http import get_with_retry
+
 SOURCE_NAME = "MunchStats"
 RAW_BASE_URL = "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main"
 TOURNAMENTS_INDEX_URL = f"{RAW_BASE_URL}/stats/tournaments/tournaments_index.json"
@@ -77,8 +79,7 @@ def _tournament_dir_url(tournament_id: str) -> str:
 
 
 def _fetch_json(session: requests.Session, url: str):
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, url, timeout=30)
     return response.json()
 
 

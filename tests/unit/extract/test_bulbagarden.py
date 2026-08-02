@@ -1,16 +1,23 @@
 import csv
 import hashlib
 
+import requests
+
 from pipelines.extract import bulbagarden
+from pipelines.extract import http as extract_http
 
 
 class _FakeResponse:
-    def __init__(self, *, json_data=None, content: bytes = b""):
+    def __init__(self, *, json_data=None, content: bytes = b"", status_code: int = 200):
         self._json_data = json_data
         self.content = content
+        self.status_code = status_code
 
     def raise_for_status(self) -> None:
-        return None
+        if self.status_code >= 400:
+            error = requests.exceptions.HTTPError(f"{self.status_code} error")
+            error.response = self
+            raise error
 
     def json(self):
         return self._json_data
@@ -21,15 +28,26 @@ class _FakeSession:
     imageinfo) return canned JSON; anything else (a resolved image URL) is
     treated as a binary image download and returns fixed bytes content."""
 
-    def __init__(self, *, categorymembers_pages: list[list[dict]], imageinfo_by_title: dict):
+    def __init__(
+        self,
+        *,
+        categorymembers_pages: list[list[dict]],
+        imageinfo_by_title: dict,
+        fail_count: int = 0,
+        fail_status_code: int = 500,
+    ):
         self._categorymembers_pages = categorymembers_pages
         self._imageinfo_by_title = imageinfo_by_title
+        self._fail_count = fail_count
+        self._fail_status_code = fail_status_code
         self.requested_urls: list[str] = []
         self.downloaded_urls: list[str] = []
         self._cm_call_index = 0
 
     def get(self, url: str, params: dict | None = None, timeout: int = 30):
         self.requested_urls.append(url)
+        if len(self.requested_urls) <= self._fail_count:
+            return _FakeResponse(status_code=self._fail_status_code)
         if url != bulbagarden.API_BASE_URL:
             self.downloaded_urls.append(url)
             return _FakeResponse(content=_FAKE_IMAGE_BYTES)
@@ -89,6 +107,8 @@ def _make_session(**kwargs):
     return _FakeSession(
         categorymembers_pages=kwargs.get("categorymembers_pages", [MEMBERS_PAGE_1, MEMBERS_PAGE_2]),
         imageinfo_by_title=kwargs.get("imageinfo_by_title", IMAGEINFO),
+        fail_count=kwargs.get("fail_count", 0),
+        fail_status_code=kwargs.get("fail_status_code", 500),
     )
 
 
@@ -214,3 +234,16 @@ def test_extract_defaults_dataset_version_when_not_provided(tmp_path):
         row = next(csv.DictReader(fh))
 
     assert row["dataset_version"] == bulbagarden.DEFAULT_DATASET_VERSION
+
+
+def test_extract_retries_transient_error_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
+    session = _make_session(categorymembers_pages=[MEMBERS_PAGE_1], fail_count=2)
+    output_path = tmp_path / "bulbagarden.csv"
+
+    bulbagarden.extract(output_path, session=session, cache_dir=tmp_path / "cache")
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+
+    assert len(rows) == 1

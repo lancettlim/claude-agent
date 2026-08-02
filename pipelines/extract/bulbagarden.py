@@ -52,6 +52,8 @@ from pathlib import Path
 
 import requests
 
+from pipelines.extract.http import get_with_retry
+
 SOURCE_NAME = "Bulbagarden Archives"
 API_BASE_URL = "https://archives.bulbagarden.net/w/api.php"
 CATEGORY_TITLE = "Category:Champions_menu_sprites"
@@ -85,8 +87,9 @@ FIELDNAMES = [
 
 
 def _api_get(session: requests.Session, params: dict) -> dict:
-    response = session.get(API_BASE_URL, params={**params, "format": "json"}, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(
+        session, API_BASE_URL, params={**params, "format": "json"}, timeout=30
+    )
     return response.json()
 
 
@@ -146,8 +149,7 @@ def _local_cache_path(pokedex_number_raw: str, form_suffix_raw: str | None) -> s
 
 
 def _download_image(session: requests.Session, url: str, dest_path: Path) -> None:
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, url, timeout=30)
     dest_path.parent.mkdir(parents=True, exist_ok=True)
     dest_path.write_bytes(response.content)
 

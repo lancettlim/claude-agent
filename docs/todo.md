@@ -462,6 +462,19 @@ All five are now shipped.
   against a synthetic two-snapshot fixture: a 300→50 drop fails at
   1667bps, a 300→280 fluctuation passes, and a single-snapshot source
   passes.
+- [x] Backlog #43: Extractor resilience (retry/backoff) — new shared
+  `pipelines/extract/http.py`'s `get_with_retry`: retries a transient
+  failure (connection error, timeout, 5xx response) up to three times with
+  exponential backoff, failing immediately on a 4xx. Applied to every raw
+  HTTP call across all five extractors, including the two paths that had
+  none before — `pokeapi.py`'s `_fetch_pokemon_list`/`_fetch_pokemon` (the
+  ~1,350-sequential-request path this item names directly) and
+  `opgg.py`/`pokebase.py`/`munchstats.py`/`bulbagarden.py`'s page/JSON/
+  image fetches. `pokeapi.py`'s move/ability/item lookups already had a
+  bespoke retry loop from an earlier pass; that's now deleted in favor of
+  the shared helper. Rate limiting (throttling request cadence, not just
+  reacting to failures) is the one part of this item's value statement
+  still open — a smaller, separate follow-up.
 - [x] Backlog #49: Fix bps-based validation-report metrics reading as 0 on
   a passing check — dbt-core's `TestRunner.build_test_run_result`
   (`dbt/task/test.py`) hardcodes `failures = 0` on a passing test, so every
