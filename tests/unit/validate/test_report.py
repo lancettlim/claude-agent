@@ -1,5 +1,8 @@
 import json
 
+import duckdb
+import pytest
+
 from pipelines.validate import report
 
 
@@ -70,7 +73,9 @@ def test_build_report_matches_template_shape():
         ]
     }
 
-    result = report.build_report(manifest, run_results, dataset_version="0.1.0")
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
     template = _template()
 
     assert set(result) == set(template)
@@ -108,7 +113,9 @@ def test_build_report_marks_unresulted_tests_as_skipped():
             ),
         }
     }
-    result = report.build_report(manifest, {"results": []}, dataset_version="0.1.0")
+    result = report.build_report(
+        manifest, {"results": []}, dataset_version="0.1.0", warehouse_path=None
+    )
 
     assert len(result["duplicate_key_checks"]) == 1
     check = result["duplicate_key_checks"][0]
@@ -170,7 +177,11 @@ def test_build_report_folds_freshness_failures_into_release_blocking_findings():
     }
 
     result = report.build_report(
-        {"nodes": {}}, {"results": []}, dataset_version="0.1.0", sources_result=sources_result
+        {"nodes": {}},
+        {"results": []},
+        dataset_version="0.1.0",
+        sources_result=sources_result,
+        warehouse_path=None,
     )
 
     assert result["freshness_checks"] == [
@@ -205,7 +216,9 @@ def test_build_report_categorizes_row_count_anomaly_checks():
         ]
     }
 
-    result = report.build_report(manifest, run_results, dataset_version="0.1.0")
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
     template = _template()
 
     assert set(result) == set(template)
@@ -238,9 +251,105 @@ def test_build_report_routes_unrecognized_test_to_uncategorized():
         ]
     }
 
-    result = report.build_report(manifest, run_results, dataset_version="0.1.0")
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
 
     assert result["uncategorized_checks"] == [
         {"test_name": "assert_something_new", "status": "fail", "failures": 3}
     ]
     assert "assert_something_new: status=fail" in result["release_blocking_findings"]
+
+
+def test_recompute_bps_ratio_recovers_true_value_on_a_passing_check(tmp_path):
+    """Backlog #49: dbt-core hardcodes `failures = 0` for a *passing* test
+    (dbt/task/test.py's TestRunner.build_test_run_result) regardless of the
+    test's real fail_calc value, so `result["failures"]` can't be trusted
+    on the pass path. Re-executing the test's own compiled_code against the
+    warehouse (wrapped in its own fail_calc expression, exactly like dbt
+    itself would) must recover the true ratio even though this result's
+    `failures`/status claim the check passed with 0 failures."""
+    warehouse_path = tmp_path / "warehouse.duckdb"
+    con = duckdb.connect(str(warehouse_path))
+    con.execute("create table t as select * from (values (1), (0), (1), (1)) as v(n)")
+    con.close()
+
+    node = {"config": {"fail_calc": "max(pass_bps)"}}
+    result = {
+        "status": "pass",
+        "failures": 0,
+        "compiled_code": (
+            "select round(sum(n)::double / count(*) * 10000)::integer as pass_bps from t"
+        ),
+    }
+
+    assert report._recompute_bps_ratio(node, result, warehouse_path) == 0.75
+
+
+def test_recompute_bps_ratio_falls_back_when_warehouse_missing(tmp_path):
+    node = {"config": {"fail_calc": "max(pass_bps)"}}
+    result = {"status": "pass", "failures": 0, "compiled_code": "select 1 as pass_bps"}
+
+    assert report._recompute_bps_ratio(node, result, tmp_path / "no_such.duckdb") == 0.0
+
+
+def test_recompute_bps_ratio_falls_back_when_node_declares_no_fail_calc(tmp_path):
+    warehouse_path = tmp_path / "warehouse.duckdb"
+    duckdb.connect(str(warehouse_path)).close()
+
+    node = {"config": {}}
+    result = {"status": "fail", "failures": 300}
+
+    assert report._recompute_bps_ratio(node, result, warehouse_path) == 0.03
+
+
+def test_recompute_bps_ratio_falls_back_on_a_broken_compiled_query(tmp_path):
+    """The recompute query itself can fail (e.g. a stale run_results.json
+    pointing at a relation the current warehouse no longer has) -- that
+    must degrade to the pre-#49 `_ratio_from_bps(result)` fallback, not
+    raise out of report generation."""
+    warehouse_path = tmp_path / "warehouse.duckdb"
+    duckdb.connect(str(warehouse_path)).close()
+
+    node = {"config": {"fail_calc": "max(pass_bps)"}}
+    result = {
+        "status": "pass",
+        "failures": 0,
+        "compiled_code": "select * from no_such_table",
+    }
+
+    assert report._recompute_bps_ratio(node, result, warehouse_path) == 0.0
+
+
+def test_recompute_bps_ratio_resolves_relative_source_paths_from_the_dbt_project_dir(tmp_path):
+    """dbt-duckdb inlines a `source()` reference as a literal, relative CSV
+    glob path in compiled_code (e.g. `'../data/staging/x/*.csv'`), resolved
+    against dbt's own working directory at query time -- not the repo root,
+    and not wherever this process happens to be running from. Confirmed
+    against a real build (see docs/backlog.md #49) that the naive "just
+    connect and run it" approach silently reads zero rows instead of
+    erroring, which is why this needs its own regression test rather than
+    trusting the happy-path fixture above."""
+    dbt_dir = tmp_path / "dbt"
+    (dbt_dir / "data").mkdir(parents=True)
+    staging_dir = tmp_path / "data" / "staging" / "widget"
+    staging_dir.mkdir(parents=True)
+    (staging_dir / "2026-01-01.csv").write_text("legal\ntrue\ntrue\nfalse\n")
+
+    warehouse_path = dbt_dir / "data" / "warehouse.duckdb"
+    duckdb.connect(str(warehouse_path)).close()
+
+    node = {"config": {"fail_calc": "max(legal_bps)"}}
+    result = {
+        "status": "pass",
+        "failures": 0,
+        "compiled_code": (
+            "select round(sum(case when legal then 1 else 0 end)::double "
+            "/ count(*) * 10000)::integer as legal_bps "
+            "from '../data/staging/widget/*.csv'"
+        ),
+    }
+
+    assert report._recompute_bps_ratio(node, result, warehouse_path) == pytest.approx(
+        0.6667, abs=1e-4
+    )

@@ -462,6 +462,27 @@ All five are now shipped.
   against a synthetic two-snapshot fixture: a 300→50 drop fails at
   1667bps, a 300→280 fluctuation passes, and a single-snapshot source
   passes.
+- [x] Backlog #49: Fix bps-based validation-report metrics reading as 0 on
+  a passing check — dbt-core's `TestRunner.build_test_run_result`
+  (`dbt/task/test.py`) hardcodes `failures = 0` on a passing test, so every
+  coverage/null-rate/row-count-anomaly check's `metric_value` in
+  `validation_report.json` read `0.0` whenever the check actually passed
+  (status was still correct; only the reported number was wrong).
+  `pipelines/validate/report.py`'s new `_recompute_bps_ratio` re-executes
+  each check's own `compiled_code` (already present per-result in
+  `run_results.json`) against the built `dbt/data/warehouse.duckdb`,
+  wrapped in the same `fail_calc` expression the manifest already
+  declares, recovering the true ratio regardless of pass/fail; falls back
+  to the old (fail-path-only-correct) behavior if the warehouse or
+  compiled_code isn't available. Needed a `chdir` into `dbt/` for the
+  recompute query, since a `source()` reference compiles to a literal
+  relative CSV glob path resolved against dbt's own working directory, not
+  the repo root — confirmed by testing the naive approach directly:  it
+  silently read zero rows instead of erroring. Verified against a real
+  `extract all` + `dbt build` + `validate` run: `opgg_legal_pool_coverage`
+  now reports `0.9842` (previously `0.0`), matching the real figure
+  already documented elsewhere in this repo. `duckdb` is now an explicit
+  `pyproject.toml` dependency (`report.py` imports it directly).
 
 ## Consumption surfaces (backlog Section 2)
 

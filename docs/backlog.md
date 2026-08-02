@@ -16,17 +16,17 @@ stable and never reused** — a completed or dropped item keeps its number.
 
 ## Progress overview
 
-*Last updated 2026-08-01.* 49 numbered items exist (#1-#49, none dropped).
+*Last updated 2026-08-02.* 49 numbered items exist (#1-#49, none dropped).
 This table is maintained by hand alongside each grooming/implementation
 pass — if it drifts from the per-item statuses below, the per-item entries
 are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 29 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47 |
+| **Done** | 30 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #46, #47, #49 |
 | **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 8 | No blocker, just not started: #15, #16, #41, #42, #43, #44, #48, #49 |
+| **Open, buildable now** | 7 | No blocker, just not started: #15, #16, #41, #42, #43, #44, #48 |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
@@ -39,19 +39,21 @@ By section:
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
 | 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#49) | 8 | 1 | 6 | 0 | 15 |
-| **Total** | **29** | **4** | **8** | **8** | **49** |
+| 3 — Platform, quality, and ops (#35-#49) | 9 | 1 | 5 | 0 | 15 |
+| **Total** | **30** | **4** | **7** | **8** | **49** |
 
 Takeaways: every item in Section 0 and every "buildable today, no new data
 required" item that isn't genuinely open (#15, #16) or a judgment call
 (#17) is done — that bucket is close to exhausted. Section 2 (Consumption
 surfaces) is now fully closed out except the one genuinely blocked item
-(#31). This pass closed four more items (#29, #30, #33, #40) and added
-one new, precisely-scoped item (#49 — a real correctness gap in the
-validation report's bps-based metrics, discovered while verifying #29/#30
-against a real data run, not shipped-but-hidden). The remaining open work
-now skews toward Section 3 (platform/quality hardening, 6 open items:
-#41-#44, #48, #49). The 8 blocked items aren't neglect — 4 are waiting on
+(#31). This pass closed #49 — the real correctness gap in the validation
+report's bps-based metrics found while verifying #29/#30 in the previous
+pass — by re-executing each bps test's own compiled SQL against the built
+warehouse instead of trusting dbt-core's `run_results.json`, which
+(confirmed directly against a real `extract all` + `dbt build` + `validate`
+run) only reports the true value on the failing path. The remaining open
+work now skews toward Section 3 (platform/quality hardening, 5 open items:
+#41-#44, #48). The 8 blocked items aren't neglect — 4 are waiting on
 real-world time/events (Blocker A's snapshot history, Blocker B's
 rebalance, #31's snapshot-dependent hosting justification) and 4 need a
 source this repo doesn't have and, in
@@ -1061,7 +1063,7 @@ unchanged.
 
 Prerequisite for any real monitoring, and directly supports #40's baselines.
 
-### 49. Bps-based validation-report metrics read as 0 on a passing check
+### 49. Bps-based validation-report metrics read as 0 on a passing check — DONE
 
 - **Size**: S
 - **Value**: A real, previously-undetected correctness gap in the
@@ -1089,19 +1091,46 @@ dbt-side — **no release has ever shipped on a false pass**, but every
 published manifest's `quality_checks` numbers for these checks have been
 wrong since the ratio pattern was introduced.
 
-Not a one-line fix: dbt gives no way to recover the real fail_calc value
-on the passing path through `run_results.json` alone (confirmed by reading
-`build_test_run_result`'s source directly, not assumed). The real fix has
-to re-derive the value independently of dbt's pass/fail bookkeeping —
-e.g. re-executing each bps test's already-compiled SQL (`run_results.json`
-results already carry `compiled_code` per test) directly against
-`dbt/data/warehouse.duckdb` from `report.py`, since that query is
-deterministic and re-running it recovers the true ratio regardless of
-status. Left as an open, precisely-scoped item rather than attempted
-in-place, since it needs a DuckDB read path `report.py` doesn't have today
-and careful handling of `compiled_code`'s relative `external_location`
-paths (resolved relative to dbt's own working directory) — a rushed fix
-risked getting those subtly wrong.
+Fixed as this entry's own "not a one-line fix" note described: a new
+`_recompute_bps_ratio` in `report.py` re-executes each bps test's own
+`compiled_code` (already present per-result in `run_results.json`,
+confirmed by reading dbt-core's `RunResultOutput`/`process_run_result`
+directly) against `dbt/data/warehouse.duckdb`, wrapped in the same
+`fail_calc` expression the manifest's `node.config.fail_calc` already
+declares (`select {fail_calc} as value from ({compiled_code}) as t`) —
+deterministic and correct regardless of pass/fail, since the underlying
+data hasn't changed since dbt itself ran that query moments earlier. The
+"careful handling of relative `external_location` paths" caveat this entry
+flagged was real and caught empirically, not just anticipated: a `source()`
+reference compiles to a literal, relative CSV glob path (e.g.
+`'../data/staging/opgg_champions/*.csv'`), resolved against dbt's own
+working directory (`dbt/`) at query time — running the recompute query
+from the repo root silently read zero rows instead of erroring, rather
+than raising something obviously wrong. Fixed by temporarily `chdir`-ing
+into the warehouse's parent `dbt/` directory for the duration of the
+recompute query. Falls back to the old `_ratio_from_bps(result)` behavior
+whenever recompute isn't possible (no warehouse file, no compiled_code/
+fail_calc on the node, or the recompute query itself errors), so report
+generation degrades gracefully rather than raising. Verified against a
+real `extract all` + `dbt build` + `validate` run: `opgg_legal_pool_
+coverage` now reports `0.9842` (previously `0.0`), `pokebase_legal_pool_
+coverage` `0.9871`, `bulbagarden_sprite_coverage` `0.883`,
+`tournament_team_member_mapping_coverage` `0.9995` — all matching the real
+figures already documented elsewhere in this file and `docs/todo.md`
+(e.g. "98.4%, 312/317") that this bug had been silently contradicting in
+the machine-readable report the whole time. `null_rate_checks` correctly
+still show `0.0` — confirmed against the warehouse directly that the real
+null rate for these tables genuinely is zero, not a residual bug. New
+regression tests in `tests/unit/validate/test_report.py` cover the
+recompute-recovers-the-true-value case (using a result with `failures: 0`/
+`status: "pass"`, i.e. the exact shape dbt itself produces on this bug),
+each fallback path, and the relative-source-path resolution specifically
+(a synthetic `dbt/` + `data/staging/` layout under `tmp_path`, not just the
+happy-path same-directory fixture, since that's the case that silently
+produced a wrong-but-plausible answer rather than an obvious error).
+`duckdb` is now also an explicit `pyproject.toml` dependency (`report.py`
+imports it directly) rather than an implicit transitive one via
+`dbt-duckdb`.
 
 ---
 

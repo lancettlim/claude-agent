@@ -24,24 +24,45 @@ count) in `metric_value`. dbt's run_results.json schema requires `failures`
 to be an integer, so those singular tests can't report a raw ratio directly
 (a fractional `fail_calc` result crashes dbt's results serialization) —
 instead they report the ratio in basis points (1.0 == 10000 bps) via a
-`fail_calc` override (e.g. `fail_calc = "max(null_rate_bps)"`), and
-`_ratio_from_bps` below divides back down to a ratio for `metric_value`.
+`fail_calc` override (e.g. `fail_calc = "max(null_rate_bps)"`).
 Duplicate-key and referential-integrity checks use dbt's default
 `fail_calc` (`count(*)`), so `failures` is already the duplicate/violation
 count the report wants.
+
+Backlog #49: dbt-core's `TestRunner.build_test_run_result`
+(`dbt/task/test.py`) hardcodes `failures = 0` on a *passing* test and only
+assigns the real `fail_calc` value on the fail/warn branches — so
+`run_results.json["failures"]` is only trustworthy for a bps-based check
+when it fails, not when it passes. `_recompute_bps_ratio` below works
+around that by re-executing the test's own compiled SQL (each
+`run_results.json` result already carries `compiled_code`, the fully
+ref/source-resolved query dbt just ran) against the built warehouse,
+wrapped in the same `fail_calc` expression the manifest already declares
+(`node.config.fail_calc`) — recovering the true ratio regardless of
+pass/fail, deterministically, since the underlying data hasn't changed
+since dbt itself ran that query moments earlier. `_ratio_from_bps` is kept
+as the fallback for when the warehouse file isn't available (e.g. a caller
+that only has archived run_results.json/manifest.json, not the .duckdb
+file itself) — correct on the fail path, and the best available answer on
+the pass path (still better than crashing).
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+import duckdb
 
 from pipelines.versioning import latest_published_version
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_TARGET_DIR = REPO_ROOT / "dbt" / "target"
+DBT_WAREHOUSE_PATH = REPO_ROOT / "dbt" / "data" / "warehouse.duckdb"
 REPORT_PATH = REPO_ROOT / "reports" / "validation" / "validation_report.json"
 
 
@@ -117,10 +138,73 @@ def build_freshness_checks(sources_result: dict[str, Any] | None) -> list[dict[s
 
 
 def _ratio_from_bps(result: dict[str, Any] | None) -> float | None:
-    """Recover a 0-1 ratio from a fail_calc result reported in basis points."""
+    """Recover a 0-1 ratio from a fail_calc result reported in basis points.
+
+    Only trustworthy when the check failed or warned -- see this module's
+    docstring and `_recompute_bps_ratio` for why a passing check's
+    `failures` can't be trusted at all (backlog #49).
+    """
     if result is None or result["failures"] is None:
         return None
     return result["failures"] / 10000.0
+
+
+@contextlib.contextmanager
+def _chdir(path: Path):
+    previous = Path.cwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(previous)
+
+
+def _recompute_bps_ratio(
+    node: dict[str, Any],
+    result: dict[str, Any] | None,
+    warehouse_path: Path | None,
+) -> float | None:
+    """Recover a bps-based check's true 0-1 ratio regardless of pass/fail
+    status, by re-executing its own compiled SQL against the built
+    warehouse (backlog #49 -- see this module's docstring for why
+    `result["failures"]` alone can't be trusted on the passing path).
+
+    A test's compiled SQL isn't self-contained: dbt-duckdb inlines a
+    `source()` reference to an external table as a literal, relative CSV
+    glob path (e.g. `'../data/staging/opgg_champions/*.csv'`), resolved
+    relative to dbt's own working directory (the `dbt/` project dir) at
+    query time -- unlike a `ref()`, which compiles to a real
+    already-materialized relation name, valid from any cwd. So this
+    temporarily chdirs into the warehouse's parent `dbt/` project directory
+    for the duration of the recompute query, confirmed necessary by testing
+    directly against a real build: the same query returns the correct ratio
+    from `dbt/` and a wrong one (relative paths resolving against the
+    wrong base and silently reading zero rows) from the repo root.
+
+    Falls back to `_ratio_from_bps(result)` whenever the recompute isn't
+    possible (no warehouse file, no compiled_code/fail_calc on this node, or
+    the recompute query itself errors) rather than raising -- report
+    generation should degrade to the pre-#49 behavior, not fail outright.
+    """
+    fallback = _ratio_from_bps(result)
+    if result is None:
+        return fallback
+    fail_calc = node.get("config", {}).get("fail_calc")
+    compiled_code = result.get("compiled_code")
+    if not fail_calc or not compiled_code or warehouse_path is None or not warehouse_path.exists():
+        return fallback
+    try:
+        with _chdir(warehouse_path.parent.parent):
+            con = duckdb.connect(str(warehouse_path), read_only=True)
+            try:
+                value = con.execute(
+                    f"select {fail_calc} as value from ({compiled_code}) as _bps_recompute"
+                ).fetchone()[0]
+            finally:
+                con.close()
+    except duckdb.Error:
+        return fallback
+    return fallback if value is None else value / 10000.0
 
 
 def _status_for(result: dict[str, Any] | None) -> str:
@@ -138,6 +222,7 @@ def build_report(
     run_results: dict[str, Any],
     dataset_version: str,
     sources_result: dict[str, Any] | None = None,
+    warehouse_path: Path | None = DBT_WAREHOUSE_PATH,
 ) -> dict[str, Any]:
     """Build a dict matching reports/validation/validation_report.template.json's shape.
 
@@ -151,6 +236,13 @@ def build_report(
     `sources_result` is the parsed target/sources.json from a `dbt source
     freshness` run (backlog.md #39); omit it (or pass None) if that command
     wasn't run, and freshness_checks is simply empty.
+
+    `warehouse_path` points at the built DuckDB warehouse file, used to
+    recompute bps-based (coverage/null_rate/row_count_anomaly) metric values
+    that dbt itself only reports correctly on the failing path (backlog
+    #49); pass None to skip the recompute and fall back to
+    `_ratio_from_bps` unconditionally (e.g. in a test with no real
+    warehouse to point at).
     """
     freshness_checks = build_freshness_checks(sources_result)
     coverage_checks = []
@@ -171,7 +263,7 @@ def build_report(
                     "check_name": meta["check_name"],
                     "description": meta.get("description"),
                     "threshold": meta.get("threshold"),
-                    "metric_value": _ratio_from_bps(result),
+                    "metric_value": _recompute_bps_ratio(node, result, warehouse_path),
                     "status": status,
                 }
             )
@@ -179,7 +271,7 @@ def build_report(
             null_rate_checks.append(
                 {
                     "table_name": meta["table_name"],
-                    "metric_value": _ratio_from_bps(result),
+                    "metric_value": _recompute_bps_ratio(node, result, warehouse_path),
                     "threshold": "<=0.01",
                     "status": status,
                 }
@@ -205,7 +297,7 @@ def build_report(
             row_count_anomaly_checks.append(
                 {
                     "source_name": meta["source_name"],
-                    "metric_value": _ratio_from_bps(result),
+                    "metric_value": _recompute_bps_ratio(node, result, warehouse_path),
                     "threshold": ">=0.5x previous snapshot",
                     "status": status,
                 }
@@ -274,6 +366,12 @@ def generate(
     not part of `dbt build`) is read if present; its absence doesn't raise,
     since freshness is an additional gate layered on the existing ones, not
     a hard prerequisite for every caller of this function.
+
+    The DuckDB warehouse is located as a sibling of `target_dir` (both live
+    under `dbt/` -- `target_dir.parent / "data" / "warehouse.duckdb"`)
+    rather than the module-level `DBT_WAREHOUSE_PATH` default, so a caller
+    that points `target_dir` at a non-standard location (e.g. a test
+    fixture) gets a consistently-located warehouse alongside it.
     """
     if dataset_version is None:
         dataset_version = latest_published_version()
@@ -281,6 +379,7 @@ def generate(
     run_results = _load_json(target_dir / "run_results.json")
     sources_path = target_dir / "sources.json"
     sources_result = json.loads(sources_path.read_text()) if sources_path.exists() else None
-    report = build_report(manifest, run_results, dataset_version, sources_result)
+    warehouse_path = target_dir.parent / "data" / "warehouse.duckdb"
+    report = build_report(manifest, run_results, dataset_version, sources_result, warehouse_path)
     write_report(report)
     return report
