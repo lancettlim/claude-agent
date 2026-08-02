@@ -160,6 +160,26 @@ models:
       top of pokemon_team_core_usage's mirrored pairs. pair_team_count is
       exposed alongside lift since lift is noisy at low pair counts.
       Written to data/marts/pokemon_team_synergy.csv.
+  - name: pokemon_usage_by_country
+    description: >
+      Country-grain half of backlog.md #7 ("which regions favor which
+      archetypes"): usage x player_country cross-tab, restricted to the
+      current legal pool and to roster rows with a reported
+      player_country (optional in the source). usage_share/
+      country_usage_rank are computed within each player_country
+      partition, mirroring pokemon_usage_by_regulation's usage-x-dimension
+      pattern. Written to data/marts/pokemon_usage_by_country.csv.
+  - name: player_signature_pokemon
+    description: >
+      Player-grain half of backlog.md #7 ("does this player have a
+      signature Pokémon," across their full history): one row per
+      player_id x pokemon_key they've fielded, restricted to the current
+      legal pool. player_usage_share is this Pokémon's fraction of the
+      player's own total legal-pool roster appearances across every team
+      of theirs on record; player_pokemon_rank 1 is their most-played
+      Pokémon. player_team_count (distinct teams this player has fielded)
+      is a sample-size signal alongside the rank. Written to
+      data/marts/player_signature_pokemon.csv.
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it

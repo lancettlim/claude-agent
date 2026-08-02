@@ -222,7 +222,7 @@ MunchStats event-date history. Not yet wired into the dashboard UI (#29's
 trend/line charts are the natural consumer, but that item is bigger scope
 than this mart alone).
 
-#### 7. Player and country dimension mart — PARTIALLY DONE
+#### 7. Player and country dimension mart — DONE
 
 - **Size**: S
 - **Value**: Answers "who plays what," "which regions favor which
@@ -230,15 +230,39 @@ than this mart alone).
 - **Blocked by**: nothing
 - **Touches**: new mart, `tournament_team`
 
-`player_name`/`player_country` now surface in `top_tournament_teams`
+`player_name`/`player_country` already surfaced in `top_tournament_teams`
 (`dbt/models/marts/top_tournament_teams.sql`, shipped as part of the M6
 Top Teams tab work), answering "who plays what" for the top 100 teams by
-win rate. Still open: a dedicated country/player-aggregate dimension mart
-("which regions favor which archetypes," "does this player have a
-signature Pokémon" across their full history rather than one team row) —
-`top_tournament_teams` is team-grain, not player- or country-grain.
-Related polish still open too: `docs/dashboard.md` notes country codes
-render as plain two-letter text because no flag-emoji/ISO lookup exists.
+win rate, but that mart is team-grain, not player- or country-grain. This
+pass closed the real gap with two new sibling marts. New
+`dbt/models/marts/pokemon_usage_by_country.sql`: usage x player_country
+cross-tab (usage_count/usage_share/country_usage_rank within each
+country), restricted to the current legal pool and to roster rows with a
+reported player_country. New
+`dbt/models/marts/player_signature_pokemon.sql`: one row per player_id x
+pokemon_key they've fielded across their *entire* recorded history (not
+just their best single team), with player_usage_share and
+player_pokemon_rank (rank 1 = signature Pokémon) plus player_team_count as
+a sample-size signal, since a "signature" claim from a player with one
+recorded team is much weaker evidence than one from a player with dozens.
+Both use "which Pokémon," not archetype, as the practical unit of
+analysis -- deriving a real per-country/per-player *archetype* profile
+would additionally require joining the curated, NOT-sourced
+`archetype_pokemon_map` seed, which is a bigger, separate ask than this
+item's own S sizing. Verified against real data (a fresh `extract
+munchstats`+`opgg`+`pokebase`+`pokeapi` and `dbt build`, not a synthetic
+fixture): `pokemon_usage_by_country` produced 2,433 rows across 69
+countries with a #1 Pokémon (e.g. Incineroar at 14.8% share in Germany,
+569 roster appearances); `player_signature_pokemon` produced 44,533 rows,
+8,431 players with a rank-1 signature pick, and real, plausible signature
+picks at non-trivial sample sizes (e.g. a French player fielding
+Incineroar in 11 of 11 recorded teams' legal-pool slots, a 29.7% overall
+share).
+
+Not wired into the dashboard UI (real, queryable mart output; a
+country/player drill-down view is separate, undone follow-up work).
+Related polish still open: `docs/dashboard.md` notes country codes render
+as plain two-letter text because no flag-emoji/ISO lookup exists.
 
 #### 8. Placement-weighted usage — DONE
 
