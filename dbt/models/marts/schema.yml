@@ -103,7 +103,12 @@ models:
       Denormalized per-Pokémon profile for the Speed Tiers and Team
       Builder dashboard views: one row per currently legal Pokémon with
       its Champions-format base stats (including speed) plus nullable
-      overall usage_count/usage_share/win_rate/record_count. Written to
+      overall usage_count/usage_share/win_rate/record_count.
+      max_investment_speed (backlog.md #16) is the Level-50 Speed stat
+      under the standard "max speed investment" competitive convention
+      (252 EVs, a beneficial nature, 31 IV) rather than raw base speed --
+      see pokemon_speed_tiers below for the full modified-speed bracket
+      table built on top of it. Written to
       data/marts/pokemon_champions_profile.csv.
   - name: pokemon_tera_type_usage
     description: >
@@ -169,6 +174,20 @@ models:
       country_usage_rank are computed within each player_country
       partition, mirroring pokemon_usage_by_regulation's usage-x-dimension
       pattern. Written to data/marts/pokemon_usage_by_country.csv.
+  - name: pokemon_speed_tiers
+    description: >
+      Speed-tier bracket mart (backlog.md #16): modified Speed under the
+      format's common competitive scenarios, built on top of
+      pokemon_champions_profile.max_investment_speed. plus_one_speed/
+      scarf_speed (x1.5) and plus_two_speed/tailwind_speed (x2.0) are
+      numerically identical pairs kept as separately-named columns since
+      they answer different real questions (a stat-stage boost vs. an
+      item vs. a team-wide field effect); scarf_tailwind_speed (x3.0)
+      covers the common scarfed-Pokémon-under-Tailwind combination. The
+      multipliers themselves are fixed game-mechanics constants, the same
+      treatment already given to app.js's SPEED_TIERS thresholds and
+      matchup.js's TYPE_CHART. Written to
+      data/marts/pokemon_speed_tiers.csv.
   - name: player_signature_pokemon
     description: >
       Player-grain half of backlog.md #7 ("does this player have a

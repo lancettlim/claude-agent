@@ -418,7 +418,7 @@ dashboard UI.
 A softer intermediate step: keep the curated seed but add a test that flags
 when its members drift far from observed clusters.
 
-#### 16. Speed-tier bracket mart
+#### 16. Speed-tier bracket mart — DONE
 
 - **Size**: M
 - **Value**: The Speed Tiers tab currently shows flat base speed. Real speed
@@ -427,8 +427,33 @@ when its members drift far from observed clusters.
 - **Blocked by**: nothing (pure derivation from existing stats)
 - **Touches**: `dbt/models/marts/pokemon_champions_profile.sql`, new mart
 
-Needs EV/nature assumptions to be exact; a documented "max speed investment"
-convention is the honest simplification. Item #25 would make it precise.
+Took exactly the honest-simplification path this entry named: a documented
+"max speed investment" convention (252 EVs, a beneficial nature, a perfect
+31 IV, Level 50) rather than waiting on #25's real per-roster EV data.
+`pokemon_champions_profile` gained a `max_investment_speed` column
+(`floor((base_speed + 52) * 1.1)`, Bulbapedia's standard stat formula
+simplified for this specific EV/nature/IV/level combination — verified
+against a known reference value: base speed 142 (Dragapult) produces 213,
+matching the commonly-cited real figure). New sibling mart
+`dbt/models/marts/pokemon_speed_tiers.sql` builds the actual bracket table
+on top of it: `plus_one_speed`/`scarf_speed` (x1.5) and
+`plus_two_speed`/`tailwind_speed` (x2.0) are numerically-identical pairs
+kept as separately-named columns since they answer different real
+questions, plus `scarf_tailwind_speed` (x3.0) for the common
+scarfed-under-Tailwind combination — the multipliers themselves are fixed
+game-mechanics constants, the same treatment `pokemon_champions_profile`'s
+schema.yml entry already gives `app.js`'s `SPEED_TIERS` thresholds and
+`matchup.js`'s `TYPE_CHART`, so they're applied as plain SQL multiplication
+rather than sourced from anywhere. Verified against real data (`dbt
+build` against the existing warehouse): 312 legal-pool rows, correct
+values end-to-end for Dragapult (213/319/319/426/426/639) and internally
+consistent for every row (`plus_one_speed == scarf_speed`,
+`plus_two_speed == tailwind_speed`, `scarf_tailwind_speed ==
+plus_two_speed * 1.5`). Not yet wired into the dashboard UI — the Speed
+Tiers tab still buckets on raw `speed`; switching it to these columns is
+separate, undone follow-up work. Item #25 (real per-roster EVs) would
+still make this exact instead of assumed, unchanged from this entry's own
+original note.
 
 #### 17. Wire up `stat_change_leaderboard` — RESOLVED, staying unwired on purpose
 
