@@ -58,12 +58,14 @@ from typing import Any
 
 import duckdb
 
+from pipelines.schema_contracts import csv_header, schema_field_names
 from pipelines.versioning import latest_published_version
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DBT_TARGET_DIR = REPO_ROOT / "dbt" / "target"
 DBT_WAREHOUSE_PATH = REPO_ROOT / "dbt" / "data" / "warehouse.duckdb"
 REPORT_PATH = REPO_ROOT / "reports" / "validation" / "validation_report.json"
+NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 
 
 class DbtArtifactsMissing(RuntimeError):
@@ -134,6 +136,48 @@ def build_freshness_checks(sources_result: dict[str, Any] | None) -> list[dict[s
             }
         )
     checks.sort(key=lambda c: c["source_name"])
+    return checks
+
+
+def build_schema_drift_checks(normalized_dir: Path = NORMALIZED_DIR) -> list[dict[str, Any]]:
+    """Compare each data/normalized/<entity>.csv's actual header against
+    its data/normalized/<entity>.schema.json contract (backlog.md #41) --
+    the normalized-layer half of schema-drift enforcement (the staging
+    half, extractor FIELDNAMES vs data/staging/*.schema.json, is a pure
+    code-level check covered directly by
+    tests/unit/extract/test_schema_contracts.py, no build needed).
+
+    One entry per data/normalized/*.schema.json file found, regardless of
+    whether the matching .csv exists yet -- a missing CSV (e.g. a fresh
+    clone with no `dbt build` yet, or pokemon_asset before Bulbagarden has
+    ever been extracted) reports "skipped", not "fail": there's no drift
+    to detect against data that was never produced, and that's a
+    different case from a real mismatch.
+    """
+    checks = []
+    for schema_path in sorted(normalized_dir.glob("*.schema.json")):
+        entity = schema_path.name[: -len(".schema.json")]
+        csv_path = normalized_dir / f"{entity}.csv"
+        expected_fields = schema_field_names(schema_path)
+        if not csv_path.exists():
+            checks.append(
+                {
+                    "table_name": entity,
+                    "status": "skipped",
+                    "expected_fields": expected_fields,
+                    "actual_fields": None,
+                }
+            )
+            continue
+        actual_fields = csv_header(csv_path)
+        checks.append(
+            {
+                "table_name": entity,
+                "status": "pass" if actual_fields == expected_fields else "fail",
+                "expected_fields": expected_fields,
+                "actual_fields": actual_fields,
+            }
+        )
     return checks
 
 
@@ -223,6 +267,7 @@ def build_report(
     dataset_version: str,
     sources_result: dict[str, Any] | None = None,
     warehouse_path: Path | None = DBT_WAREHOUSE_PATH,
+    normalized_dir: Path = NORMALIZED_DIR,
 ) -> dict[str, Any]:
     """Build a dict matching reports/validation/validation_report.template.json's shape.
 
@@ -243,8 +288,15 @@ def build_report(
     #49); pass None to skip the recompute and fall back to
     `_ratio_from_bps` unconditionally (e.g. in a test with no real
     warehouse to point at).
+
+    `normalized_dir` points at data/normalized/, used for the
+    schema_drift_checks section (backlog.md #41): each *.schema.json
+    contract's declared fields compared against the matching *.csv's
+    actual header, catching a column rename/add/drop that a bare
+    `select *` staging model would otherwise pass through silently.
     """
     freshness_checks = build_freshness_checks(sources_result)
+    schema_drift_checks = build_schema_drift_checks(normalized_dir)
     coverage_checks = []
     null_rate_checks = []
     duplicate_key_checks = []
@@ -329,6 +381,7 @@ def build_report(
             *row_count_anomaly_checks,
             *uncategorized_checks,
             *freshness_checks,
+            *schema_drift_checks,
         )
         if entry["status"] == "fail"
     ]
@@ -343,6 +396,7 @@ def build_report(
         "row_count_anomaly_checks": row_count_anomaly_checks,
         "uncategorized_checks": uncategorized_checks,
         "freshness_checks": freshness_checks,
+        "schema_drift_checks": schema_drift_checks,
         "release_blocking_findings": release_blocking_findings,
     }
 

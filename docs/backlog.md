@@ -979,7 +979,7 @@ source_row_count_anomaly_staging_pokeapi_`): a 300→50 row drop fails at
 passes vacuously — plus a new `test_report.py` unit test for the
 report-shaping side.
 
-### 41. Schema-drift enforcement
+### 41. Schema-drift enforcement — DONE
 
 - **Size**: M
 - **Value**: The `data/staging/*.schema.json` and `data/normalized/*.schema.json`
@@ -991,9 +991,39 @@ report-shaping side.
 - **Blocked by**: nothing
 - **Touches**: `data/**/*.schema.json`, `dbt/models/staging/`, `tests/`
 
-Especially worth it given both RSC-scraping extractors depend on hand-rolled
-string markers (`pipelines/extract/opgg.py:65`) that will break silently on
-any upstream markup change.
+Shipped as two layers, matching the two contract directories this entry
+names. New shared `pipelines/schema_contracts.py` (`schema_field_names`,
+`csv_header`) is the one place both layers load a `*.schema.json`
+contract's declared field-name list. **Staging layer**: new
+`tests/unit/extract/test_schema_contracts.py` asserts every one of the
+five extractors' `FIELDNAMES` (plus PokéAPI's three detail-feed
+`MOVE_FIELDNAMES`/`ABILITY_FIELDNAMES`/`ITEM_FIELDNAMES` constants) exactly
+matches its `data/staging/<subdir>.schema.json` contract — a pure
+code-level check needing no live data, so it runs on every `make test`/CI
+push and catches the "code and docs drifted apart" mistake immediately,
+before anything downstream. **Normalized layer**: new
+`pipelines/validate/report.py`'s `build_schema_drift_checks` compares each
+`data/normalized/<entity>.csv`'s real header (post-`dbt build`) against its
+`data/normalized/<entity>.schema.json` contract, wired into `build_report`
+as a new `schema_drift_checks` report section and into
+`release_blocking_findings` the same way any other failing gate is — a
+missing CSV (fresh clone, or an unextracted source like `pokemon_asset`
+before Bulbagarden runs) reports `skipped`, not `fail`, since there's no
+drift to detect against data that doesn't exist yet. Verified against real
+data: a full `extract` + `dbt build` + `validate` run reports all 11
+present normalized entities `pass` and `pokemon_asset` correctly
+`skipped` (Bulbagarden wasn't extracted this pass), with
+`release_blocking_findings` empty.
+
+The RSC-scraping risk this entry specifically named (`opgg.py`/`pokebase.py`'s
+hand-rolled string markers) turns out to fail loud already, not silent —
+`_extract_pokemon_payloads` raises `ValueError` if the marker or bracket
+structure it scans for ever goes missing, and a genuine upstream JSON-key
+rename (e.g. `stats["hp"]`) would raise `KeyError` the same way. The real
+silent-drift risk this item closes is narrower but still real: our own
+`FIELDNAMES`/`schema.json` pair (or a normalized model's `select` list)
+drifting out of sync with each other through an ordinary code edit, which
+neither layer's tests caught before this pass.
 
 ### 42. Mart tests
 

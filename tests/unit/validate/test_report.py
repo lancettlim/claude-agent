@@ -233,6 +233,78 @@ def test_build_report_categorizes_row_count_anomaly_checks():
     assert "munchstats: status=fail" in result["release_blocking_findings"]
 
 
+def _write_schema(path, field_names):
+    path.write_text(json.dumps({"fields": [{"name": n, "required": True} for n in field_names]}))
+
+
+def _write_csv(path, header):
+    path.write_text(",".join(header) + "\n")
+
+
+def test_build_schema_drift_checks_pass_when_header_matches_schema(tmp_path):
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "pokemon_name"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks == [
+        {
+            "table_name": "pokemon",
+            "status": "pass",
+            "expected_fields": ["pokemon_key", "pokemon_name"],
+            "actual_fields": ["pokemon_key", "pokemon_name"],
+        }
+    ]
+
+
+def test_build_schema_drift_checks_fails_on_renamed_column(tmp_path):
+    """A column rename (or add/drop/reorder) must be caught here, not
+    silently propagate through the normalized layer's bare `select *`
+    staging models (backlog.md #41)."""
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "species_name"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks[0]["status"] == "fail"
+    assert checks[0]["expected_fields"] == ["pokemon_key", "pokemon_name"]
+    assert checks[0]["actual_fields"] == ["pokemon_key", "species_name"]
+
+
+def test_build_schema_drift_checks_skipped_when_csv_missing(tmp_path):
+    """A schema.json with no matching .csv yet (fresh clone, no dbt build,
+    or a source like Bulbagarden that hasn't been extracted) is a
+    different case from a real mismatch -- it must not fail the gate."""
+    _write_schema(tmp_path / "pokemon_asset.schema.json", ["pokemon_asset_key"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks == [
+        {
+            "table_name": "pokemon_asset",
+            "status": "skipped",
+            "expected_fields": ["pokemon_asset_key"],
+            "actual_fields": None,
+        }
+    ]
+
+
+def test_build_report_folds_schema_drift_failures_into_release_blocking_findings(tmp_path):
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "species_name"])
+
+    result = report.build_report(
+        {"nodes": {}},
+        {"results": []},
+        dataset_version="0.1.0",
+        warehouse_path=None,
+        normalized_dir=tmp_path,
+    )
+
+    assert result["schema_drift_checks"][0]["status"] == "fail"
+    assert "pokemon: status=fail" in result["release_blocking_findings"]
+
+
 def test_build_report_routes_unrecognized_test_to_uncategorized():
     """A test with no meta.category (e.g. a newly-added test nobody tagged
     yet) must still surface and be able to block a release -- it must not

@@ -533,6 +533,19 @@ All five are now shipped.
   came back as 90, not ~32, revealing live TCG-tournament entries #44's
   caching couldn't recognize) — after that fix, a real re-run confirmed
   the true minimum, 61 requests, with the same 106,134 rows preserved.
+- [x] Backlog #41: Schema-drift enforcement — new `pipelines/
+  schema_contracts.py` loads a `*.schema.json` contract's declared field
+  names; new `tests/unit/extract/test_schema_contracts.py` asserts every
+  extractor's `FIELDNAMES` matches its `data/staging/*.schema.json`
+  contract (pure code-level, runs on every push); new
+  `pipelines/validate/report.py`'s `build_schema_drift_checks` compares
+  each real `data/normalized/<entity>.csv` header against its
+  `data/normalized/<entity>.schema.json` contract, wired into
+  `release_blocking_findings` like any other gate (a missing CSV reports
+  `skipped`, not `fail`). Verified against a real `extract` + `dbt build`
+  + `validate` run: all 11 present normalized entities pass,
+  `pokemon_asset` correctly skips (Bulbagarden wasn't extracted this
+  pass).
 
 ## Consumption surfaces (backlog Section 2)
 
