@@ -14,6 +14,22 @@ clean-targets:
   - "target"
   - "dbt_packages"
 
+# csv_read_options pins quote/escape to '"' rather than leaving them to
+# DuckDB's auto-detection (backlog.md #42, caught while adding mart
+# tests): read_csv's sniffer only samples the first ~20480 rows to guess
+# CSV dialect, so a quoted comma that first appears later in a larger
+# table (e.g. player_signature_pokemon.csv's "Wyatt Thibodeaux, Jr." at
+# row 34569) can get mis-detected as needing no quote character at all --
+# harmless for a single-column query the optimizer can prune down to
+# before the bad row's column count is ever validated, but a real,
+# reproducible CSV parse error for any query that reads the full row
+# (confirmed directly: unique_combination_of_columns's multi-column GROUP
+# BY hit it while single-column not_null tests against the same view did
+# not). auto_detect stays on for delimiter/header/types; only quote/escape
+# are pinned, since Python's csv.DictWriter (every extractor) and
+# dbt-duckdb's own CSV writer both already always use '"' as the quote
+# character -- this isn't a guess, it's the one value that was always
+# structurally correct and never needed sniffing in the first place.
 models:
   pokemon_champions:
     staging:
@@ -23,6 +39,8 @@ models:
     normalized:
       +materialized: external
       +format: csv
+      +csv_read_options: {auto_detect: true, quote: '"', escape: '"'}
     marts:
       +materialized: external
       +format: csv
+      +csv_read_options: {auto_detect: true, quote: '"', escape: '"'}

@@ -233,5 +233,25 @@
     {"source_name": "munchstats", "status": "pending", "max_loaded_at": null, "age_hours": null},
     {"source_name": "pokebase", "status": "pending", "max_loaded_at": null, "age_hours": null}
   ],
+  "schema_drift_checks": [
+    {"table_name": "ability_detail", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "item_detail", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "legality_snapshot", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "move_detail", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "pokemon", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "pokemon_asset", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "pokemon_stat_canonical", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "pokemon_stat_champions", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "pokemon_stat_delta", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "tournament_event", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "tournament_team", "status": "pending", "expected_fields": null, "actual_fields": null},
+    {"table_name": "tournament_team_member", "status": "pending", "expected_fields": null, "actual_fields": null}
+  ],
+  "mart_quality_checks": [
+    {"table_name": "pokemon_usage_summary", "check_name": "pending", "status": "pending", "failures": null}
+  ],
+  "archetype_drift_checks": [
+    {"check_name": "archetype_pokemon_map_intra_group_synergy", "status": "pending", "flagged_archetype_count": null}
+  ],
   "release_blocking_findings": []
 }

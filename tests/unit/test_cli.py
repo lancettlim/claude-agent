@@ -3,6 +3,8 @@ import os
 import subprocess
 import time
 
+import pytest
+
 from pipelines import cli
 
 
@@ -87,6 +89,18 @@ def test_referenced_move_ability_item_names_empty_when_no_snapshot(tmp_path, mon
     assert cli._referenced_move_ability_item_names() == (set(), set(), set())
 
 
+def _stub_extraction_summary(monkeypatch):
+    """Replace extraction_summary.update with a recording no-op so cli
+    tests never write to the real reports/validation/extraction_summary.json."""
+    calls = []
+    monkeypatch.setattr(
+        cli.extraction_summary,
+        "update",
+        lambda result, *, dataset_version: calls.append((result, dataset_version)) or {},
+    )
+    return calls
+
+
 class _RecordingExtractor:
     def __init__(self):
         self.calls = []
@@ -98,6 +112,7 @@ class _RecordingExtractor:
 
 def test_run_extract_writes_dated_snapshot_and_prunes(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     fake = _RecordingExtractor()
     monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
     monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
@@ -110,8 +125,50 @@ def test_run_extract_writes_dated_snapshot_and_prunes(tmp_path, monkeypatch):
     assert (tmp_path / "fake_source" / "2026-07-30.csv").exists()
 
 
+class _RecordingMunchstatsExtractor:
+    def __init__(self):
+        self.calls = []
+
+    def extract(
+        self, output_path, *, dataset_version=None, session=None, previous_snapshot_path=None
+    ):
+        self.calls.append((output_path, dataset_version, previous_snapshot_path))
+        _write_csv(output_path, [], ["a"])
+
+
+def test_run_extract_munchstats_passes_previous_snapshot_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
+    previous_path = tmp_path / "munchstats" / "2026-07-29.csv"
+    _write_csv(previous_path, [], ["a"])
+    fake = _RecordingMunchstatsExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"munchstats": (fake, "munchstats")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"munchstats": 7})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("munchstats", "1.2.3")
+
+    assert exit_code == 0
+    assert fake.calls == [(tmp_path / "munchstats" / "2026-07-30.csv", "1.2.3", previous_path)]
+
+
+def test_run_extract_other_sources_do_not_receive_previous_snapshot_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
+    fake = _RecordingExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 0
+    assert fake.calls == [(tmp_path / "fake_source" / "2026-07-30.csv", "1.2.3")]
+
+
 def test_run_extract_all_runs_every_source_in_order(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     call_order = []
 
     class _Recorder:
@@ -136,6 +193,48 @@ def test_run_extract_all_runs_every_source_in_order(tmp_path, monkeypatch):
 
     assert exit_code == 0
     assert call_order == ["first", "second"]
+
+
+def test_run_extract_updates_extraction_summary_with_source_name(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    calls = _stub_extraction_summary(monkeypatch)
+    fake = _RecordingExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    result, dataset_version = calls[0]
+    assert result.staging_subdir == "fake_source"
+    assert result.output_path == tmp_path / "fake_source" / "2026-07-30.csv"
+    assert result.error is None
+    assert dataset_version == "1.2.3"
+
+
+def test_run_extract_catches_extractor_exception_and_returns_error_code(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    calls = _stub_extraction_summary(monkeypatch)
+
+    class _FailingExtractor:
+        def extract(self, output_path, *, dataset_version=None, session=None):
+            raise RuntimeError("upstream is down")
+
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (_FailingExtractor(), "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 1
+    assert len(calls) == 1
+    result, _ = calls[0]
+    assert result.error == "RuntimeError: upstream is down"
+    assert "upstream is down" in capsys.readouterr().err
 
 
 def test_main_extract_defaults_dataset_version_to_latest_published(monkeypatch):
@@ -302,3 +401,189 @@ def test_main_extract_accepts_all_choice(monkeypatch):
 
     assert exit_code == 0
     assert captured == {"source": "all"}
+
+
+def test_main_release_dispatches_version_and_known_limitations(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_release",
+        lambda dataset_version, known_limitations: (
+            captured.update(dataset_version=dataset_version, known_limitations=known_limitations)
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(
+        [
+            "release",
+            "--version",
+            "0.3.0",
+            "--known-limitation",
+            "no removal signal",
+            "--known-limitation",
+            "zero stat deltas",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "dataset_version": "0.3.0",
+        "known_limitations": ["no removal signal", "zero stat deltas"],
+    }
+
+
+def test_main_release_defaults_known_limitations_to_empty_list(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_release",
+        lambda dataset_version, known_limitations: (
+            captured.update(dataset_version=dataset_version, known_limitations=known_limitations)
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(["release", "--version", "0.3.0"])
+
+    assert exit_code == 0
+    assert captured == {"dataset_version": "0.3.0", "known_limitations": []}
+
+
+def test_main_release_requires_version(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["release"])
+
+    assert exc_info.value.code == 2
+    assert "--version" in capsys.readouterr().err
+
+
+def test_main_render_card_dispatches_with_team_id(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_render_card",
+        lambda team_id, spec_path, output_path: (
+            captured.update(team_id=team_id, spec_path=spec_path, output_path=output_path) or 0
+        ),
+    )
+
+    exit_code = cli.main(["render-card", "--team-id", "abc123", "--output", "card.png"])
+
+    assert exit_code == 0
+    assert captured == {
+        "team_id": "abc123",
+        "spec_path": None,
+        "output_path": cli.Path("card.png"),
+    }
+
+
+def test_main_render_card_dispatches_with_spec(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_render_card",
+        lambda team_id, spec_path, output_path: (
+            captured.update(team_id=team_id, spec_path=spec_path, output_path=output_path) or 0
+        ),
+    )
+
+    exit_code = cli.main(["render-card", "--spec", "team.json", "--output", "card.png"])
+
+    assert exit_code == 0
+    assert captured == {
+        "team_id": None,
+        "spec_path": cli.Path("team.json"),
+        "output_path": cli.Path("card.png"),
+    }
+
+
+def test_main_render_card_requires_team_id_or_spec(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["render-card", "--output", "card.png"])
+
+    assert exc_info.value.code == 2
+    assert "required" in capsys.readouterr().err.lower()
+
+
+def test_main_render_card_rejects_both_team_id_and_spec(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(
+            [
+                "render-card",
+                "--team-id",
+                "abc123",
+                "--spec",
+                "team.json",
+                "--output",
+                "card.png",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err.lower()
+
+
+def test_main_build_dashboard_dispatches_with_defaults(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_build_dashboard",
+        lambda marts_dir, normalized_dir, output_dir, fetch_icons: (
+            captured.update(
+                marts_dir=marts_dir,
+                normalized_dir=normalized_dir,
+                output_dir=output_dir,
+                fetch_icons=fetch_icons,
+            )
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(["build-dashboard"])
+
+    assert exit_code == 0
+    assert captured == {
+        "marts_dir": None,
+        "normalized_dir": None,
+        "output_dir": None,
+        "fetch_icons": True,
+    }
+
+
+def test_main_build_dashboard_dispatches_with_overrides_and_no_fetch_icons(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_build_dashboard",
+        lambda marts_dir, normalized_dir, output_dir, fetch_icons: (
+            captured.update(
+                marts_dir=marts_dir,
+                normalized_dir=normalized_dir,
+                output_dir=output_dir,
+                fetch_icons=fetch_icons,
+            )
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(
+        [
+            "build-dashboard",
+            "--marts-dir",
+            "custom/marts",
+            "--normalized-dir",
+            "custom/normalized",
+            "--output-dir",
+            "custom/out",
+            "--no-fetch-icons",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "marts_dir": cli.Path("custom/marts"),
+        "normalized_dir": cli.Path("custom/normalized"),
+        "output_dir": cli.Path("custom/out"),
+        "fetch_icons": False,
+    }

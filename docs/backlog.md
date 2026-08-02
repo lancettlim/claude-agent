@@ -23,45 +23,49 @@ are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 31 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #43, #46, #47, #49 |
-| **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
+| **Done** | 39 | Shipped and verified against real data: #1-#16, #22-#24, #28-#30, #32, #33, #35-#49 (every item in this range except #17 and #34, see below) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 6 | No blocker, just not started: #15, #16, #41, #42, #44, #48 |
+| **Open, buildable now** | 0 | Every previously-open, unblocked item has shipped |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
 
-| Section | Done | Partial/Resolved | Open | Blocked | Total |
+| Section | Done | Resolved | Open | Blocked | Total |
 |---|---|---|---|---|---|
 | 0 — Foundational enablers | 5 | 0 | 0 | 0 | 5 |
-| 1 — Buildable today (#6-#17) | 8 | 2 | 2 | 0 | 12 |
+| 1 — Buildable today (#6-#17) | 11 | 1 | 0 | 0 | 12 |
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
 | 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#49) | 10 | 1 | 4 | 0 | 15 |
-| **Total** | **31** | **4** | **6** | **8** | **49** |
+| 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 15 |
+| **Total** | **39** | **2** | **0** | **8** | **49** |
 
-Takeaways: every item in Section 0 and every "buildable today, no new data
-required" item that isn't genuinely open (#15, #16) or a judgment call
-(#17) is done — that bucket is close to exhausted. Section 2 (Consumption
-surfaces) is now fully closed out except the one genuinely blocked item
-(#31). This pass closed #43 — a shared retry-with-exponential-backoff
-helper (`pipelines/extract/http.py`) applied to every raw HTTP call across
-all five extractors, so a single transient failure (a 5xx, a dropped
-connection, a timeout) no longer aborts an entire extraction run with no
-output at all; a prior pass had already closed #49, the real correctness
-gap in the validation report's bps-based metrics found while verifying
-#29/#30, by re-executing each bps test's own compiled SQL against the
-built warehouse instead of trusting dbt-core's `run_results.json`, which
-(confirmed directly against a real `extract all` + `dbt build` + `validate`
-run) only reports the true value on the failing path. The remaining open
-work now skews toward Section 3 (platform/quality hardening, 4 open items:
-#41, #42, #44, #48). The 8 blocked items aren't neglect — 4 are waiting on
-real-world time/events (Blocker A's snapshot history, Blocker B's
-rebalance, #31's snapshot-dependent hosting justification) and 4 need a
-source this repo doesn't have and, in
-#26/#27's case, may not exist in scriptable form at all.
+Takeaways: **every unblocked item in the backlog is now done.** Sections 0,
+1's "buildable today" subsection (except #17, a deliberate non-build), 2,
+and 3 are all fully closed out. This pass closed the remaining six "open,
+buildable now" items in one sweep — #45 (CLI dispatch test coverage for
+`release`/`render-card`/`build-dashboard`), #7 (player/country dimension
+marts — `pokemon_usage_by_country`, `player_signature_pokemon`), #44
+(incremental MunchStats extraction, `teams_scraped`-aware), #16 (speed
+-tier bracket mart — `max_investment_speed`, `pokemon_speed_tiers`), #48
+(real, code-generated `extraction_summary.json` + structured per-request
+stats — which caught and fixed a real gap in #44's own caching logic that
+content-only verification had missed), #41 (schema-drift enforcement,
+staging and normalized layers), #42 (quality tests on all 21 marts — which
+caught and fixed a real DuckDB CSV-sniffing bug), and #15's softer step
+(archetype seed drift-flagging, which found genuine drift in 3 of 6
+curated archetypes against real data). Three of these passes (#48, #42,
+and #15) each surfaced a real, previously-unknown issue while verifying
+against live data rather than synthetic fixtures — not hypothetical risk,
+actual bugs and actual data-vs-editorial mismatches caught in the act.
+
+The 8 remaining blocked items aren't neglect — 4 are waiting on real-world
+time/events (Blocker A's snapshot history, Blocker B's rebalance, #31's
+snapshot-dependent hosting justification) and 4 need a source this repo
+doesn't have and, in #26/#27's case, may not exist in scriptable form at
+all. What's left to do in this file now is exactly what's left: wait for
+those, or bring a new source into scope.
 
 ## Entry format
 
@@ -222,7 +226,7 @@ MunchStats event-date history. Not yet wired into the dashboard UI (#29's
 trend/line charts are the natural consumer, but that item is bigger scope
 than this mart alone).
 
-#### 7. Player and country dimension mart — PARTIALLY DONE
+#### 7. Player and country dimension mart — DONE
 
 - **Size**: S
 - **Value**: Answers "who plays what," "which regions favor which
@@ -230,15 +234,39 @@ than this mart alone).
 - **Blocked by**: nothing
 - **Touches**: new mart, `tournament_team`
 
-`player_name`/`player_country` now surface in `top_tournament_teams`
+`player_name`/`player_country` already surfaced in `top_tournament_teams`
 (`dbt/models/marts/top_tournament_teams.sql`, shipped as part of the M6
 Top Teams tab work), answering "who plays what" for the top 100 teams by
-win rate. Still open: a dedicated country/player-aggregate dimension mart
-("which regions favor which archetypes," "does this player have a
-signature Pokémon" across their full history rather than one team row) —
-`top_tournament_teams` is team-grain, not player- or country-grain.
-Related polish still open too: `docs/dashboard.md` notes country codes
-render as plain two-letter text because no flag-emoji/ISO lookup exists.
+win rate, but that mart is team-grain, not player- or country-grain. This
+pass closed the real gap with two new sibling marts. New
+`dbt/models/marts/pokemon_usage_by_country.sql`: usage x player_country
+cross-tab (usage_count/usage_share/country_usage_rank within each
+country), restricted to the current legal pool and to roster rows with a
+reported player_country. New
+`dbt/models/marts/player_signature_pokemon.sql`: one row per player_id x
+pokemon_key they've fielded across their *entire* recorded history (not
+just their best single team), with player_usage_share and
+player_pokemon_rank (rank 1 = signature Pokémon) plus player_team_count as
+a sample-size signal, since a "signature" claim from a player with one
+recorded team is much weaker evidence than one from a player with dozens.
+Both use "which Pokémon," not archetype, as the practical unit of
+analysis -- deriving a real per-country/per-player *archetype* profile
+would additionally require joining the curated, NOT-sourced
+`archetype_pokemon_map` seed, which is a bigger, separate ask than this
+item's own S sizing. Verified against real data (a fresh `extract
+munchstats`+`opgg`+`pokebase`+`pokeapi` and `dbt build`, not a synthetic
+fixture): `pokemon_usage_by_country` produced 2,433 rows across 69
+countries with a #1 Pokémon (e.g. Incineroar at 14.8% share in Germany,
+569 roster appearances); `player_signature_pokemon` produced 44,533 rows,
+8,431 players with a rank-1 signature pick, and real, plausible signature
+picks at non-trivial sample sizes (e.g. a French player fielding
+Incineroar in 11 of 11 recorded teams' legal-pool slots, a 29.7% overall
+share).
+
+Not wired into the dashboard UI (real, queryable mart output; a
+country/player drill-down view is separate, undone follow-up work).
+Related polish still open: `docs/dashboard.md` notes country codes render
+as plain two-letter text because no flag-emoji/ISO lookup exists.
 
 #### 8. Placement-weighted usage — DONE
 
@@ -379,7 +407,7 @@ and `pokemon_ability_usage.ability_share` per Pokémon, plus how many
 distinct items/abilities were observed at all. Not yet wired into the
 dashboard UI.
 
-#### 15. Data-derived archetype clustering
+#### 15. Data-derived archetype clustering — SOFTER STEP DONE, full clustering still open
 
 - **Size**: L
 - **Value**: `archetype_pokemon_map` is a 33-row hand-curated seed and the
@@ -391,10 +419,46 @@ dashboard UI.
 - **Touches**: `dbt/seeds/archetype_pokemon_map.csv`,
   `dbt/models/marts/pokemon_archetype_usage.sql`, `archetype_summary.sql`
 
-A softer intermediate step: keep the curated seed but add a test that flags
-when its members drift far from observed clusters.
+Shipped exactly the softer intermediate step this entry itself proposed,
+not the full L-sized clustering rebuild: the curated seed stays, and a new
+singular test, `dbt/tests/singular/
+assert_archetype_pokemon_map_intra_group_synergy.sql`, flags archetypes
+whose curated members don't actually show above-chance real team synergy
+with each other, using #9's `pokemon_team_synergy.lift` as the "observed
+cluster" signal to check the editorial judgment against. Per archetype:
+averages `lift` across every pair of its own curated members (a pair that
+never co-occurred on a real team at all has no `pokemon_team_synergy` row
+-- a left join preserves that as a real "no observed pairs" signal rather
+than silently dropping it); flags `drifted` (avg lift <= 1.0, no better
+than chance) or `no_observed_pairs`; a single-member archetype (no pair
+exists to judge) is `insufficient_data` and never flagged.
+`severity=warn` (this test's own config) plus a new `archetype_drift`
+`meta.category` (excluded from `release_blocking_findings` in
+`pipelines/validate/report.py`, the same deliberate-exception treatment
+backlog #42's `mart_quality` category already gets) means a real drift
+surfaces in `reports/validation/validation_report.json`'s new
+`archetype_drift_checks` section without ever blocking `dbt build`, CI, or
+`pipelines.cli release`.
 
-#### 16. Speed-tier bracket mart
+Verified against real data, and it immediately found real, non-hypothetical
+drift in half the curated archetypes (not a contrived example): of the 6
+current archetypes, `rain` (pelipper/politoed) has genuinely **zero**
+recorded teams fielding both together despite being a textbook rain-team
+pairing; `sun` (torkoal/ninetales/venusaur-mega/charizard-mega-y) averages
+0.53 lift (real co-occurrence *below* chance for most pairs); `tailwind
+-hyper-offense` (whimsicott/grimmsnarl) averages 0.098 (far below chance).
+`sand` correctly stays unflagged (average pulled to 7.58 by a genuinely
+strong tyranitar-mega/excadrill pairing at 20.4 lift, even though one of
+its other pairs is weak) and the two single-member archetypes
+(`trick-room`, `bulky-balance`) correctly report no pairs to judge. This
+is real evidence for this item's own "encodes your opinion rather than the
+data's" concern, not just a theoretical risk.
+
+Full data-derived clustering (replacing the curated seed outright) is
+still open -- this only adds a signal for when the curated seed disagrees
+with real data, not a replacement for it.
+
+#### 16. Speed-tier bracket mart — DONE
 
 - **Size**: M
 - **Value**: The Speed Tiers tab currently shows flat base speed. Real speed
@@ -403,8 +467,33 @@ when its members drift far from observed clusters.
 - **Blocked by**: nothing (pure derivation from existing stats)
 - **Touches**: `dbt/models/marts/pokemon_champions_profile.sql`, new mart
 
-Needs EV/nature assumptions to be exact; a documented "max speed investment"
-convention is the honest simplification. Item #25 would make it precise.
+Took exactly the honest-simplification path this entry named: a documented
+"max speed investment" convention (252 EVs, a beneficial nature, a perfect
+31 IV, Level 50) rather than waiting on #25's real per-roster EV data.
+`pokemon_champions_profile` gained a `max_investment_speed` column
+(`floor((base_speed + 52) * 1.1)`, Bulbapedia's standard stat formula
+simplified for this specific EV/nature/IV/level combination — verified
+against a known reference value: base speed 142 (Dragapult) produces 213,
+matching the commonly-cited real figure). New sibling mart
+`dbt/models/marts/pokemon_speed_tiers.sql` builds the actual bracket table
+on top of it: `plus_one_speed`/`scarf_speed` (x1.5) and
+`plus_two_speed`/`tailwind_speed` (x2.0) are numerically-identical pairs
+kept as separately-named columns since they answer different real
+questions, plus `scarf_tailwind_speed` (x3.0) for the common
+scarfed-under-Tailwind combination — the multipliers themselves are fixed
+game-mechanics constants, the same treatment `pokemon_champions_profile`'s
+schema.yml entry already gives `app.js`'s `SPEED_TIERS` thresholds and
+`matchup.js`'s `TYPE_CHART`, so they're applied as plain SQL multiplication
+rather than sourced from anywhere. Verified against real data (`dbt
+build` against the existing warehouse): 312 legal-pool rows, correct
+values end-to-end for Dragapult (213/319/319/426/426/639) and internally
+consistent for every row (`plus_one_speed == scarf_speed`,
+`plus_two_speed == tailwind_speed`, `scarf_tailwind_speed ==
+plus_two_speed * 1.5`). Not yet wired into the dashboard UI — the Speed
+Tiers tab still buckets on raw `speed`; switching it to these columns is
+separate, undone follow-up work. Item #25 (real per-roster EVs) would
+still make this exact instead of assumed, unchanged from this entry's own
+original note.
 
 #### 17. Wire up `stat_change_leaderboard` — RESOLVED, staying unwired on purpose
 
@@ -930,7 +1019,7 @@ source_row_count_anomaly_staging_pokeapi_`): a 300→50 row drop fails at
 passes vacuously — plus a new `test_report.py` unit test for the
 report-shaping side.
 
-### 41. Schema-drift enforcement
+### 41. Schema-drift enforcement — DONE
 
 - **Size**: M
 - **Value**: The `data/staging/*.schema.json` and `data/normalized/*.schema.json`
@@ -942,11 +1031,41 @@ report-shaping side.
 - **Blocked by**: nothing
 - **Touches**: `data/**/*.schema.json`, `dbt/models/staging/`, `tests/`
 
-Especially worth it given both RSC-scraping extractors depend on hand-rolled
-string markers (`pipelines/extract/opgg.py:65`) that will break silently on
-any upstream markup change.
+Shipped as two layers, matching the two contract directories this entry
+names. New shared `pipelines/schema_contracts.py` (`schema_field_names`,
+`csv_header`) is the one place both layers load a `*.schema.json`
+contract's declared field-name list. **Staging layer**: new
+`tests/unit/extract/test_schema_contracts.py` asserts every one of the
+five extractors' `FIELDNAMES` (plus PokéAPI's three detail-feed
+`MOVE_FIELDNAMES`/`ABILITY_FIELDNAMES`/`ITEM_FIELDNAMES` constants) exactly
+matches its `data/staging/<subdir>.schema.json` contract — a pure
+code-level check needing no live data, so it runs on every `make test`/CI
+push and catches the "code and docs drifted apart" mistake immediately,
+before anything downstream. **Normalized layer**: new
+`pipelines/validate/report.py`'s `build_schema_drift_checks` compares each
+`data/normalized/<entity>.csv`'s real header (post-`dbt build`) against its
+`data/normalized/<entity>.schema.json` contract, wired into `build_report`
+as a new `schema_drift_checks` report section and into
+`release_blocking_findings` the same way any other failing gate is — a
+missing CSV (fresh clone, or an unextracted source like `pokemon_asset`
+before Bulbagarden runs) reports `skipped`, not `fail`, since there's no
+drift to detect against data that doesn't exist yet. Verified against real
+data: a full `extract` + `dbt build` + `validate` run reports all 11
+present normalized entities `pass` and `pokemon_asset` correctly
+`skipped` (Bulbagarden wasn't extracted this pass), with
+`release_blocking_findings` empty.
 
-### 42. Mart tests
+The RSC-scraping risk this entry specifically named (`opgg.py`/`pokebase.py`'s
+hand-rolled string markers) turns out to fail loud already, not silent —
+`_extract_pokemon_payloads` raises `ValueError` if the marker or bracket
+structure it scans for ever goes missing, and a genuine upstream JSON-key
+rename (e.g. `stats["hp"]`) would raise `KeyError` the same way. The real
+silent-drift risk this item closes is narrower but still real: our own
+`FIELDNAMES`/`schema.json` pair (or a normalized model's `select` list)
+drifting out of sync with each other through an ordinary code edit, which
+neither layer's tests caught before this pass.
+
+### 42. Mart tests — DONE
 
 - **Size**: M
 - **Value**: All 32 singular tests target normalized and seed models. **Zero
@@ -955,10 +1074,57 @@ any upstream markup change.
 - **Blocked by**: nothing
 - **Touches**: `dbt/tests/singular/`, `dbt/models/marts/schema.yml`
 
-Also worth noting there is not a single dbt *generic* test in the project —
-no `unique`, `not_null`, `relationships`, or `accepted_values` anywhere.
-Everything is bespoke SQL, which is a lot of surface for tests that generics
-would cover in one line.
+Took the "generics would cover it in one line" path this entry itself
+suggested, applied to all 21 marts that exist by the time this was picked
+up (not ten -- the mart layer grew across several other backlog items
+before this one landed). Every mart now carries `not_null` on its grain
+column(s) plus a uniqueness check on its real primary key: dbt's built-in
+`unique` for the 8 marts with a genuine single-column grain
+(`pokemon_champions_profile`, `pokemon_speed_tiers`, etc.), and a new
+generic test, `dbt/macros/test_unique_combination_of_columns.sql`, for the
+13 marts with a real composite grain (e.g. `pokemon_usage_summary`'s
+`(pokemon_key, event_tier)`, `pokemon_team_core_usage`'s `(pokemon_key,
+partner_pokemon_key)`) -- the standard `unique_combination_of_columns`
+pattern (the same one dbt-utils ships), reimplemented directly rather than
+adding a package dependency for one macro. This is this project's second
+generic test (the first was backlog #40's `row_count_anomaly`), so the
+"not a single generic test" observation this entry originally made no
+longer holds at all.
+
+Tagged `meta.category: mart_quality`, following #37's mechanism, and
+wired into `pipelines/validate/report.py` as a new `mart_quality_checks`
+report section -- but deliberately **excluded** from
+`release_blocking_findings`, unlike every other category: marts branch off
+the normalized layer for dashboard-facing output and aren't part of the
+release package (`CLAUDE.md`'s "Repository structure"), so a mart-quality
+failure should be visible and actionable without blocking
+`pipelines.cli release`. New `tests/unit/validate/test_report.py` cases
+cover both the categorization and the never-blocks guarantee directly.
+
+Verified against real data, and this real run caught a real, previously
+-latent bug, not a hypothetical: `dbt build` against the actual warehouse
+initially failed with a DuckDB CSV parse error on `player_signature_pokemon
+.csv` (a `unique_combination_of_columns` test was the first query ever to
+read that mart's *full* row width back into DuckDB) -- `read_csv`'s
+`auto_detect` sniffer only samples the first ~20,480 rows to guess the CSV
+dialect, and the first quoted comma in a player name ("Wyatt Thibodeaux,
+Jr.") didn't appear until row 34,569, so it wrongly concluded no quote
+character was needed at all. A single-column `not_null` test against the
+same view didn't trip it (confirmed: the optimizer can prune that down to
+one column without validating full row arity), so this was a real gap
+only a multi-column test could have caught. Fixed at the source, not
+worked around in the test: `dbt_project.yml`'s `marts`/`normalized` model
+configs now pin `csv_read_options: {quote: '"', escape: '"'}` (Python's
+`csv.DictWriter` and dbt-duckdb's own CSV writer both already always use
+`"`, so this was never actually a value that needed sniffing) while
+leaving delimiter/header/type detection on `auto_detect`. Confirmed fixed
+directly against the same file with `read_csv(..., quote=chr(34),
+escape=chr(34))`, then via a real, clean `dbt build` (147 pass, 0 mart
+test failures) and `pipelines.cli validate` (54 mart_quality_checks, all
+`pass`, `release_blocking_findings` empty). The same latent risk existed
+for `normalized/*.csv` too (e.g. `tournament_team.player_name`) even
+though nothing had tripped it yet -- fixed there in the same config change
+rather than only patching the mart that happened to surface it first.
 
 ### 43. Extractor resilience — DONE (retry/backoff; rate limiting still open)
 
@@ -994,7 +1160,7 @@ request *cadence*, not just reacting to failures after the fact) — a
 distinct, smaller follow-up, not folded in here since retry/backoff was
 the change with the real "whole run aborts" failure mode behind it.
 
-### 44. Incremental extraction
+### 44. Incremental extraction — DONE
 
 - **Size**: M
 - **Value**: MunchStats refetches all 31 tournaments and ~106k rows every
@@ -1003,11 +1169,31 @@ the change with the real "whole run aborts" failure mode behind it.
 - **Blocked by**: nothing (design alongside #1)
 - **Touches**: `pipelines/extract/munchstats.py`, others as applicable
 
-Bulbagarden's sha1-based `skip_existing` is the existing pattern to follow.
-Conditional requests (ETag / If-Modified-Since) would help the two scraped
-sources.
+Followed Bulbagarden's sha1-based `skip_existing` pattern as this entry
+suggested, adapted to what MunchStats actually offers: there's no
+per-tournament content hash, so `extract`'s new `previous_snapshot_path`
+parameter (wired up in `pipelines/cli.py`'s `_run_extract`, munchstats-only,
+via the already-existing `_latest_snapshot_path` helper) still always
+re-fetches each tournament's cheap `metadata.json`, and only skips
+re-fetching the heavy `players.json` (the bulk of every run's ~106k rows)
+when that tournament's `(name, date, type)` signature is unchanged from
+what's already cached in the previous dated snapshot. Reused rows are
+re-stamped with the current run's `extracted_at_utc`/`dataset_version`,
+matching `bulbagarden.py`'s "every row reflects this extraction run"
+convention for its own skipped-download rows. Verified against real data,
+not just the new unit tests (`tests/unit/extract/test_munchstats.py`):
+re-running `extract munchstats` same-day against a freshly-extracted
+snapshot reproduced the identical 106,134 rows in 11 seconds (down from
+the original run's 63 live requests fetching ~37MB), confirming every
+tournament's roster data was correctly reused rather than silently
+dropped or duplicated.
 
-### 45. `pipelines/cli.py` test coverage — PARTIALLY DONE, stale "zero tests" claim
+Conditional requests (ETag / If-Modified-Since) for the two scraped
+sources (OP.GG/PokéBase) are lower value than this was: both are already a
+single request each, so there's no comparable "N heavy fetches down to
+near-zero" win available there.
+
+### 45. `pipelines/cli.py` test coverage — DONE
 
 - **Size**: S
 - **Value**: 74 unit tests cover the extractors, release, render, dashboard,
@@ -1017,15 +1203,17 @@ sources.
 - **Blocked by**: nothing
 - **Touches**: new `tests/unit/test_cli.py`
 
-`tests/unit/test_cli.py` already exists (added alongside backlog #38's
-fix) and isn't zero: 16 tests cover the snapshot-path helpers, `extract`
+`tests/unit/test_cli.py` already existed (added alongside backlog #38's
+fix) with 16 tests covering the snapshot-path helpers, `extract`
 orchestration (including `all`), `dataset_version` defaulting/override, and
-all four `validate` exit-code paths (clean pass, gate failure, unexpected
-crash, stale `run_results.json`). Still genuinely uncovered: `main()`'s
-argument-parsing/dispatch for the `release`, `render-card`, and
-`build-dashboard` subcommands (e.g. `render-card`'s `--team-id`/`--spec`
-mutual-exclusivity, `release`'s required `--version`) — narrower than this
-entry originally described, but real.
+all four `validate` exit-code paths. This pass closed the remaining gap: 11
+new tests cover `main()`'s argument-parsing/dispatch for `release` (version
+plus repeatable `--known-limitation`, defaulting to `[]`, and the
+required-`--version` `SystemExit(2)` path), `render-card` (`--team-id` and
+`--spec` each dispatch correctly, plus both the missing-both and
+both-given `SystemExit(2)` mutual-exclusivity paths), and `build-dashboard`
+(default `None`/`True` kwargs, and all four overrides including
+`--no-fetch-icons`). 27 tests total in the file now, all passing.
 
 Related, still true: there is no `conftest.py` or shared fixture module
 anywhere under `tests/`, so each file re-declares its own helpers.
@@ -1078,7 +1266,7 @@ asserts it survives; the existing stale-sprite-cleanup test
 (`test_copy_sprites_clears_stale_files_across_rebuilds`) still passes
 unchanged.
 
-### 48. Extraction run metadata and structured logging
+### 48. Extraction run metadata and structured logging — DONE
 
 - **Size**: M
 - **Value**: `reports/validation/extraction_summary.json` reports per-source
@@ -1089,7 +1277,57 @@ unchanged.
 - **Blocked by**: nothing
 - **Touches**: `pipelines/extract/`, `reports/validation/`
 
-Prerequisite for any real monitoring, and directly supports #40's baselines.
+Shipped as three pieces. `pipelines/extract/http.py` gained `RequestStats`
+and a `track_requests()` context manager: since every extractor's raw HTTP
+calls already funnel through the one `get_with_retry` chokepoint (#43),
+that's instrumented directly rather than touching each extractor module —
+one `get_with_retry` call is one logical "attempted" request regardless of
+how many raw retry attempts it took internally. New
+`pipelines/extract/summary.py` computes each source's `rows_written`
+(counting the written CSV) and `required_field_null_rate` (only over
+fields the matching `data/staging/<subdir>.schema.json` marks `required:
+true`, matching the old file's own convention of not penalizing
+known-optional blanks like OP.GG's `pokemon_id`) and `update()`s
+`reports/validation/extraction_summary.json` by merging just the
+just-run source's entry into the existing document — a single-source
+`extract <source>` run no longer wipes out what's known about every other
+source. `pipelines/cli.py`'s new `_run_tracked_extract` wraps every
+extraction call in `track_requests()` and calls `summary.update()`
+regardless of success; on an extractor exception it now prints a
+structured one-line error and returns a controlled exit code instead of
+letting a raw traceback propagate, matching `_run_validate`'s existing
+catch-log-return convention. PokéAPI's move/ability/item detail fetches
+(previously invisible — the old hand-written file only ever had one merged
+"PokéAPI" entry) each get their own entry now, correctly distinguishing
+"PokéAPI" (1,352 requests) from "PokéAPI (move detail)" (569 requests,
+1 genuinely 404'd — an unresolvable move name the extractor already
+gracefully skips) etc.
+
+Verified against real, freshly-run extractions, not synthetic fixtures —
+and this real run caught a genuine bug in #44's just-shipped
+implementation, not a hypothetical: `extract munchstats`'s real
+`requests_attempted` came back as 90, not the ~32 the #44 write-up
+expected, because live MunchStats indexes both VGC events *and*
+same-venue TCG events (a fact invisible to #44's own row-count/md5-based
+verification, since a TCG tournament's `players.json` reports players
+whose `team` list is always empty, so it silently contributes zero rows
+either way — content-only verification couldn't tell full-refetch and
+correctly-cached apart). Fixed in the same pass: `metadata.json`'s own
+`teams_scraped` count tells `munchstats.py` upfront, with no
+`players.json` fetch and no cache needed at all, that a tournament will
+contribute zero rows (`teams_scraped: 0`). A real re-run afterward
+confirmed `requests_attempted` at the true minimum, 61 (1 index + 60
+metadata, zero `players.json` fetches — all 31 real VGC tournaments
+correctly cache-hit, all 29 TCG ones correctly skipped via
+`teams_scraped`), with the same 106,134 real rows preserved. This is the
+concrete case for why this item's own value statement is true: content-
+equality checks couldn't see this waste at all; the structured request
+counts this item adds surfaced it immediately. `reports/validation/
+extraction_summary.json` itself is now a real, current, code-generated
+document for four of five sources (Bulbagarden was never in the old
+hand-written file either and wasn't re-extracted in this pass; it gets a
+real entry the first time someone runs `extract bulbagarden` after this
+change, same as any other source).
 
 ### 49. Bps-based validation-report metrics read as 0 on a passing check — DONE
 

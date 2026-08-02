@@ -8,6 +8,18 @@ models:
       one overall row per Pokémon (event_tier is null) plus one row per
       tournament tier it appears in, each ranked within its own event_tier
       partition. Written to data/marts/pokemon_usage_summary.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'event_tier']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_usage_summary}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_summary}
   - name: legality_summary_by_regulation
     description: >
       Legal-pool size per regulation and snapshot_date: legal_pokemon_count
@@ -19,11 +31,37 @@ models:
       was actually banned in a later regulation, since there's no event to
       subtract it back out. Written to
       data/marts/legality_summary_by_regulation.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['regulation_code', 'snapshot_date']
+          config:
+            meta: {category: mart_quality, table_name: legality_summary_by_regulation}
+    columns:
+      - name: regulation_code
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: legality_summary_by_regulation}
+      - name: snapshot_date
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: legality_summary_by_regulation}
   - name: stat_change_leaderboard
     description: >
       pokemon_stat_delta reshaped with a gainer/loser direction flag and a
       rank within that direction. Written to
       data/marts/stat_change_leaderboard.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: stat_change_leaderboard}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: stat_change_leaderboard}
   - name: pokemon_win_rate_summary
     description: >
       Win-rate-proxy KPI per Pokémon: total wins/losses and win_rate
@@ -35,6 +73,15 @@ models:
       small-sample win rates more honestly than raw win_rate does (a 100%
       win rate over 3 matches no longer outranks 62% over 200). Written
       to data/marts/pokemon_win_rate_summary.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_win_rate_summary}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_win_rate_summary}
   - name: pokemon_item_usage
     description: >
       Item drill-down for the Pokémon Profile tab's Items section (top 5
@@ -45,6 +92,23 @@ models:
       data/marts/pokemon_item_usage.csv. Replaces the old combined
       pokemon_build_usage mart (see pokemon_ability_usage below for the
       other half of that split).
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'item_name']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_item_usage}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_item_usage}
+      - name: item_name
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_item_usage}
   - name: pokemon_ability_usage
     description: >
       Ability drill-down for the Pokémon Profile tab's Ability section:
@@ -53,6 +117,23 @@ models:
       to the current legal pool, ranked within each Pokémon, with
       short_effect joined from ability_detail. Written to
       data/marts/pokemon_ability_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'ability']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_ability_usage}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_ability_usage}
+      - name: ability
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_ability_usage}
   - name: pokemon_move_usage
     description: >
       Move drill-down for the Pokémon Profile tab's Moves section (top 15
@@ -63,12 +144,38 @@ models:
       the current legal pool, ranked within each Pokémon, with
       move_type/power/accuracy/category/priority/pp/short_effect joined
       from move_detail. Written to data/marts/pokemon_move_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'move_name']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_move_usage}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_move_usage}
+      - name: move_name
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_move_usage}
   - name: top_tournament_teams
     description: >
       Top Teams tab's leaderboard feed: one row per tournament_team with a
       reported win/loss record, ranked by win_rate, with event context and
       full member roster (pokemon_keys, pipe-delimited in slot order).
       Written to data/marts/top_tournament_teams.csv.
+    columns:
+      - name: team_id
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: top_tournament_teams}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: top_tournament_teams}
   - name: pokemon_team_core_usage
     description: >
       Team-core drill-down (docs/prd.md's "Drill-down by Pokémon, team
@@ -81,6 +188,23 @@ models:
       (once per anchor direction) so either Pokémon in the pair can be the
       drill-down's selected anchor. Written to
       data/marts/pokemon_team_core_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'partner_pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_team_core_usage}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_core_usage}
+      - name: partner_pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_core_usage}
   - name: pokemon_archetype_usage
     description: >
       Archetype Explorer member-level drill-down: joins the curated,
@@ -89,6 +213,23 @@ models:
       usage_share/win_rate/record_count are nullable -- a curated member
       may have no recorded tournament appearances yet. Written to
       data/marts/pokemon_archetype_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['archetype_key', 'pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_archetype_usage}
+    columns:
+      - name: archetype_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_archetype_usage}
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_archetype_usage}
   - name: archetype_summary
     description: >
       Archetype Explorer card-grid feed: one row per curated archetype
@@ -98,13 +239,36 @@ models:
       archetype_pokemon_map seed -- see that seed's schema.yml entry for
       why this is an explicit exception to the provenance-is-mandatory
       convention. Written to data/marts/archetype_summary.csv.
+    columns:
+      - name: archetype_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: archetype_summary}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: archetype_summary}
   - name: pokemon_champions_profile
     description: >
       Denormalized per-Pokémon profile for the Speed Tiers and Team
       Builder dashboard views: one row per currently legal Pokémon with
       its Champions-format base stats (including speed) plus nullable
-      overall usage_count/usage_share/win_rate/record_count. Written to
+      overall usage_count/usage_share/win_rate/record_count.
+      max_investment_speed (backlog.md #16) is the Level-50 Speed stat
+      under the standard "max speed investment" competitive convention
+      (252 EVs, a beneficial nature, 31 IV) rather than raw base speed --
+      see pokemon_speed_tiers below for the full modified-speed bracket
+      table built on top of it. Written to
       data/marts/pokemon_champions_profile.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_champions_profile}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_champions_profile}
   - name: pokemon_tera_type_usage
     description: >
       Tera type drill-down (backlog.md #10): usage count and tera_share
@@ -113,6 +277,23 @@ models:
       ranked within each Pokémon. Coverage is partial -- MunchStats
       doesn't report tera_type for every roster slot. Written to
       data/marts/pokemon_tera_type_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'tera_type']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
+      - name: tera_type
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
   - name: pokemon_usage_by_regulation
     description: >
       Usage x regulation cross-tab (backlog.md #12): pokemon_usage_summary's
@@ -124,6 +305,23 @@ models:
       existing usage numbers down to a single regulation's legal pool
       instead of the union across all regulations. Written to
       data/marts/pokemon_usage_by_regulation.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['regulation_code', 'pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_usage_by_regulation}
+    columns:
+      - name: regulation_code
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_regulation}
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_regulation}
   - name: pokemon_build_concentration
     description: >
       Item and ability build concentration (backlog.md #14): a
@@ -134,6 +332,15 @@ models:
       contested choices. item_count/ability_count is how many distinct
       items/abilities were observed at all. Written to
       data/marts/pokemon_build_concentration.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_build_concentration}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_build_concentration}
   - name: pokemon_placement_weighted_usage
     description: >
       Placement-weighted usage (backlog.md #8): distinguishes "popular"
@@ -142,6 +349,15 @@ models:
       placement_weighted_score/weighted_usage_share use a continuous
       inverse-placement (1/placement) weight per appearance instead.
       Written to data/marts/pokemon_placement_weighted_usage.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_placement_weighted_usage}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_placement_weighted_usage}
   - name: pokemon_usage_by_event_date
     description: >
       Usage over time from tournament_event.event_date (backlog.md #6):
@@ -150,6 +366,23 @@ models:
       extraction snapshots (Blocker A), since it trends across tournaments
       actually played instead of across re-extraction dates. Written to
       data/marts/pokemon_usage_by_event_date.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'event_date']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_usage_by_event_date}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_event_date}
+      - name: event_date
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_event_date}
   - name: pokemon_team_synergy
     description: >
       Team synergy beyond raw co-occurrence (backlog.md #9): lift per
@@ -160,6 +393,100 @@ models:
       top of pokemon_team_core_usage's mirrored pairs. pair_team_count is
       exposed alongside lift since lift is noisy at low pair counts.
       Written to data/marts/pokemon_team_synergy.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'partner_pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_team_synergy}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_synergy}
+      - name: partner_pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_synergy}
+  - name: pokemon_usage_by_country
+    description: >
+      Country-grain half of backlog.md #7 ("which regions favor which
+      archetypes"): usage x player_country cross-tab, restricted to the
+      current legal pool and to roster rows with a reported
+      player_country (optional in the source). usage_share/
+      country_usage_rank are computed within each player_country
+      partition, mirroring pokemon_usage_by_regulation's usage-x-dimension
+      pattern. Written to data/marts/pokemon_usage_by_country.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'player_country']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_usage_by_country}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_country}
+      - name: player_country
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_usage_by_country}
+  - name: pokemon_speed_tiers
+    description: >
+      Speed-tier bracket mart (backlog.md #16): modified Speed under the
+      format's common competitive scenarios, built on top of
+      pokemon_champions_profile.max_investment_speed. plus_one_speed/
+      scarf_speed (x1.5) and plus_two_speed/tailwind_speed (x2.0) are
+      numerically identical pairs kept as separately-named columns since
+      they answer different real questions (a stat-stage boost vs. an
+      item vs. a team-wide field effect); scarf_tailwind_speed (x3.0)
+      covers the common scarfed-Pokémon-under-Tailwind combination. The
+      multipliers themselves are fixed game-mechanics constants, the same
+      treatment already given to app.js's SPEED_TIERS thresholds and
+      matchup.js's TYPE_CHART. Written to
+      data/marts/pokemon_speed_tiers.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_speed_tiers}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_speed_tiers}
+  - name: player_signature_pokemon
+    description: >
+      Player-grain half of backlog.md #7 ("does this player have a
+      signature Pokémon," across their full history): one row per
+      player_id x pokemon_key they've fielded, restricted to the current
+      legal pool. player_usage_share is this Pokémon's fraction of the
+      player's own total legal-pool roster appearances across every team
+      of theirs on record; player_pokemon_rank 1 is their most-played
+      Pokémon. player_team_count (distinct teams this player has fielded)
+      is a sample-size signal alongside the rank. Written to
+      data/marts/player_signature_pokemon.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['player_id', 'pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: player_signature_pokemon}
+    columns:
+      - name: player_id
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: player_signature_pokemon}
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: player_signature_pokemon}
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
@@ -214,3 +541,14 @@ models:
 # docs/dataset-spec.md's tournament_event/tournament_team/
 # tournament_team_member "Optional fields" — so these marts only cover the
 # subset of tournaments/rosters MunchStats actually reported them for.
+#
+# Mart tests (backlog.md #42): every model above now carries a
+# unique_combination_of_columns (or built-in unique, for a single-column
+# grain) plus not_null on its grain columns, tagged meta.category:
+# mart_quality so pipelines/validate/report.py buckets them into their own
+# schema_drift_checks-style report section -- but, unlike every other
+# category, mart_quality_checks is deliberately NOT folded into
+# release_blocking_findings: marts branch off the normalized layer for
+# dashboard-facing output and aren't part of the release package (see
+# CLAUDE.md's "Repository structure"), so a mart-quality failure should be
+# visible and actionable without blocking `pipelines.cli release`.

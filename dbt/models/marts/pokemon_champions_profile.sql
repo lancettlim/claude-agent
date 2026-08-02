@@ -10,6 +10,20 @@
 -- record_count are nullable — real MunchStats tournament data doesn't
 -- cover every legal Pokémon, and a null here means "not yet seen in a
 -- recorded roster", not zero.
+--
+-- max_investment_speed (backlog.md #16) is the Level-50 Speed stat under
+-- the standard competitive "max speed investment" convention -- 252 EVs, a
+-- beneficial nature, and a perfect (31) IV -- rather than the raw base
+-- `speed` stat above, which is what a real team's Speed actually looks
+-- like at the format's standard level and is what determines turn order
+-- in practice. Exact EVs/nature per real roster entry would need Victory
+-- Road's moveset data (backlog.md #25, still deferred); this is the
+-- documented simplification that item calls out as the honest interim
+-- convention. Formula (Bulbapedia's standard stat formula, Level 50, IV
+-- 31, EV 252, nature 1.1x): floor((floor((2*base + 31 + floor(252/4)) *
+-- 50/100) + 5) * 1.1), which simplifies exactly (2*base+94 is always
+-- even) to floor((base_speed + 52) * 1.1) -- verified against a known
+-- reference value: base speed 142 (Dragapult) -> 213.
 select
   champions.pokemon_key,
   pokemon.type_1,
@@ -20,6 +34,7 @@ select
   champions.sp_attack,
   champions.sp_defense,
   champions.speed,
+  floor((champions.speed + 52) * 1.1) as max_investment_speed,
   champions.stat_total,
   usage.usage_count,
   usage.usage_share,

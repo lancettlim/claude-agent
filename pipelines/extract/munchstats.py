@@ -27,6 +27,38 @@ alongside `player_id` — real, sourced fields, not fabricated.
 `ability`/`tera_type`/`nature`/`moves` are captured too, duplicated onto
 every roster-slot row like `placement` already is; `moves` is a
 pipe-delimited string since a roster slot can carry more than one.
+
+Incremental extraction (backlog.md #44): a concluded tournament's
+`players.json` (the bulk of every run's ~106k rows) never changes once
+published, so re-downloading every tournament's full roster data on every
+scheduled run is pure waste. `extract`'s `previous_snapshot_path` lets the
+caller pass the most recent prior dated snapshot (see
+`pipelines.cli._latest_snapshot_path`); for each tournament, the cheap
+`metadata.json` is still always re-fetched (so a genuine change is never
+missed), and the heavier `players.json` fetch is skipped in favor of the
+cached rows only when that tournament's `(name, date, type)` signature is
+unchanged from what's already cached -- mirroring
+`pipelines/extract/bulbagarden.py`'s sha1-based `skip_existing` pattern
+(fetch a cheap signal first, skip the expensive download only when it
+still matches). Reused rows are still re-stamped with this run's
+`extracted_at_utc`/`dataset_version`, the same "every row reflects this
+extraction run" convention `bulbagarden.py`'s `extract()` already
+establishes for its own skipped-download rows.
+
+`tournaments_index.json` in production actually lists both Pokémon VGC
+events and same-venue Pokémon TCG events side by side (discovered while
+verifying this against the real live source, not anticipated up front) --
+a TCG tournament's `players.json` reports players but every player's
+`team` is empty, since TCG doesn't have a "Pokémon team" in this dataset's
+sense, so it always contributes zero roster rows. Those TCG tournaments
+can never satisfy the cache-hit check above (a zero-row tournament is
+never actually written to the CSV, so it's never present in
+`cached_rows_by_tournament` to compare against), which would otherwise
+mean re-fetching their `players.json` on *every* run forever regardless of
+caching. `metadata.json`'s own `teams_scraped` count avoids that
+unconditionally, with no cache needed at all: `teams_scraped: 0` means
+skip straight to an empty row list without ever fetching `players.json`,
+on the very first extraction as much as the hundredth.
 """
 
 from __future__ import annotations
@@ -95,14 +127,58 @@ def _player_id(player: dict) -> str:
     return hashlib.sha1(basis.encode("utf-8")).hexdigest()[:16]
 
 
+def _load_cached_rows_by_tournament(previous_snapshot_path: Path | None) -> dict[str, list[dict]]:
+    """Group the prior dated snapshot's rows by event_id (tournament_id),
+    so a tournament whose metadata hasn't changed can reuse its cached
+    roster rows instead of re-fetching players.json."""
+    if previous_snapshot_path is None or not previous_snapshot_path.exists():
+        return {}
+    cached: dict[str, list[dict]] = {}
+    with previous_snapshot_path.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            cached.setdefault(row["event_id"], []).append(row)
+    return cached
+
+
+def _metadata_signature(metadata: dict) -> tuple[str, str, str]:
+    return (metadata["name"], metadata["date"], metadata.get("type", ""))
+
+
+def _cached_metadata_signature(cached_rows: list[dict]) -> tuple[str, str, str] | None:
+    if not cached_rows:
+        return None
+    first = cached_rows[0]
+    return (first.get("event_name", ""), first.get("event_date", ""), first.get("event_tier", ""))
+
+
 def _rows_for_tournament(
     session: requests.Session,
     tournament_id: str,
     *,
     extracted_at_utc: str,
     dataset_version: str,
+    cached_rows_by_tournament: dict[str, list[dict]],
 ) -> list[dict]:
     metadata = _fetch_json(session, f"{_tournament_dir_url(tournament_id)}/metadata.json")
+    # metadata.json's own `teams_scraped` count tells us upfront, with no
+    # players.json fetch at all, whether this tournament has any roster
+    # data to contribute. MunchStats' index carries both VGC events (which
+    # populate `team`) and same-venue TCG events (teams_scraped: 0 --
+    # TCG has no "Pokémon team" in this dataset's sense, so every player's
+    # `team` list is always empty) under the same index/metadata/players.json
+    # shape; a TCG tournament's metadata never changes once published any
+    # more than a VGC one's does, so this check is unconditional -- it
+    # saves the always-wasted fetch on every run, not just a cached one.
+    if metadata.get("teams_scraped", 0) == 0:
+        return []
+
+    cached_rows = cached_rows_by_tournament.get(tournament_id)
+    if cached_rows and _cached_metadata_signature(cached_rows) == _metadata_signature(metadata):
+        return [
+            {**row, "extracted_at_utc": extracted_at_utc, "dataset_version": dataset_version}
+            for row in cached_rows
+        ]
+
     players = _fetch_json(session, f"{_tournament_dir_url(tournament_id)}/players.json")
     players_url = f"{_tournament_dir_url(tournament_id)}/players.json"
 
@@ -149,6 +225,7 @@ def extract(
     *,
     dataset_version: str = DEFAULT_DATASET_VERSION,
     session: requests.Session | None = None,
+    previous_snapshot_path: Path | None = None,
 ) -> None:
     """Fetch MunchStats tournament/team/roster JSON, flatten nested team
     arrays into one row per team member, and write to output_path as CSV
@@ -158,6 +235,11 @@ def extract(
     `tournament_ids` defaults to every tournament in
     stats/tournaments/tournaments_index.json; pass an explicit iterable to
     scope the extract to specific events.
+
+    `previous_snapshot_path`, if given, enables incremental extraction
+    (backlog.md #44): a tournament whose freshly-fetched metadata.json
+    signature matches what's already cached from that prior snapshot
+    reuses its cached roster rows instead of re-fetching players.json.
     """
     http = session if session is not None else requests.Session()
     ids = (
@@ -166,6 +248,7 @@ def extract(
         else [entry["id"] for entry in _fetch_json(http, TOURNAMENTS_INDEX_URL)]
     )
     extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    cached_rows_by_tournament = _load_cached_rows_by_tournament(previous_snapshot_path)
 
     rows = []
     for tournament_id in ids:
@@ -175,6 +258,7 @@ def extract(
                 tournament_id,
                 extracted_at_utc=extracted_at_utc,
                 dataset_version=dataset_version,
+                cached_rows_by_tournament=cached_rows_by_tournament,
             )
         )
 

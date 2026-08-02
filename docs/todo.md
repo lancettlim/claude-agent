@@ -496,6 +496,88 @@ All five are now shipped.
   now reports `0.9842` (previously `0.0`), matching the real figure
   already documented elsewhere in this repo. `duckdb` is now an explicit
   `pyproject.toml` dependency (`report.py` imports it directly).
+- [x] Backlog #44: Incremental extraction — `pipelines/extract/
+  munchstats.py`'s `extract` gained a `previous_snapshot_path` parameter
+  (wired up munchstats-only in `pipelines/cli.py`'s `_run_extract`, via the
+  already-existing `_latest_snapshot_path` helper): each tournament's cheap
+  `metadata.json` is still always re-fetched, but the heavy `players.json`
+  fetch (the bulk of every run's ~106k rows) is skipped in favor of cached
+  rows whenever that tournament's `(name, date, type)` signature is
+  unchanged — the same "cheap signal first, skip the expensive download
+  only if it still matches" pattern `bulbagarden.py`'s sha1-based
+  `skip_existing` already established. Verified against real data:
+  re-running `extract munchstats` same-day reproduced the identical
+  106,134 rows in 11 seconds, down from the original run's 63 live
+  requests fetching ~37MB. (A real request-count gap this content-only
+  verification couldn't see — live MunchStats indexes same-venue TCG
+  events alongside VGC ones, which this caching couldn't recognize as
+  cacheable since they never produce output rows to cache — was caught
+  and fixed under backlog #48 below, once real per-request counting
+  existed to reveal it.)
+- [x] Backlog #48: Extraction run metadata and structured logging —
+  `pipelines/extract/http.py` gained `RequestStats`/`track_requests()`
+  (instrumenting the one `get_with_retry` chokepoint every extractor's raw
+  HTTP calls already share, rather than touching each extractor module);
+  new `pipelines/extract/summary.py` computes real `rows_written`/
+  `required_field_null_rate` per source and merges just that source's
+  entry into `reports/validation/extraction_summary.json` (previously a
+  hand-written file dated 2026-07-19 that no code generated or updated).
+  `pipelines/cli.py`'s new `_run_tracked_extract` wraps every extraction
+  in this tracking and now catches an extractor exception, prints a
+  structured one-line error, and returns a controlled exit code instead of
+  an unhandled traceback — matching `_run_validate`'s existing catch-log-
+  return convention. PokéAPI's move/ability/item detail fetches each get
+  their own entry now instead of vanishing into one merged "PokéAPI" row.
+  Verified against real, freshly-run extractions: this is exactly what
+  caught the real #44 gap described above (MunchStats' `requests_attempted`
+  came back as 90, not ~32, revealing live TCG-tournament entries #44's
+  caching couldn't recognize) — after that fix, a real re-run confirmed
+  the true minimum, 61 requests, with the same 106,134 rows preserved.
+- [x] Backlog #41: Schema-drift enforcement — new `pipelines/
+  schema_contracts.py` loads a `*.schema.json` contract's declared field
+  names; new `tests/unit/extract/test_schema_contracts.py` asserts every
+  extractor's `FIELDNAMES` matches its `data/staging/*.schema.json`
+  contract (pure code-level, runs on every push); new
+  `pipelines/validate/report.py`'s `build_schema_drift_checks` compares
+  each real `data/normalized/<entity>.csv` header against its
+  `data/normalized/<entity>.schema.json` contract, wired into
+  `release_blocking_findings` like any other gate (a missing CSV reports
+  `skipped`, not `fail`). Verified against a real `extract` + `dbt build`
+  + `validate` run: all 11 present normalized entities pass,
+  `pokemon_asset` correctly skips (Bulbagarden wasn't extracted this
+  pass).
+- [x] Backlog #42: Mart tests — every one of the 21 marts now carries
+  `not_null` on its grain column(s) plus a uniqueness check (dbt's
+  built-in `unique` for 8 single-column-grain marts, a new generic test
+  `dbt/macros/test_unique_combination_of_columns.sql` for the 13
+  composite-grain marts — this project's second generic test after
+  backlog #40's `row_count_anomaly`). Tagged `meta.category: mart_quality`
+  and wired into `report.py` as a new `mart_quality_checks` section,
+  deliberately excluded from `release_blocking_findings` since marts
+  aren't part of the release package. Caught a real bug while verifying:
+  a `unique_combination_of_columns` test was the first query to ever read
+  `player_signature_pokemon.csv`'s full row width back into DuckDB, and
+  `read_csv`'s auto-detect sniffer (only samples ~20,480 rows) mis-guessed
+  the CSV dialect because the first quoted comma in a player name didn't
+  appear until row 34,569. Fixed at the source — `dbt_project.yml`'s
+  `marts`/`normalized` configs now pin `csv_read_options: {quote: '"',
+  escape: '"'}` — rather than working around it in the test, since the
+  same latent risk existed for the normalized layer too. Verified against
+  real data: a clean `dbt build` (147 pass) and `pipelines.cli validate`
+  (54 mart_quality_checks, all pass).
+- [x] Backlog #15 (softer step): Archetype seed drift-flagging test — new
+  `dbt/tests/singular/assert_archetype_pokemon_map_intra_group_synergy.sql`
+  flags (via `severity=warn`, a new non-blocking `archetype_drift`
+  `meta.category`) archetypes in the curated `archetype_pokemon_map` seed
+  whose members don't show above-chance real team synergy with each other
+  (backlog #9's `pokemon_team_synergy.lift`). Verified against real data:
+  found genuine drift in 3 of 6 current archetypes — `rain`
+  (pelipper/politoed) has zero recorded teams ever fielding both, `sun`
+  and `tailwind-hyper-offense` both average well below-chance lift across
+  their curated pairs — while correctly leaving `sand` (one genuinely
+  strong pair) and the two single-member archetypes unflagged. Full
+  data-derived clustering (replacing the curated seed) is still open;
+  this only adds a signal for when it disagrees with real data.
 
 ## Consumption surfaces (backlog Section 2)
 

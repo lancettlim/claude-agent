@@ -233,6 +233,223 @@ def test_build_report_categorizes_row_count_anomaly_checks():
     assert "munchstats: status=fail" in result["release_blocking_findings"]
 
 
+def _write_schema(path, field_names):
+    path.write_text(json.dumps({"fields": [{"name": n, "required": True} for n in field_names]}))
+
+
+def _write_csv(path, header):
+    path.write_text(",".join(header) + "\n")
+
+
+def test_build_schema_drift_checks_pass_when_header_matches_schema(tmp_path):
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "pokemon_name"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks == [
+        {
+            "table_name": "pokemon",
+            "status": "pass",
+            "expected_fields": ["pokemon_key", "pokemon_name"],
+            "actual_fields": ["pokemon_key", "pokemon_name"],
+        }
+    ]
+
+
+def test_build_schema_drift_checks_fails_on_renamed_column(tmp_path):
+    """A column rename (or add/drop/reorder) must be caught here, not
+    silently propagate through the normalized layer's bare `select *`
+    staging models (backlog.md #41)."""
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "species_name"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks[0]["status"] == "fail"
+    assert checks[0]["expected_fields"] == ["pokemon_key", "pokemon_name"]
+    assert checks[0]["actual_fields"] == ["pokemon_key", "species_name"]
+
+
+def test_build_schema_drift_checks_skipped_when_csv_missing(tmp_path):
+    """A schema.json with no matching .csv yet (fresh clone, no dbt build,
+    or a source like Bulbagarden that hasn't been extracted) is a
+    different case from a real mismatch -- it must not fail the gate."""
+    _write_schema(tmp_path / "pokemon_asset.schema.json", ["pokemon_asset_key"])
+
+    checks = report.build_schema_drift_checks(tmp_path)
+
+    assert checks == [
+        {
+            "table_name": "pokemon_asset",
+            "status": "skipped",
+            "expected_fields": ["pokemon_asset_key"],
+            "actual_fields": None,
+        }
+    ]
+
+
+def test_build_report_folds_schema_drift_failures_into_release_blocking_findings(tmp_path):
+    _write_schema(tmp_path / "pokemon.schema.json", ["pokemon_key", "pokemon_name"])
+    _write_csv(tmp_path / "pokemon.csv", ["pokemon_key", "species_name"])
+
+    result = report.build_report(
+        {"nodes": {}},
+        {"results": []},
+        dataset_version="0.1.0",
+        warehouse_path=None,
+        normalized_dir=tmp_path,
+    )
+
+    assert result["schema_drift_checks"][0]["status"] == "fail"
+    assert "pokemon: status=fail" in result["release_blocking_findings"]
+
+
+def test_build_report_categorizes_mart_quality_checks():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.not_null_pokemon_usage_summary_pokemon_key.abc123": (
+                _manifest_node(
+                    "not_null_pokemon_usage_summary_pokemon_key",
+                    {"category": "mart_quality", "table_name": "pokemon_usage_summary"},
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.not_null_pokemon_usage_summary_pokemon_key.abc123",
+                "fail",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+    template = _template()
+
+    assert set(result) == set(template)
+    assert result["mart_quality_checks"] == [
+        {
+            "table_name": "pokemon_usage_summary",
+            "check_name": "not_null_pokemon_usage_summary_pokemon_key",
+            "status": "fail",
+            "failures": 3,
+        }
+    ]
+
+
+def test_build_report_never_folds_mart_quality_into_release_blocking_findings():
+    """Marts branch off the normalized layer for dashboard-facing output
+    and aren't part of the release package (CLAUDE.md's "Repository
+    structure"), so a failing mart_quality check must stay visible in the
+    report without blocking pipelines.cli release -- unlike every other
+    category, which does block (backlog.md #42)."""
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.unique_pokemon_speed_tiers_pokemon_key.def456": (
+                _manifest_node(
+                    "unique_pokemon_speed_tiers_pokemon_key",
+                    {"category": "mart_quality", "table_name": "pokemon_speed_tiers"},
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.unique_pokemon_speed_tiers_pokemon_key.def456",
+                "fail",
+                2,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+
+    assert result["mart_quality_checks"][0]["status"] == "fail"
+    assert result["release_blocking_findings"] == []
+
+
+def test_build_report_categorizes_archetype_drift_checks():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123": (
+                _manifest_node(
+                    "assert_archetype_pokemon_map_intra_group_synergy",
+                    {
+                        "category": "archetype_drift",
+                        "check_name": "archetype_pokemon_map_intra_group_synergy",
+                    },
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123",
+                "warn",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+    template = _template()
+
+    assert set(result) == set(template)
+    assert result["archetype_drift_checks"] == [
+        {
+            "check_name": "archetype_pokemon_map_intra_group_synergy",
+            "status": "warn",
+            "flagged_archetype_count": 3,
+        }
+    ]
+
+
+def test_build_report_never_folds_archetype_drift_into_release_blocking_findings():
+    """archetype_drift's own dbt test uses severity=warn, so its status
+    can never be "fail" -- but the category is also explicitly excluded
+    here as documented intent, not left to rely on that alone
+    (backlog.md #15)."""
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123": (
+                _manifest_node(
+                    "assert_archetype_pokemon_map_intra_group_synergy",
+                    {
+                        "category": "archetype_drift",
+                        "check_name": "archetype_pokemon_map_intra_group_synergy",
+                    },
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123",
+                "warn",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+
+    assert result["release_blocking_findings"] == []
+
+
 def test_build_report_routes_unrecognized_test_to_uncategorized():
     """A test with no meta.category (e.g. a newly-added test nobody tagged
     yet) must still surface and be able to block a release -- it must not

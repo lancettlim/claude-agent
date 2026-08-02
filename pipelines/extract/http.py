@@ -14,11 +14,56 @@ from __future__ import annotations
 
 import sys
 import time
+from contextlib import contextmanager
+from dataclasses import dataclass, field
+from typing import Iterator
 
 import requests
 
 DEFAULT_RETRY_ATTEMPTS = 3
 DEFAULT_RETRY_BACKOFF_SECONDS = 2.0
+
+
+@dataclass
+class RequestStats:
+    """Logical-request counters for one `track_requests()` scope. One
+    `get_with_retry` call is one logical request regardless of how many
+    raw retry attempts it took internally -- `attempted` counts calls that
+    were made, `succeeded` counts the ones that returned a response
+    without exhausting retries. Backs backlog.md #48's generated
+    reports/validation/extraction_summary.json."""
+
+    attempted: int = 0
+    succeeded: int = 0
+    failed_urls: list[str] = field(default_factory=list)
+
+    @property
+    def success_rate(self) -> float | None:
+        if self.attempted == 0:
+            return None
+        return self.succeeded / self.attempted
+
+
+# Stack (not a single slot) so a nested track_requests() scope -- none exist
+# today, but the extractors are plain functions callers could compose --
+# still attributes requests to its own innermost tracker rather than
+# silently falling back to an outer one.
+_stats_stack: list[RequestStats] = []
+
+
+@contextmanager
+def track_requests() -> Iterator[RequestStats]:
+    """Context manager collecting RequestStats for every `get_with_retry`
+    call made anywhere during the `with` block, regardless of which
+    extractor module makes it -- every extractor's raw HTTP calls already
+    funnel through this one function, so this is the natural place to
+    instrument request counts without touching extractor internals."""
+    stats = RequestStats()
+    _stats_stack.append(stats)
+    try:
+        yield stats
+    finally:
+        _stats_stack.pop()
 
 
 def get_with_retry(
@@ -41,9 +86,15 @@ def get_with_retry(
         try:
             response = session.get(url, **kwargs)
             response.raise_for_status()
+            if _stats_stack:
+                _stats_stack[-1].attempted += 1
+                _stats_stack[-1].succeeded += 1
             return response
         except requests.exceptions.HTTPError as exc:
             if exc.response is not None and exc.response.status_code < 500:
+                if _stats_stack:
+                    _stats_stack[-1].attempted += 1
+                    _stats_stack[-1].failed_urls.append(url)
                 raise
             last_exc = exc
         except requests.exceptions.RequestException as exc:
@@ -56,4 +107,7 @@ def get_with_retry(
                 file=sys.stderr,
             )
             time.sleep(delay)
+    if _stats_stack:
+        _stats_stack[-1].attempted += 1
+        _stats_stack[-1].failed_urls.append(url)
     raise last_exc
