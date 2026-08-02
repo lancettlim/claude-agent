@@ -691,6 +691,7 @@ source = { editable = "." }
 dependencies = [
     { name = "dbt-core" },
     { name = "dbt-duckdb" },
+    { name = "duckdb" },
     { name = "jinja2" },
     { name = "pandas" },
     { name = "playwright" },
@@ -707,6 +708,7 @@ dev = [
 requires-dist = [
     { name = "dbt-core", specifier = ">=1.8,<2.0" },
     { name = "dbt-duckdb", specifier = ">=1.8,<2.0" },
+    { name = "duckdb", specifier = ">=1.0" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "pandas", specifier = ">=2.2" },
     { name = "playwright", specifier = ">=1.45" },
