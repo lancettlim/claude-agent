@@ -23,45 +23,49 @@ are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 31 | Shipped and verified against real data: #1-#6, #8-#14, #22-#24, #28, #29, #30, #32, #33, #35, #36, #37, #38, #39, #40, #43, #46, #47, #49 |
-| **Partially done** | 2 | Real progress, real gap remains: #7 (team-grain, not player/country-grain), #45 (CLI's `extract`/`validate` paths covered, `release`/`render-card`/`build-dashboard` dispatch isn't) |
+| **Done** | 39 | Shipped and verified against real data: #1-#16, #22-#24, #28-#30, #32, #33, #35-#49 (every item in this range except #17 and #34, see below) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
-| **Open, buildable now** | 6 | No blocker, just not started: #15, #16, #41, #42, #44, #48 |
+| **Open, buildable now** | 0 | Every previously-open, unblocked item has shipped |
 | **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
 
 By section:
 
-| Section | Done | Partial/Resolved | Open | Blocked | Total |
+| Section | Done | Resolved | Open | Blocked | Total |
 |---|---|---|---|---|---|
 | 0 — Foundational enablers | 5 | 0 | 0 | 0 | 5 |
-| 1 — Buildable today (#6-#17) | 8 | 2 | 2 | 0 | 12 |
+| 1 — Buildable today (#6-#17) | 11 | 1 | 0 | 0 | 12 |
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
 | 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
 | 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#49) | 10 | 1 | 4 | 0 | 15 |
-| **Total** | **31** | **4** | **6** | **8** | **49** |
+| 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 15 |
+| **Total** | **39** | **2** | **0** | **8** | **49** |
 
-Takeaways: every item in Section 0 and every "buildable today, no new data
-required" item that isn't genuinely open (#15, #16) or a judgment call
-(#17) is done — that bucket is close to exhausted. Section 2 (Consumption
-surfaces) is now fully closed out except the one genuinely blocked item
-(#31). This pass closed #43 — a shared retry-with-exponential-backoff
-helper (`pipelines/extract/http.py`) applied to every raw HTTP call across
-all five extractors, so a single transient failure (a 5xx, a dropped
-connection, a timeout) no longer aborts an entire extraction run with no
-output at all; a prior pass had already closed #49, the real correctness
-gap in the validation report's bps-based metrics found while verifying
-#29/#30, by re-executing each bps test's own compiled SQL against the
-built warehouse instead of trusting dbt-core's `run_results.json`, which
-(confirmed directly against a real `extract all` + `dbt build` + `validate`
-run) only reports the true value on the failing path. The remaining open
-work now skews toward Section 3 (platform/quality hardening, 4 open items:
-#41, #42, #44, #48). The 8 blocked items aren't neglect — 4 are waiting on
-real-world time/events (Blocker A's snapshot history, Blocker B's
-rebalance, #31's snapshot-dependent hosting justification) and 4 need a
-source this repo doesn't have and, in
-#26/#27's case, may not exist in scriptable form at all.
+Takeaways: **every unblocked item in the backlog is now done.** Sections 0,
+1's "buildable today" subsection (except #17, a deliberate non-build), 2,
+and 3 are all fully closed out. This pass closed the remaining six "open,
+buildable now" items in one sweep — #45 (CLI dispatch test coverage for
+`release`/`render-card`/`build-dashboard`), #7 (player/country dimension
+marts — `pokemon_usage_by_country`, `player_signature_pokemon`), #44
+(incremental MunchStats extraction, `teams_scraped`-aware), #16 (speed
+-tier bracket mart — `max_investment_speed`, `pokemon_speed_tiers`), #48
+(real, code-generated `extraction_summary.json` + structured per-request
+stats — which caught and fixed a real gap in #44's own caching logic that
+content-only verification had missed), #41 (schema-drift enforcement,
+staging and normalized layers), #42 (quality tests on all 21 marts — which
+caught and fixed a real DuckDB CSV-sniffing bug), and #15's softer step
+(archetype seed drift-flagging, which found genuine drift in 3 of 6
+curated archetypes against real data). Three of these passes (#48, #42,
+and #15) each surfaced a real, previously-unknown issue while verifying
+against live data rather than synthetic fixtures — not hypothetical risk,
+actual bugs and actual data-vs-editorial mismatches caught in the act.
+
+The 8 remaining blocked items aren't neglect — 4 are waiting on real-world
+time/events (Blocker A's snapshot history, Blocker B's rebalance, #31's
+snapshot-dependent hosting justification) and 4 need a source this repo
+doesn't have and, in #26/#27's case, may not exist in scriptable form at
+all. What's left to do in this file now is exactly what's left: wait for
+those, or bring a new source into scope.
 
 ## Entry format
 
