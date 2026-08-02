@@ -490,6 +490,23 @@ All five are now shipped.
   version. Verified end-to-end against the real `releases/data/0.2.0/`
   (330 files, 11MB zip) with a stubbed `gh` binary, and the added-manifest
   diff logic against a synthetic git history.
+- [x] Backlog #29 + #30: Usage-tab Trends subtab — a tournament-date
+  filter (`#usage-trend-date-filter`, most recent date selected by
+  default) over `pokemon_usage_by_event_date`, plus each Pokémon's usage-
+  share *change* versus the immediately preceding tournament date as a
+  `▲/▼ Npp` badge (new `.badge-positive`/`.badge-negative` variants,
+  reusing the already-defined `--positive`/`--danger` tokens) or a `NEW`
+  badge for a Pokémon absent from that previous date — the dependency-free
+  stand-in for a line chart both entries flagged as the option once
+  Chart.js was removed. Verified against a real `extract all` + `dbt
+  build` + `build-dashboard` run: 26 real tournament dates, correct deltas
+  and `NEW` badges at a mid-range date, all `—` (no false `NEW`s) at the
+  earliest date, zero browser console errors. Also caught and documented a
+  real, pre-existing bug while doing that verification: backlog #49, every
+  bps-based validation-report metric (coverage/null-rate) reads `0.0` on a
+  passing check due to a dbt-core behavior this project's `report.py`
+  didn't account for — status/gating is unaffected, but the reported
+  numbers have been wrong since the ratio pattern was introduced.
 
 ## Analytics depth (backlog Section 1, "buildable today")
 

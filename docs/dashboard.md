@@ -110,7 +110,12 @@ Teams, and restructured every remaining tab around
 - **Usage** — tier/type/role/usage-%/speed filters, a `.grid-6xn` of
   usage-share leaders, a full Usage leaders table, then the same
   grid+table pattern again for Win rate leaders (with a minimum-recorded-
-  matches filter).
+  matches filter), plus a **Trends** subtab (backlog #29/#30): a
+  tournament-date filter over `pokemon_usage_by_event_date` and a
+  `.grid-6xn`/table showing each Pokémon's usage share *change* versus the
+  previous tournament date (▲/▼ badge, or a `NEW` badge for a Pokémon
+  absent from that previous date) — this dashboard's dependency-free stand
+  -in for a usage-over-time line chart, since it has no charting library.
 - **Pokémon Profile** — a single Pokémon picker (sorted by usage
   relevance, not alphabetically) driving: a profile header (base stats,
   speed-tier badge, and now a type badge), then three separate `.grid-6xn`

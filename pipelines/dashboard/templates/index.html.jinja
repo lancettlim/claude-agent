@@ -304,6 +304,9 @@
   .badge-speed-fast { background: var(--speed-fast-bg); color: var(--speed-fast); }
   .badge-speed-average { background: var(--speed-average-bg); color: var(--speed-average); }
   .badge-speed-slow { background: var(--speed-slow-bg); color: var(--speed-slow); }
+  .badge-positive { background: var(--positive-bg); color: var(--positive); }
+  .badge-negative { background: var(--danger-bg); color: var(--danger); }
+  .badge-new { background: var(--accent-gold-bg); color: var(--warning); }
 
   /* --- Type badge (Pokémon Profile header, Matchup tab pickers) — the
      dashboard's first-ever Pokémon-type display (pokemon.type_1/type_2,
@@ -634,6 +637,7 @@
     <div class="subtabs" role="tablist">
       <button class="subtab-btn" role="tab" data-subtab="usage-leaders" aria-selected="true">Usage leaders</button>
       <button class="subtab-btn" role="tab" data-subtab="win-rate-leaders" aria-selected="false">Win rate leaders</button>
+      <button class="subtab-btn" role="tab" data-subtab="usage-trends" aria-selected="false">Trends</button>
     </div>
 
     <div class="subtab-panel" data-subpanel="usage-leaders">
@@ -661,6 +665,22 @@
       <div class="table-scroll">
         <table id="win-rate-table">
           <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="usage-trends" hidden>
+      <p class="sub">Usage by tournament date (<code>tournament_event.event_date</code>), not by extraction snapshot — this shows how usage shifted across events actually played. Change is versus the previous tournament date in the data, not a fixed time window.</p>
+      <div class="controls">
+        <label>Tournament date
+          <select id="usage-trend-date-filter"></select>
+        </label>
+      </div>
+      <div class="grid-6xn" id="usage-trend-grid"></div>
+      <div class="table-scroll">
+        <table id="usage-trend-table">
+          <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">% of meta</th><th class="sortable" data-sort-key="usage_share_delta">Change</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
