@@ -52,6 +52,7 @@ METADATA = {
     "date": "2026-05-23",
     "type": "Regional",
     "format": "gen9vgc2026regi",
+    "teams_scraped": 2,
 }
 
 PLAYERS = [
@@ -180,6 +181,51 @@ def test_extract_defaults_to_full_tournaments_index(tmp_path):
     with output_path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
     assert len(rows) == 3
+
+
+def test_extract_skips_players_fetch_for_zero_teams_scraped_tournament(tmp_path):
+    # A same-venue TCG tournament: metadata.json reports teams_scraped: 0,
+    # so players.json is never fetched (its absence from the payload map
+    # would otherwise raise KeyError) and it contributes zero rows.
+    tcg_metadata = {**METADATA, "name": "2026 Melbourne Pokémon TCG Regional Championships"}
+    del tcg_metadata["teams_scraped"]
+    tcg_metadata["teams_scraped"] = 0
+    session = _FakeSession(
+        {
+            munchstats.TOURNAMENTS_INDEX_URL: [{"id": TOURNAMENT_ID}],
+            f"{DIR_URL}/metadata.json": tcg_metadata,
+        }
+    )
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(output_path, [TOURNAMENT_ID], session=session)
+
+    assert f"{DIR_URL}/players.json" not in session.requested_urls
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows == []
+
+
+def test_extract_skips_players_fetch_even_with_no_previous_snapshot(tmp_path):
+    """The teams_scraped: 0 short-circuit isn't cache-dependent -- it must
+    also fire on a completely fresh extraction with nothing cached yet."""
+    tcg_metadata = {**METADATA, "teams_scraped": 0}
+    session = _FakeSession(
+        {
+            munchstats.TOURNAMENTS_INDEX_URL: [{"id": TOURNAMENT_ID}],
+            f"{DIR_URL}/metadata.json": tcg_metadata,
+        }
+    )
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(
+        output_path,
+        [TOURNAMENT_ID],
+        session=session,
+        previous_snapshot_path=tmp_path / "does-not-exist.csv",
+    )
+
+    assert f"{DIR_URL}/players.json" not in session.requested_urls
 
 
 def _write_previous_snapshot(path, rows):

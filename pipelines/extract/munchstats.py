@@ -30,7 +30,7 @@ pipe-delimited string since a roster slot can carry more than one.
 
 Incremental extraction (backlog.md #44): a concluded tournament's
 `players.json` (the bulk of every run's ~106k rows) never changes once
-published, so re-downloading all 31 tournaments' full roster data on every
+published, so re-downloading every tournament's full roster data on every
 scheduled run is pure waste. `extract`'s `previous_snapshot_path` lets the
 caller pass the most recent prior dated snapshot (see
 `pipelines.cli._latest_snapshot_path`); for each tournament, the cheap
@@ -44,6 +44,21 @@ still matches). Reused rows are still re-stamped with this run's
 `extracted_at_utc`/`dataset_version`, the same "every row reflects this
 extraction run" convention `bulbagarden.py`'s `extract()` already
 establishes for its own skipped-download rows.
+
+`tournaments_index.json` in production actually lists both Pokémon VGC
+events and same-venue Pokémon TCG events side by side (discovered while
+verifying this against the real live source, not anticipated up front) --
+a TCG tournament's `players.json` reports players but every player's
+`team` is empty, since TCG doesn't have a "Pokémon team" in this dataset's
+sense, so it always contributes zero roster rows. Those TCG tournaments
+can never satisfy the cache-hit check above (a zero-row tournament is
+never actually written to the CSV, so it's never present in
+`cached_rows_by_tournament` to compare against), which would otherwise
+mean re-fetching their `players.json` on *every* run forever regardless of
+caching. `metadata.json`'s own `teams_scraped` count avoids that
+unconditionally, with no cache needed at all: `teams_scraped: 0` means
+skip straight to an empty row list without ever fetching `players.json`,
+on the very first extraction as much as the hundredth.
 """
 
 from __future__ import annotations
@@ -145,6 +160,18 @@ def _rows_for_tournament(
     cached_rows_by_tournament: dict[str, list[dict]],
 ) -> list[dict]:
     metadata = _fetch_json(session, f"{_tournament_dir_url(tournament_id)}/metadata.json")
+    # metadata.json's own `teams_scraped` count tells us upfront, with no
+    # players.json fetch at all, whether this tournament has any roster
+    # data to contribute. MunchStats' index carries both VGC events (which
+    # populate `team`) and same-venue TCG events (teams_scraped: 0 --
+    # TCG has no "Pokémon team" in this dataset's sense, so every player's
+    # `team` list is always empty) under the same index/metadata/players.json
+    # shape; a TCG tournament's metadata never changes once published any
+    # more than a VGC one's does, so this check is unconditional -- it
+    # saves the always-wasted fetch on every run, not just a cached one.
+    if metadata.get("teams_scraped", 0) == 0:
+        return []
+
     cached_rows = cached_rows_by_tournament.get(tournament_id)
     if cached_rows and _cached_metadata_signature(cached_rows) == _metadata_signature(metadata):
         return [

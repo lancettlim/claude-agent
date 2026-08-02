@@ -1,10 +1,30 @@
 {
   "description": "Phase 1 ingestion check: source availability and row-level parsing success for each staging extractor. Distinct from validation_report.json, which gates normalized-table release readiness.",
-  "generated_at_utc": "2026-07-19T06:15:49Z",
-  "dataset_version": "0.0.0-dev",
+  "generated_at_utc": "2026-08-02T14:37:05Z",
+  "dataset_version": "0.2.0",
   "sources": [
     {
-      "source_name": "PokéAPI",
+      "source_name": "MunchStats",
+      "endpoint": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/stats/tournaments/",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 61,
+      "requests_succeeded": 61,
+      "request_success_rate": 1.0,
+      "rows_written": 106134,
+      "required_field_null_rate": 0.0
+    },
+    {
+      "source_name": "OP.GG Pok\u00e9mon Champions",
+      "endpoint": "https://op.gg/pokemon-champions/pokedex",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 1,
+      "requests_succeeded": 1,
+      "request_success_rate": 1.0,
+      "rows_written": 317,
+      "required_field_null_rate": 0.0
+    },
+    {
+      "source_name": "Pok\u00e9API",
       "endpoint": "https://pokeapi.co/api/v2/pokemon/{form_name} (list from https://pokeapi.co/api/v2/pokemon?limit=5000)",
       "availability": "reachable, HTTP 200 for all requests",
       "requests_attempted": 1352,
@@ -12,40 +32,50 @@
       "request_success_rate": 1.0,
       "rows_written": 1351,
       "required_field_null_rate": 0.0,
-      "notes": "Covers every entry in PokéAPI's /pokemon list: base species plus Mega/regional/alternate forms, so Champions/tournament form-level rows have a canonical row to join against (Phase 2 normalization)."
+      "checked_at_utc": "2026-08-02T14:35:52Z"
     },
     {
-      "source_name": "OP.GG Pokémon Champions",
-      "endpoint": "https://op.gg/pokemon-champions/pokedex",
-      "availability": "reachable, HTTP 200, embedded pokemon payload located and parsed",
-      "requests_attempted": 1,
-      "requests_succeeded": 1,
-      "request_success_rate": 1.0,
-      "rows_written": 317,
+      "source_name": "Pok\u00e9API (ability detail)",
+      "endpoint": "https://pokeapi.co/api/v2/ability/{ability_name}",
+      "availability": "reachable, but 1/234 request(s) failed",
+      "requests_attempted": 234,
+      "requests_succeeded": 233,
+      "request_success_rate": 0.9957,
+      "rows_written": 233,
       "required_field_null_rate": 0.0,
-      "notes": "pokemon_id is null for 105/317 rows (fabricated OP.GG ids >=10000 for Mega/regional/alternate forms); expected per schema contract (pokemon_id required: false). regulation_code blank for all rows; expected, not published on this page (required: false)."
+      "checked_at_utc": "2026-08-02T14:36:51Z"
     },
     {
-      "source_name": "MunchStats",
-      "endpoint": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/stats/tournaments/",
-      "availability": "reachable, HTTP 200 for tournaments_index.json and all per-tournament metadata.json/players.json fetches",
-      "requests_attempted": 63,
-      "requests_succeeded": 63,
+      "source_name": "Pok\u00e9API (item detail)",
+      "endpoint": "https://pokeapi.co/api/v2/item/{item_name}",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 204,
+      "requests_succeeded": 204,
       "request_success_rate": 1.0,
-      "rows_written": 106134,
+      "rows_written": 204,
       "required_field_null_rate": 0.0,
-      "notes": "31 tournaments, 17685 teams, 8844 distinct players. form_name blank for all rows; expected, not separately reported by this source (required: false)."
+      "checked_at_utc": "2026-08-02T14:37:05Z"
     },
     {
-      "source_name": "PokéBase",
+      "source_name": "Pok\u00e9API (move detail)",
+      "endpoint": "https://pokeapi.co/api/v2/move/{move_name}",
+      "availability": "reachable, but 1/569 request(s) failed",
+      "requests_attempted": 569,
+      "requests_succeeded": 568,
+      "request_success_rate": 0.9982,
+      "rows_written": 568,
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-02T14:36:33Z"
+    },
+    {
+      "source_name": "Pok\u00e9Base",
       "endpoint": "https://pokebase.app/pokemon-champions/pokemon",
-      "availability": "reachable, HTTP 200, embedded pokemon payload located and parsed",
+      "availability": "reachable, HTTP 200 for all requests",
       "requests_attempted": 1,
       "requests_succeeded": 1,
       "request_success_rate": 1.0,
       "rows_written": 311,
-      "required_field_null_rate": 0.0,
-      "notes": "One row per (pokemon, regulation) pair for the 310 pokemon entries (of 1360 total in PokéBase's database) currently in the Champions legal pool; 272 rows under regulation m-a, 39 under m-b."
+      "required_field_null_rate": 0.0
     }
   ]
 }

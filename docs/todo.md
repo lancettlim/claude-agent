@@ -508,7 +508,31 @@ All five are now shipped.
   `skip_existing` already established. Verified against real data:
   re-running `extract munchstats` same-day reproduced the identical
   106,134 rows in 11 seconds, down from the original run's 63 live
-  requests fetching ~37MB.
+  requests fetching ~37MB. (A real request-count gap this content-only
+  verification couldn't see — live MunchStats indexes same-venue TCG
+  events alongside VGC ones, which this caching couldn't recognize as
+  cacheable since they never produce output rows to cache — was caught
+  and fixed under backlog #48 below, once real per-request counting
+  existed to reveal it.)
+- [x] Backlog #48: Extraction run metadata and structured logging —
+  `pipelines/extract/http.py` gained `RequestStats`/`track_requests()`
+  (instrumenting the one `get_with_retry` chokepoint every extractor's raw
+  HTTP calls already share, rather than touching each extractor module);
+  new `pipelines/extract/summary.py` computes real `rows_written`/
+  `required_field_null_rate` per source and merges just that source's
+  entry into `reports/validation/extraction_summary.json` (previously a
+  hand-written file dated 2026-07-19 that no code generated or updated).
+  `pipelines/cli.py`'s new `_run_tracked_extract` wraps every extraction
+  in this tracking and now catches an extractor exception, prints a
+  structured one-line error, and returns a controlled exit code instead of
+  an unhandled traceback — matching `_run_validate`'s existing catch-log-
+  return convention. PokéAPI's move/ability/item detail fetches each get
+  their own entry now instead of vanishing into one merged "PokéAPI" row.
+  Verified against real, freshly-run extractions: this is exactly what
+  caught the real #44 gap described above (MunchStats' `requests_attempted`
+  came back as 90, not ~32, revealing live TCG-tournament entries #44's
+  caching couldn't recognize) — after that fix, a real re-run confirmed
+  the true minimum, 61 requests, with the same 106,134 rows preserved.
 
 ## Consumption surfaces (backlog Section 2)
 

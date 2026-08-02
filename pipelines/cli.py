@@ -31,6 +31,8 @@ from pathlib import Path
 from pipelines import versioning
 from pipelines.dashboard import build as dashboard_build
 from pipelines.extract import bulbagarden, munchstats, opgg, pokeapi, pokebase
+from pipelines.extract import http as extract_http
+from pipelines.extract import summary as extraction_summary
 from pipelines.release import build as release_build
 from pipelines.render import team_card
 from pipelines.validate import report
@@ -65,6 +67,32 @@ _RETENTION_COUNTS = {
     "munchstats": 7,
     "pokebase": 14,
     "bulbagarden": 10,
+}
+
+# Static per-staging-subdirectory endpoint descriptions for
+# reports/validation/extraction_summary.json (backlog.md #48) -- these
+# describe the fixed shape of each API call, not anything that varies
+# per-run, so they're recorded here rather than derived at runtime.
+# pokeapi_move/pokeapi_ability/pokeapi_item get their own entries (distinct
+# from "pokeapi" itself) since they're separate requests made during the
+# same `extract pokeapi` invocation.
+_ENDPOINTS = {
+    "pokeapi": "https://pokeapi.co/api/v2/pokemon/{form_name} "
+    "(list from https://pokeapi.co/api/v2/pokemon?limit=5000)",
+    "pokeapi_move": "https://pokeapi.co/api/v2/move/{move_name}",
+    "pokeapi_ability": "https://pokeapi.co/api/v2/ability/{ability_name}",
+    "pokeapi_item": "https://pokeapi.co/api/v2/item/{item_name}",
+    "opgg_champions": "https://op.gg/pokemon-champions/pokedex",
+    "munchstats": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/"
+    "stats/tournaments/",
+    "pokebase": "https://pokebase.app/pokemon-champions/pokemon",
+    "bulbagarden": "https://archives.bulbagarden.net/w/api.php (Category:Champions_menu_sprites)",
+}
+
+_SOURCE_NAME_SUFFIXES = {
+    "pokeapi_move": " (move detail)",
+    "pokeapi_ability": " (ability detail)",
+    "pokeapi_item": " (item detail)",
 }
 
 
@@ -123,6 +151,46 @@ def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]
     return moves, abilities, items
 
 
+def _source_display_name(module, staging_subdir: str) -> str:
+    base = getattr(module, "SOURCE_NAME", staging_subdir)
+    return f"{base}{_SOURCE_NAME_SUFFIXES.get(staging_subdir, '')}"
+
+
+def _run_tracked_extract(
+    *, source_name: str, staging_subdir: str, output_path: Path, dataset_version: str, call
+) -> bool:
+    """Run `call()` (an extraction into output_path) inside an
+    `http.track_requests()` scope, then merge the run's request/row/
+    null-rate stats into reports/validation/extraction_summary.json
+    (backlog.md #48) regardless of whether the extraction succeeded.
+
+    Returns True on success. On failure, prints a structured one-line
+    error (source name + exception) to stderr and returns False instead of
+    letting the exception propagate as a raw traceback -- matching
+    `_run_validate`'s existing "catch, log, return a code" convention
+    rather than crashing the process.
+    """
+    error = None
+    with extract_http.track_requests() as stats:
+        try:
+            call()
+        except Exception as exc:  # noqa: BLE001 -- must catch anything to still write the summary
+            error = f"{type(exc).__name__}: {exc}"
+        result = extraction_summary.SourceRunResult(
+            source_name=source_name,
+            endpoint=_ENDPOINTS.get(staging_subdir, ""),
+            staging_subdir=staging_subdir,
+            output_path=output_path,
+            stats=stats,
+            error=error,
+        )
+        extraction_summary.update(result, dataset_version=dataset_version)
+    if error is not None:
+        print(f"Extraction failed for {source_name} ({staging_subdir}): {error}", file=sys.stderr)
+        return False
+    return True
+
+
 def _run_extract(source: str, dataset_version: str) -> int:
     if source == "all":
         for one_source in _EXTRACTORS:
@@ -140,7 +208,15 @@ def _run_extract(source: str, dataset_version: str) -> int:
         # metadata hasn't changed since the previous snapshot, instead of
         # re-fetching all ~106k rows on every scheduled run.
         extract_kwargs["previous_snapshot_path"] = _latest_snapshot_path(staging_subdir)
-    module.extract(output_path, dataset_version=dataset_version, **extract_kwargs)
+    ok = _run_tracked_extract(
+        source_name=_source_display_name(module, staging_subdir),
+        staging_subdir=staging_subdir,
+        output_path=output_path,
+        dataset_version=dataset_version,
+        call=lambda: module.extract(output_path, dataset_version=dataset_version, **extract_kwargs),
+    )
+    if not ok:
+        return 1
     _prune_old_snapshots(staging_subdir)
     if source == "pokeapi":
         moves, abilities, items = _referenced_move_ability_item_names()
@@ -151,17 +227,26 @@ def _run_extract(source: str, dataset_version: str) -> int:
                 file=sys.stderr,
             )
             return 0
-        for staging_subdir, names, extract_fn in (
+        for detail_subdir, names, extract_fn in (
             ("pokeapi_move", sorted(moves), pokeapi.extract_moves),
             ("pokeapi_ability", sorted(abilities), pokeapi.extract_abilities),
             ("pokeapi_item", sorted(items), pokeapi.extract_items),
         ):
-            extract_fn(
-                _dated_snapshot_path(staging_subdir, date_str),
-                names,
+            detail_output_path = _dated_snapshot_path(detail_subdir, date_str)
+            ok = _run_tracked_extract(
+                source_name=_source_display_name(pokeapi, detail_subdir),
+                staging_subdir=detail_subdir,
+                output_path=detail_output_path,
                 dataset_version=dataset_version,
+                call=lambda extract_fn=extract_fn, detail_output_path=detail_output_path, names=names: (
+                    extract_fn(  # noqa: E501
+                        detail_output_path, names, dataset_version=dataset_version
+                    )
+                ),
             )
-            _prune_old_snapshots(staging_subdir)
+            if not ok:
+                return 1
+            _prune_old_snapshots(detail_subdir)
     return 0
 
 

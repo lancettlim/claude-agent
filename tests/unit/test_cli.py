@@ -89,6 +89,18 @@ def test_referenced_move_ability_item_names_empty_when_no_snapshot(tmp_path, mon
     assert cli._referenced_move_ability_item_names() == (set(), set(), set())
 
 
+def _stub_extraction_summary(monkeypatch):
+    """Replace extraction_summary.update with a recording no-op so cli
+    tests never write to the real reports/validation/extraction_summary.json."""
+    calls = []
+    monkeypatch.setattr(
+        cli.extraction_summary,
+        "update",
+        lambda result, *, dataset_version: calls.append((result, dataset_version)) or {},
+    )
+    return calls
+
+
 class _RecordingExtractor:
     def __init__(self):
         self.calls = []
@@ -100,6 +112,7 @@ class _RecordingExtractor:
 
 def test_run_extract_writes_dated_snapshot_and_prunes(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     fake = _RecordingExtractor()
     monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
     monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
@@ -125,6 +138,7 @@ class _RecordingMunchstatsExtractor:
 
 def test_run_extract_munchstats_passes_previous_snapshot_path(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     previous_path = tmp_path / "munchstats" / "2026-07-29.csv"
     _write_csv(previous_path, [], ["a"])
     fake = _RecordingMunchstatsExtractor()
@@ -140,6 +154,7 @@ def test_run_extract_munchstats_passes_previous_snapshot_path(tmp_path, monkeypa
 
 def test_run_extract_other_sources_do_not_receive_previous_snapshot_path(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     fake = _RecordingExtractor()
     monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
     monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
@@ -153,6 +168,7 @@ def test_run_extract_other_sources_do_not_receive_previous_snapshot_path(tmp_pat
 
 def test_run_extract_all_runs_every_source_in_order(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
     call_order = []
 
     class _Recorder:
@@ -177,6 +193,48 @@ def test_run_extract_all_runs_every_source_in_order(tmp_path, monkeypatch):
 
     assert exit_code == 0
     assert call_order == ["first", "second"]
+
+
+def test_run_extract_updates_extraction_summary_with_source_name(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    calls = _stub_extraction_summary(monkeypatch)
+    fake = _RecordingExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    result, dataset_version = calls[0]
+    assert result.staging_subdir == "fake_source"
+    assert result.output_path == tmp_path / "fake_source" / "2026-07-30.csv"
+    assert result.error is None
+    assert dataset_version == "1.2.3"
+
+
+def test_run_extract_catches_extractor_exception_and_returns_error_code(
+    tmp_path, monkeypatch, capsys
+):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    calls = _stub_extraction_summary(monkeypatch)
+
+    class _FailingExtractor:
+        def extract(self, output_path, *, dataset_version=None, session=None):
+            raise RuntimeError("upstream is down")
+
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (_FailingExtractor(), "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 1
+    assert len(calls) == 1
+    result, _ = calls[0]
+    assert result.error == "RuntimeError: upstream is down"
+    assert "upstream is down" in capsys.readouterr().err
 
 
 def test_main_extract_defaults_dataset_version_to_latest_published(monkeypatch):

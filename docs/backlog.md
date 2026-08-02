@@ -1149,7 +1149,7 @@ asserts it survives; the existing stale-sprite-cleanup test
 (`test_copy_sprites_clears_stale_files_across_rebuilds`) still passes
 unchanged.
 
-### 48. Extraction run metadata and structured logging
+### 48. Extraction run metadata and structured logging — DONE
 
 - **Size**: M
 - **Value**: `reports/validation/extraction_summary.json` reports per-source
@@ -1160,7 +1160,57 @@ unchanged.
 - **Blocked by**: nothing
 - **Touches**: `pipelines/extract/`, `reports/validation/`
 
-Prerequisite for any real monitoring, and directly supports #40's baselines.
+Shipped as three pieces. `pipelines/extract/http.py` gained `RequestStats`
+and a `track_requests()` context manager: since every extractor's raw HTTP
+calls already funnel through the one `get_with_retry` chokepoint (#43),
+that's instrumented directly rather than touching each extractor module —
+one `get_with_retry` call is one logical "attempted" request regardless of
+how many raw retry attempts it took internally. New
+`pipelines/extract/summary.py` computes each source's `rows_written`
+(counting the written CSV) and `required_field_null_rate` (only over
+fields the matching `data/staging/<subdir>.schema.json` marks `required:
+true`, matching the old file's own convention of not penalizing
+known-optional blanks like OP.GG's `pokemon_id`) and `update()`s
+`reports/validation/extraction_summary.json` by merging just the
+just-run source's entry into the existing document — a single-source
+`extract <source>` run no longer wipes out what's known about every other
+source. `pipelines/cli.py`'s new `_run_tracked_extract` wraps every
+extraction call in `track_requests()` and calls `summary.update()`
+regardless of success; on an extractor exception it now prints a
+structured one-line error and returns a controlled exit code instead of
+letting a raw traceback propagate, matching `_run_validate`'s existing
+catch-log-return convention. PokéAPI's move/ability/item detail fetches
+(previously invisible — the old hand-written file only ever had one merged
+"PokéAPI" entry) each get their own entry now, correctly distinguishing
+"PokéAPI" (1,352 requests) from "PokéAPI (move detail)" (569 requests,
+1 genuinely 404'd — an unresolvable move name the extractor already
+gracefully skips) etc.
+
+Verified against real, freshly-run extractions, not synthetic fixtures —
+and this real run caught a genuine bug in #44's just-shipped
+implementation, not a hypothetical: `extract munchstats`'s real
+`requests_attempted` came back as 90, not the ~32 the #44 write-up
+expected, because live MunchStats indexes both VGC events *and*
+same-venue TCG events (a fact invisible to #44's own row-count/md5-based
+verification, since a TCG tournament's `players.json` reports players
+whose `team` list is always empty, so it silently contributes zero rows
+either way — content-only verification couldn't tell full-refetch and
+correctly-cached apart). Fixed in the same pass: `metadata.json`'s own
+`teams_scraped` count tells `munchstats.py` upfront, with no
+`players.json` fetch and no cache needed at all, that a tournament will
+contribute zero rows (`teams_scraped: 0`). A real re-run afterward
+confirmed `requests_attempted` at the true minimum, 61 (1 index + 60
+metadata, zero `players.json` fetches — all 31 real VGC tournaments
+correctly cache-hit, all 29 TCG ones correctly skipped via
+`teams_scraped`), with the same 106,134 real rows preserved. This is the
+concrete case for why this item's own value statement is true: content-
+equality checks couldn't see this waste at all; the structured request
+counts this item adds surfaced it immediately. `reports/validation/
+extraction_summary.json` itself is now a real, current, code-generated
+document for four of five sources (Bulbagarden was never in the old
+hand-written file either and wasn't re-extracted in this pass; it gets a
+real entry the first time someone runs `extract bulbagarden` after this
+change, same as any other source).
 
 ### 49. Bps-based validation-report metrics read as 0 on a passing check — DONE
 
