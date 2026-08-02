@@ -39,12 +39,13 @@ from __future__ import annotations
 
 import csv
 import sys
-import time
 from collections.abc import Iterable
 from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+
+from pipelines.extract.http import get_with_retry
 
 SOURCE_NAME = "PokéAPI"
 API_BASE_URL = "https://pokeapi.co/api/v2"
@@ -122,15 +123,13 @@ _STAT_NAME_TO_FIELD = {
 
 def _fetch_pokemon_list(session: requests.Session) -> list[str]:
     url = f"{API_BASE_URL}/pokemon?limit={_LIST_PAGE_SIZE}"
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, url, timeout=30)
     return [entry["name"] for entry in response.json()["results"]]
 
 
 def _fetch_pokemon(session: requests.Session, form_name: str) -> dict:
     url = f"{API_BASE_URL}/pokemon/{form_name}"
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, url, timeout=30)
     return response.json()
 
 
@@ -233,47 +232,30 @@ def _english_short_effect(payload: dict) -> str | None:
     return None
 
 
-def _fetch_resource(session: requests.Session, resource: str, slug: str) -> dict:
-    url = f"{API_BASE_URL}/{resource}/{slug}"
-    response = session.get(url, timeout=30)
-    response.raise_for_status()
-    return response.json()
-
-
-_TRANSIENT_RETRY_ATTEMPTS = 3
-_TRANSIENT_RETRY_DELAY_SECONDS = 2.0
-
-
 def _fetch_resource_or_none(session: requests.Session, resource: str, slug: str) -> dict | None:
-    """Like _fetch_resource, but returns None instead of raising when a
-    single move/ability/item can't be fetched, rather than aborting
-    extraction for every other name:
+    """Like a direct GET, but returns None instead of raising when a single
+    move/ability/item can't be fetched, rather than aborting extraction for
+    every other name:
     - A 404 means the name doesn't resolve to any PokéAPI resource (a
       genuine data-quality issue in the upstream source, e.g. a truncated
-      move name) — returns None immediately, no retry.
-    - A transient error (5xx, connection/timeout) is retried a few times
-      with a short delay, then treated the same as a 404 (skip, don't
-      crash the whole run) if it never recovers — a single flaky response
-      out of hundreds of lookups shouldn't lose everything else already
-      fetched.
+      move name) — returns None immediately.
+    - A transient error (5xx, connection/timeout) is retried by
+      get_with_retry; if it never recovers, treated the same as a 404 (skip,
+      don't crash the whole run) — a single flaky response out of hundreds
+      of lookups shouldn't lose everything else already fetched.
     """
-    last_exc: Exception | None = None
-    for attempt in range(_TRANSIENT_RETRY_ATTEMPTS):
-        try:
-            return _fetch_resource(session, resource, slug)
-        except requests.exceptions.HTTPError as exc:
-            if exc.response is not None and exc.response.status_code == 404:
-                return None
-            last_exc = exc
-        except requests.exceptions.RequestException as exc:
-            last_exc = exc
-        if attempt < _TRANSIENT_RETRY_ATTEMPTS - 1:
-            time.sleep(_TRANSIENT_RETRY_DELAY_SECONDS)
-    print(
-        f"Giving up on {resource}/{slug} after {_TRANSIENT_RETRY_ATTEMPTS} attempts: {last_exc}",
-        file=sys.stderr,
-    )
-    return None
+    url = f"{API_BASE_URL}/{resource}/{slug}"
+    try:
+        response = get_with_retry(session, url, timeout=30)
+    except requests.exceptions.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 404:
+            return None
+        print(f"Giving up on {resource}/{slug}: {exc}", file=sys.stderr)
+        return None
+    except requests.exceptions.RequestException as exc:
+        print(f"Giving up on {resource}/{slug}: {exc}", file=sys.stderr)
+        return None
+    return response.json()
 
 
 def extract_moves(

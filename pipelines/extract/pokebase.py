@@ -37,6 +37,8 @@ from pathlib import Path
 
 import requests
 
+from pipelines.extract.http import get_with_retry
+
 SOURCE_NAME = "PokéBase"
 PAGE_URL = "https://pokebase.app/pokemon-champions/pokemon"
 DEFAULT_DATASET_VERSION = "0.0.0-dev"
@@ -58,8 +60,7 @@ _ARRAY_MARKER = '\\"data\\":{\\"docs\\":['
 
 
 def _fetch_page_html(session: requests.Session) -> str:
-    response = session.get(PAGE_URL, timeout=30)
-    response.raise_for_status()
+    response = get_with_retry(session, PAGE_URL, timeout=30)
     return response.text
 
 

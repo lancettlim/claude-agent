@@ -1,24 +1,35 @@
 import csv
 import json
 
+import requests
+
+from pipelines.extract import http as extract_http
 from pipelines.extract import opgg
 
 
 class _FakeResponse:
-    def __init__(self, text: str) -> None:
+    def __init__(self, text: str, *, status_code: int = 200) -> None:
         self.text = text
+        self.status_code = status_code
 
     def raise_for_status(self) -> None:
-        return None
+        if self.status_code >= 400:
+            error = requests.exceptions.HTTPError(f"{self.status_code} error")
+            error.response = self
+            raise error
 
 
 class _FakeSession:
-    def __init__(self, html: str) -> None:
+    def __init__(self, html: str, *, fail_count: int = 0, fail_status_code: int = 500) -> None:
         self._html = html
+        self._fail_count = fail_count
+        self._fail_status_code = fail_status_code
         self.requested_urls: list[str] = []
 
     def get(self, url: str, timeout: int):
         self.requested_urls.append(url)
+        if len(self.requested_urls) <= self._fail_count:
+            return _FakeResponse("", status_code=self._fail_status_code)
         return _FakeResponse(self._html)
 
 
@@ -129,3 +140,17 @@ def test_extract_defaults_dataset_version_when_not_provided(tmp_path):
         row = next(csv.DictReader(fh))
 
     assert row["dataset_version"] == opgg.DEFAULT_DATASET_VERSION
+
+
+def test_extract_retries_transient_error_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
+    session = _FakeSession(_html_with_flight_payload(POKEMON_PAYLOADS), fail_count=2)
+    output_path = tmp_path / "opgg_champions.csv"
+
+    opgg.extract(output_path, session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+
+    assert len(rows) == 2
+    assert len(session.requested_urls) == 3

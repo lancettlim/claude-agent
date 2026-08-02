@@ -1,26 +1,45 @@
 import csv
 
+import requests
+
+from pipelines.extract import http as extract_http
 from pipelines.extract import munchstats
 
 
 class _FakeResponse:
-    def __init__(self, payload) -> None:
+    def __init__(self, payload, *, status_code: int = 200) -> None:
         self._payload = payload
+        self.status_code = status_code
 
     def raise_for_status(self) -> None:
-        return None
+        if self.status_code >= 400:
+            error = requests.exceptions.HTTPError(f"{self.status_code} error")
+            error.response = self
+            raise error
 
     def json(self):
         return self._payload
 
 
 class _FakeSession:
-    def __init__(self, payloads_by_url: dict[str, object]) -> None:
+    def __init__(
+        self,
+        payloads_by_url: dict[str, object],
+        *,
+        fail_urls: dict[str, int] | None = None,
+        fail_status_code: int = 500,
+    ) -> None:
         self._payloads_by_url = payloads_by_url
+        self._fail_urls = dict(fail_urls or {})
+        self._fail_status_code = fail_status_code
         self.requested_urls: list[str] = []
 
     def get(self, url: str, timeout: int):
         self.requested_urls.append(url)
+        remaining_failures = self._fail_urls.get(url, 0)
+        if remaining_failures > 0:
+            self._fail_urls[url] = remaining_failures - 1
+            return _FakeResponse(None, status_code=self._fail_status_code)
         return _FakeResponse(self._payloads_by_url[url])
 
 
@@ -160,4 +179,24 @@ def test_extract_defaults_to_full_tournaments_index(tmp_path):
     assert munchstats.TOURNAMENTS_INDEX_URL in session.requested_urls
     with output_path.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
+    assert len(rows) == 3
+
+
+def test_extract_retries_transient_error_then_succeeds(tmp_path, monkeypatch):
+    monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
+    session = _FakeSession(
+        {
+            munchstats.TOURNAMENTS_INDEX_URL: [{"id": TOURNAMENT_ID}],
+            f"{DIR_URL}/metadata.json": METADATA,
+            f"{DIR_URL}/players.json": PLAYERS,
+        },
+        fail_urls={f"{DIR_URL}/metadata.json": 2},
+    )
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(output_path, [TOURNAMENT_ID], session=session)
+
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+
     assert len(rows) == 3
