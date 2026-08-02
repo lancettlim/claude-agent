@@ -565,6 +565,19 @@ All five are now shipped.
   same latent risk existed for the normalized layer too. Verified against
   real data: a clean `dbt build` (147 pass) and `pipelines.cli validate`
   (54 mart_quality_checks, all pass).
+- [x] Backlog #15 (softer step): Archetype seed drift-flagging test — new
+  `dbt/tests/singular/assert_archetype_pokemon_map_intra_group_synergy.sql`
+  flags (via `severity=warn`, a new non-blocking `archetype_drift`
+  `meta.category`) archetypes in the curated `archetype_pokemon_map` seed
+  whose members don't show above-chance real team synergy with each other
+  (backlog #9's `pokemon_team_synergy.lift`). Verified against real data:
+  found genuine drift in 3 of 6 current archetypes — `rain`
+  (pelipper/politoed) has zero recorded teams ever fielding both, `sun`
+  and `tailwind-hyper-offense` both average well below-chance lift across
+  their curated pairs — while correctly leaving `sand` (one genuinely
+  strong pair) and the two single-member archetypes unflagged. Full
+  data-derived clustering (replacing the curated seed) is still open;
+  this only adds a signal for when it disagrees with real data.
 
 ## Consumption surfaces (backlog Section 2)
 

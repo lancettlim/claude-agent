@@ -376,6 +376,80 @@ def test_build_report_never_folds_mart_quality_into_release_blocking_findings():
     assert result["release_blocking_findings"] == []
 
 
+def test_build_report_categorizes_archetype_drift_checks():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123": (
+                _manifest_node(
+                    "assert_archetype_pokemon_map_intra_group_synergy",
+                    {
+                        "category": "archetype_drift",
+                        "check_name": "archetype_pokemon_map_intra_group_synergy",
+                    },
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123",
+                "warn",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+    template = _template()
+
+    assert set(result) == set(template)
+    assert result["archetype_drift_checks"] == [
+        {
+            "check_name": "archetype_pokemon_map_intra_group_synergy",
+            "status": "warn",
+            "flagged_archetype_count": 3,
+        }
+    ]
+
+
+def test_build_report_never_folds_archetype_drift_into_release_blocking_findings():
+    """archetype_drift's own dbt test uses severity=warn, so its status
+    can never be "fail" -- but the category is also explicitly excluded
+    here as documented intent, not left to rely on that alone
+    (backlog.md #15)."""
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123": (
+                _manifest_node(
+                    "assert_archetype_pokemon_map_intra_group_synergy",
+                    {
+                        "category": "archetype_drift",
+                        "check_name": "archetype_pokemon_map_intra_group_synergy",
+                    },
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.assert_archetype_pokemon_map_intra_group_synergy.abc123",
+                "warn",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+
+    assert result["release_blocking_findings"] == []
+
+
 def test_build_report_routes_unrecognized_test_to_uncategorized():
     """A test with no meta.category (e.g. a newly-added test nobody tagged
     yet) must still surface and be able to block a release -- it must not

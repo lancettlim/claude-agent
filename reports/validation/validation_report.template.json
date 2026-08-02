@@ -250,5 +250,8 @@
   "mart_quality_checks": [
     {"table_name": "pokemon_usage_summary", "check_name": "pending", "status": "pending", "failures": null}
   ],
+  "archetype_drift_checks": [
+    {"check_name": "archetype_pokemon_map_intra_group_synergy", "status": "pending", "flagged_archetype_count": null}
+  ],
   "release_blocking_findings": []
 }

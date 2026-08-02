@@ -403,7 +403,7 @@ and `pokemon_ability_usage.ability_share` per Pokémon, plus how many
 distinct items/abilities were observed at all. Not yet wired into the
 dashboard UI.
 
-#### 15. Data-derived archetype clustering
+#### 15. Data-derived archetype clustering — SOFTER STEP DONE, full clustering still open
 
 - **Size**: L
 - **Value**: `archetype_pokemon_map` is a 33-row hand-curated seed and the
@@ -415,8 +415,44 @@ dashboard UI.
 - **Touches**: `dbt/seeds/archetype_pokemon_map.csv`,
   `dbt/models/marts/pokemon_archetype_usage.sql`, `archetype_summary.sql`
 
-A softer intermediate step: keep the curated seed but add a test that flags
-when its members drift far from observed clusters.
+Shipped exactly the softer intermediate step this entry itself proposed,
+not the full L-sized clustering rebuild: the curated seed stays, and a new
+singular test, `dbt/tests/singular/
+assert_archetype_pokemon_map_intra_group_synergy.sql`, flags archetypes
+whose curated members don't actually show above-chance real team synergy
+with each other, using #9's `pokemon_team_synergy.lift` as the "observed
+cluster" signal to check the editorial judgment against. Per archetype:
+averages `lift` across every pair of its own curated members (a pair that
+never co-occurred on a real team at all has no `pokemon_team_synergy` row
+-- a left join preserves that as a real "no observed pairs" signal rather
+than silently dropping it); flags `drifted` (avg lift <= 1.0, no better
+than chance) or `no_observed_pairs`; a single-member archetype (no pair
+exists to judge) is `insufficient_data` and never flagged.
+`severity=warn` (this test's own config) plus a new `archetype_drift`
+`meta.category` (excluded from `release_blocking_findings` in
+`pipelines/validate/report.py`, the same deliberate-exception treatment
+backlog #42's `mart_quality` category already gets) means a real drift
+surfaces in `reports/validation/validation_report.json`'s new
+`archetype_drift_checks` section without ever blocking `dbt build`, CI, or
+`pipelines.cli release`.
+
+Verified against real data, and it immediately found real, non-hypothetical
+drift in half the curated archetypes (not a contrived example): of the 6
+current archetypes, `rain` (pelipper/politoed) has genuinely **zero**
+recorded teams fielding both together despite being a textbook rain-team
+pairing; `sun` (torkoal/ninetales/venusaur-mega/charizard-mega-y) averages
+0.53 lift (real co-occurrence *below* chance for most pairs); `tailwind
+-hyper-offense` (whimsicott/grimmsnarl) averages 0.098 (far below chance).
+`sand` correctly stays unflagged (average pulled to 7.58 by a genuinely
+strong tyranitar-mega/excadrill pairing at 20.4 lift, even though one of
+its other pairs is weak) and the two single-member archetypes
+(`trick-room`, `bulky-balance`) correctly report no pairs to judge. This
+is real evidence for this item's own "encodes your opinion rather than the
+data's" concern, not just a theoretical risk.
+
+Full data-derived clustering (replacing the curated seed outright) is
+still open -- this only adds a signal for when the curated seed disagrees
+with real data, not a replacement for it.
 
 #### 16. Speed-tier bracket mart — DONE
 
