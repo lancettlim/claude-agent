@@ -404,9 +404,13 @@ Every release entry must summarize:
 
 ## Phased execution roadmap
 
-v1 delivery is sequenced into three phases — **ingestion**, **normalization**,
-and **analytics/dashboard outputs**. See `todo.md` for the task-level
-checklist and current status of each phase.
+v1 delivery was sequenced into three phases — **ingestion**, **normalization**,
+and **analytics/dashboard outputs**. Two post-v1 phases followed the same
+pattern: **Phase 4** (visual assets and card rendering, on top of the
+normalized dataset) and **M6** (a static analytics dashboard, on top of the
+Phase 3 marts) — see `CLAUDE.md`'s "Repository purpose" for how each layers
+on the last. See `todo.md` for the task-level checklist and current status
+of every phase.
 
 ## Validation and release gates
 
@@ -430,12 +434,9 @@ checklist and current status of each phase.
 The v1 definition-of-done checklist that tracks these gates, plus export and
 example-query validation, lives in `todo.md`.
 
-## Next implementation task
+## Current status
 
-After document alignment, create the repository structure for:
-
-- staging snapshots
-- normalized outputs
-- release manifests
-- release changelogs
-- validation reports
+Repository scaffolding, Phases 1-4, and M6 are all implemented, and
+`dataset_version 0.2.0` has been published (see `CLAUDE.md`'s "Repository
+purpose"). For outstanding work, see `docs/todo.md`'s open items and
+`docs/backlog.md`'s uncommitted wish list.

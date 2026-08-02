@@ -767,8 +767,8 @@ frontend-only feature would mean fabricating data, which this repo's
   team's aggregate win/loss record, not per-battle results against a named
   opponent, so the Matchup tab's co-usage panel is an explicitly-labeled
   teammate-pairing *proxy*, not a real matchup-outcome signal. Closing this
-  for real needs a battle-log source neither currently in scope nor
-  deferred source (Limitless VGC, Victory Road) is confirmed to provide.
+  for real needs a battle-log source — neither an in-scope nor a deferred
+  source (Limitless VGC, Victory Road) is confirmed to provide one.
   Tracked in `docs/todo.md`'s M6 backlog.
 - **Date-range filtering / trend charts.** Only one `snapshot_date` exists
   in the data so far, so a date-range control would have nothing to range
