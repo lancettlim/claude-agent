@@ -1018,7 +1018,7 @@ request *cadence*, not just reacting to failures after the fact) — a
 distinct, smaller follow-up, not folded in here since retry/backoff was
 the change with the real "whole run aborts" failure mode behind it.
 
-### 44. Incremental extraction
+### 44. Incremental extraction — DONE
 
 - **Size**: M
 - **Value**: MunchStats refetches all 31 tournaments and ~106k rows every
@@ -1027,9 +1027,29 @@ the change with the real "whole run aborts" failure mode behind it.
 - **Blocked by**: nothing (design alongside #1)
 - **Touches**: `pipelines/extract/munchstats.py`, others as applicable
 
-Bulbagarden's sha1-based `skip_existing` is the existing pattern to follow.
-Conditional requests (ETag / If-Modified-Since) would help the two scraped
-sources.
+Followed Bulbagarden's sha1-based `skip_existing` pattern as this entry
+suggested, adapted to what MunchStats actually offers: there's no
+per-tournament content hash, so `extract`'s new `previous_snapshot_path`
+parameter (wired up in `pipelines/cli.py`'s `_run_extract`, munchstats-only,
+via the already-existing `_latest_snapshot_path` helper) still always
+re-fetches each tournament's cheap `metadata.json`, and only skips
+re-fetching the heavy `players.json` (the bulk of every run's ~106k rows)
+when that tournament's `(name, date, type)` signature is unchanged from
+what's already cached in the previous dated snapshot. Reused rows are
+re-stamped with the current run's `extracted_at_utc`/`dataset_version`,
+matching `bulbagarden.py`'s "every row reflects this extraction run"
+convention for its own skipped-download rows. Verified against real data,
+not just the new unit tests (`tests/unit/extract/test_munchstats.py`):
+re-running `extract munchstats` same-day against a freshly-extracted
+snapshot reproduced the identical 106,134 rows in 11 seconds (down from
+the original run's 63 live requests fetching ~37MB), confirming every
+tournament's roster data was correctly reused rather than silently
+dropped or duplicated.
+
+Conditional requests (ETag / If-Modified-Since) for the two scraped
+sources (OP.GG/PokéBase) are lower value than this was: both are already a
+single request each, so there's no comparable "N heavy fetches down to
+near-zero" win available there.
 
 ### 45. `pipelines/cli.py` test coverage — DONE
 

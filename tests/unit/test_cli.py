@@ -112,6 +112,45 @@ def test_run_extract_writes_dated_snapshot_and_prunes(tmp_path, monkeypatch):
     assert (tmp_path / "fake_source" / "2026-07-30.csv").exists()
 
 
+class _RecordingMunchstatsExtractor:
+    def __init__(self):
+        self.calls = []
+
+    def extract(
+        self, output_path, *, dataset_version=None, session=None, previous_snapshot_path=None
+    ):
+        self.calls.append((output_path, dataset_version, previous_snapshot_path))
+        _write_csv(output_path, [], ["a"])
+
+
+def test_run_extract_munchstats_passes_previous_snapshot_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    previous_path = tmp_path / "munchstats" / "2026-07-29.csv"
+    _write_csv(previous_path, [], ["a"])
+    fake = _RecordingMunchstatsExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"munchstats": (fake, "munchstats")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"munchstats": 7})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("munchstats", "1.2.3")
+
+    assert exit_code == 0
+    assert fake.calls == [(tmp_path / "munchstats" / "2026-07-30.csv", "1.2.3", previous_path)]
+
+
+def test_run_extract_other_sources_do_not_receive_previous_snapshot_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    fake = _RecordingExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"fake": (fake, "fake_source")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"fake_source": 2})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("fake", "1.2.3")
+
+    assert exit_code == 0
+    assert fake.calls == [(tmp_path / "fake_source" / "2026-07-30.csv", "1.2.3")]
+
+
 def test_run_extract_all_runs_every_source_in_order(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
     call_order = []

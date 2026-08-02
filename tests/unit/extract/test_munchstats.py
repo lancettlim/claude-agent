@@ -182,6 +182,109 @@ def test_extract_defaults_to_full_tournaments_index(tmp_path):
     assert len(rows) == 3
 
 
+def _write_previous_snapshot(path, rows):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=munchstats.FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _cached_row(**overrides):
+    row = {name: "" for name in munchstats.FIELDNAMES}
+    row.update(
+        {
+            "event_id": TOURNAMENT_ID,
+            "event_name": METADATA["name"],
+            "event_date": METADATA["date"],
+            "event_tier": METADATA["type"],
+            "team_id": "cached-team",
+            "player_id": "cached-player",
+            "player_name": "Cached Player",
+            "slot_number": "1",
+            "pokemon_name": "Cached Mon",
+            "source_name": munchstats.SOURCE_NAME,
+            "source_url": f"{DIR_URL}/players.json",
+            "source_record_id": f"{TOURNAMENT_ID}:cached-team:1",
+            "extracted_at_utc": "2026-01-01T00:00:00+00:00",
+            "dataset_version": "0.0.1",
+        }
+    )
+    row.update(overrides)
+    return row
+
+
+def test_extract_reuses_cached_rows_when_metadata_signature_unchanged(tmp_path):
+    # players.json is deliberately absent from the payload map: if the
+    # extractor tries to fetch it despite the metadata signature matching,
+    # the fake session raises KeyError and fails the test.
+    session = _FakeSession(
+        {
+            munchstats.TOURNAMENTS_INDEX_URL: [{"id": TOURNAMENT_ID}],
+            f"{DIR_URL}/metadata.json": METADATA,
+        }
+    )
+    previous_path = tmp_path / "previous.csv"
+    _write_previous_snapshot(previous_path, [_cached_row()])
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(
+        output_path,
+        [TOURNAMENT_ID],
+        dataset_version="0.2.0",
+        session=session,
+        previous_snapshot_path=previous_path,
+    )
+
+    assert f"{DIR_URL}/players.json" not in session.requested_urls
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 1
+    assert rows[0]["pokemon_name"] == "Cached Mon"
+    assert rows[0]["team_id"] == "cached-team"
+    # Reused rows are still re-stamped with this run's provenance fields.
+    assert rows[0]["dataset_version"] == "0.2.0"
+    assert rows[0]["extracted_at_utc"] != "2026-01-01T00:00:00+00:00"
+
+
+def test_extract_refetches_when_metadata_signature_changed(tmp_path):
+    session = _session_for_one_tournament()
+    previous_path = tmp_path / "previous.csv"
+    _write_previous_snapshot(previous_path, [_cached_row(event_date="2020-01-01")])
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(
+        output_path,
+        [TOURNAMENT_ID],
+        session=session,
+        previous_snapshot_path=previous_path,
+    )
+
+    assert f"{DIR_URL}/players.json" in session.requested_urls
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 3
+    assert rows[0]["pokemon_name"] == "Miraidon"
+
+
+def test_extract_ignores_missing_previous_snapshot_path(tmp_path):
+    session = _session_for_one_tournament()
+    output_path = tmp_path / "munchstats.csv"
+    missing_path = tmp_path / "does-not-exist.csv"
+
+    munchstats.extract(
+        output_path,
+        [TOURNAMENT_ID],
+        session=session,
+        previous_snapshot_path=missing_path,
+    )
+
+    assert f"{DIR_URL}/players.json" in session.requested_urls
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert len(rows) == 3
+
+
 def test_extract_retries_transient_error_then_succeeds(tmp_path, monkeypatch):
     monkeypatch.setattr(extract_http.time, "sleep", lambda seconds: None)
     session = _FakeSession(

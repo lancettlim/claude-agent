@@ -134,7 +134,13 @@ def _run_extract(source: str, dataset_version: str) -> int:
     module, staging_subdir = _EXTRACTORS[source]
     date_str = _snapshot_date()
     output_path = _dated_snapshot_path(staging_subdir, date_str)
-    module.extract(output_path, dataset_version=dataset_version)
+    extract_kwargs = {}
+    if source == "munchstats":
+        # backlog.md #44: reuse cached roster rows for a tournament whose
+        # metadata hasn't changed since the previous snapshot, instead of
+        # re-fetching all ~106k rows on every scheduled run.
+        extract_kwargs["previous_snapshot_path"] = _latest_snapshot_path(staging_subdir)
+    module.extract(output_path, dataset_version=dataset_version, **extract_kwargs)
     _prune_old_snapshots(staging_subdir)
     if source == "pokeapi":
         moves, abilities, items = _referenced_move_ability_item_names()

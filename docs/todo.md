@@ -496,6 +496,19 @@ All five are now shipped.
   now reports `0.9842` (previously `0.0`), matching the real figure
   already documented elsewhere in this repo. `duckdb` is now an explicit
   `pyproject.toml` dependency (`report.py` imports it directly).
+- [x] Backlog #44: Incremental extraction — `pipelines/extract/
+  munchstats.py`'s `extract` gained a `previous_snapshot_path` parameter
+  (wired up munchstats-only in `pipelines/cli.py`'s `_run_extract`, via the
+  already-existing `_latest_snapshot_path` helper): each tournament's cheap
+  `metadata.json` is still always re-fetched, but the heavy `players.json`
+  fetch (the bulk of every run's ~106k rows) is skipped in favor of cached
+  rows whenever that tournament's `(name, date, type)` signature is
+  unchanged — the same "cheap signal first, skip the expensive download
+  only if it still matches" pattern `bulbagarden.py`'s sha1-based
+  `skip_existing` already established. Verified against real data:
+  re-running `extract munchstats` same-day reproduced the identical
+  106,134 rows in 11 seconds, down from the original run's 63 live
+  requests fetching ~37MB.
 
 ## Consumption surfaces (backlog Section 2)
 
