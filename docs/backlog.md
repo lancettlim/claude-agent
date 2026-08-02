@@ -1425,9 +1425,18 @@ tech-debt loop, listed here only so they're written down somewhere.
 - `docs/dataset-spec.md`'s phased roadmap names only three phases; Phase 4
   and M6 exist only in `docs/todo.md`.
 
-One item on this list is **not** prose drift and deserves separate
-attention: `releases/manifests/manifest-0.2.0.json` has
+One item on this list was **not** prose drift and got separate attention —
+now fixed: `releases/manifests/manifest-0.2.0.json` had
 `"known_limitations": []`, while all three limitations recorded in
 `manifest-0.1.0.json` — PokéBase's missing removal signal, the all-zero stat
-deltas, and the three excluded ambiguous form mappings — remain true in
-0.2.0. That is a published-artifact regression, not a doc nit.
+deltas, and the excluded ambiguous form mappings — remain true in 0.2.0 (the
+`--known-limitation` flags were simply never passed when 0.2.0 was cut).
+Corrected directly in `manifest-0.2.0.json` and `CHANGELOG-0.2.0.md`,
+carrying forward the same three limitations and extending the ambiguous
+-form-mapping one to also cover Bulbagarden's own excluded 'Mega Meowstic'
+sprite title (new in 0.2.0, same underlying ambiguity). Quality-check
+`metric_value`s in the same manifest still read `0.0` on every passing
+check — a separate, pre-existing artifact of backlog #49's bug (fixed in
+`report.py` after 0.2.0 was published) — left as-is since recomputing the
+true historical ratios would need the exact 0.2.0 warehouse snapshot, which
+no longer exists.
