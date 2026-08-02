@@ -3,6 +3,8 @@ import os
 import subprocess
 import time
 
+import pytest
+
 from pipelines import cli
 
 
@@ -302,3 +304,189 @@ def test_main_extract_accepts_all_choice(monkeypatch):
 
     assert exit_code == 0
     assert captured == {"source": "all"}
+
+
+def test_main_release_dispatches_version_and_known_limitations(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_release",
+        lambda dataset_version, known_limitations: (
+            captured.update(dataset_version=dataset_version, known_limitations=known_limitations)
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(
+        [
+            "release",
+            "--version",
+            "0.3.0",
+            "--known-limitation",
+            "no removal signal",
+            "--known-limitation",
+            "zero stat deltas",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "dataset_version": "0.3.0",
+        "known_limitations": ["no removal signal", "zero stat deltas"],
+    }
+
+
+def test_main_release_defaults_known_limitations_to_empty_list(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_release",
+        lambda dataset_version, known_limitations: (
+            captured.update(dataset_version=dataset_version, known_limitations=known_limitations)
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(["release", "--version", "0.3.0"])
+
+    assert exit_code == 0
+    assert captured == {"dataset_version": "0.3.0", "known_limitations": []}
+
+
+def test_main_release_requires_version(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["release"])
+
+    assert exc_info.value.code == 2
+    assert "--version" in capsys.readouterr().err
+
+
+def test_main_render_card_dispatches_with_team_id(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_render_card",
+        lambda team_id, spec_path, output_path: (
+            captured.update(team_id=team_id, spec_path=spec_path, output_path=output_path) or 0
+        ),
+    )
+
+    exit_code = cli.main(["render-card", "--team-id", "abc123", "--output", "card.png"])
+
+    assert exit_code == 0
+    assert captured == {
+        "team_id": "abc123",
+        "spec_path": None,
+        "output_path": cli.Path("card.png"),
+    }
+
+
+def test_main_render_card_dispatches_with_spec(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_render_card",
+        lambda team_id, spec_path, output_path: (
+            captured.update(team_id=team_id, spec_path=spec_path, output_path=output_path) or 0
+        ),
+    )
+
+    exit_code = cli.main(["render-card", "--spec", "team.json", "--output", "card.png"])
+
+    assert exit_code == 0
+    assert captured == {
+        "team_id": None,
+        "spec_path": cli.Path("team.json"),
+        "output_path": cli.Path("card.png"),
+    }
+
+
+def test_main_render_card_requires_team_id_or_spec(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(["render-card", "--output", "card.png"])
+
+    assert exc_info.value.code == 2
+    assert "required" in capsys.readouterr().err.lower()
+
+
+def test_main_render_card_rejects_both_team_id_and_spec(capsys):
+    with pytest.raises(SystemExit) as exc_info:
+        cli.main(
+            [
+                "render-card",
+                "--team-id",
+                "abc123",
+                "--spec",
+                "team.json",
+                "--output",
+                "card.png",
+            ]
+        )
+
+    assert exc_info.value.code == 2
+    assert "not allowed with" in capsys.readouterr().err.lower()
+
+
+def test_main_build_dashboard_dispatches_with_defaults(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_build_dashboard",
+        lambda marts_dir, normalized_dir, output_dir, fetch_icons: (
+            captured.update(
+                marts_dir=marts_dir,
+                normalized_dir=normalized_dir,
+                output_dir=output_dir,
+                fetch_icons=fetch_icons,
+            )
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(["build-dashboard"])
+
+    assert exit_code == 0
+    assert captured == {
+        "marts_dir": None,
+        "normalized_dir": None,
+        "output_dir": None,
+        "fetch_icons": True,
+    }
+
+
+def test_main_build_dashboard_dispatches_with_overrides_and_no_fetch_icons(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        cli,
+        "_run_build_dashboard",
+        lambda marts_dir, normalized_dir, output_dir, fetch_icons: (
+            captured.update(
+                marts_dir=marts_dir,
+                normalized_dir=normalized_dir,
+                output_dir=output_dir,
+                fetch_icons=fetch_icons,
+            )
+            or 0
+        ),
+    )
+
+    exit_code = cli.main(
+        [
+            "build-dashboard",
+            "--marts-dir",
+            "custom/marts",
+            "--normalized-dir",
+            "custom/normalized",
+            "--output-dir",
+            "custom/out",
+            "--no-fetch-icons",
+        ]
+    )
+
+    assert exit_code == 0
+    assert captured == {
+        "marts_dir": cli.Path("custom/marts"),
+        "normalized_dir": cli.Path("custom/normalized"),
+        "output_dir": cli.Path("custom/out"),
+        "fetch_icons": False,
+    }

@@ -1007,7 +1007,7 @@ Bulbagarden's sha1-based `skip_existing` is the existing pattern to follow.
 Conditional requests (ETag / If-Modified-Since) would help the two scraped
 sources.
 
-### 45. `pipelines/cli.py` test coverage — PARTIALLY DONE, stale "zero tests" claim
+### 45. `pipelines/cli.py` test coverage — DONE
 
 - **Size**: S
 - **Value**: 74 unit tests cover the extractors, release, render, dashboard,
@@ -1017,15 +1017,17 @@ sources.
 - **Blocked by**: nothing
 - **Touches**: new `tests/unit/test_cli.py`
 
-`tests/unit/test_cli.py` already exists (added alongside backlog #38's
-fix) and isn't zero: 16 tests cover the snapshot-path helpers, `extract`
+`tests/unit/test_cli.py` already existed (added alongside backlog #38's
+fix) with 16 tests covering the snapshot-path helpers, `extract`
 orchestration (including `all`), `dataset_version` defaulting/override, and
-all four `validate` exit-code paths (clean pass, gate failure, unexpected
-crash, stale `run_results.json`). Still genuinely uncovered: `main()`'s
-argument-parsing/dispatch for the `release`, `render-card`, and
-`build-dashboard` subcommands (e.g. `render-card`'s `--team-id`/`--spec`
-mutual-exclusivity, `release`'s required `--version`) — narrower than this
-entry originally described, but real.
+all four `validate` exit-code paths. This pass closed the remaining gap: 11
+new tests cover `main()`'s argument-parsing/dispatch for `release` (version
+plus repeatable `--known-limitation`, defaulting to `[]`, and the
+required-`--version` `SystemExit(2)` path), `render-card` (`--team-id` and
+`--spec` each dispatch correctly, plus both the missing-both and
+both-given `SystemExit(2)` mutual-exclusivity paths), and `build-dashboard`
+(default `None`/`True` kwargs, and all four overrides including
+`--no-fetch-icons`). 27 tests total in the file now, all passing.
 
 Related, still true: there is no `conftest.py` or shared fixture module
 anywhere under `tests/`, so each file re-declares its own helpers.
