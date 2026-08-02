@@ -546,6 +546,25 @@ All five are now shipped.
   + `validate` run: all 11 present normalized entities pass,
   `pokemon_asset` correctly skips (Bulbagarden wasn't extracted this
   pass).
+- [x] Backlog #42: Mart tests — every one of the 21 marts now carries
+  `not_null` on its grain column(s) plus a uniqueness check (dbt's
+  built-in `unique` for 8 single-column-grain marts, a new generic test
+  `dbt/macros/test_unique_combination_of_columns.sql` for the 13
+  composite-grain marts — this project's second generic test after
+  backlog #40's `row_count_anomaly`). Tagged `meta.category: mart_quality`
+  and wired into `report.py` as a new `mart_quality_checks` section,
+  deliberately excluded from `release_blocking_findings` since marts
+  aren't part of the release package. Caught a real bug while verifying:
+  a `unique_combination_of_columns` test was the first query to ever read
+  `player_signature_pokemon.csv`'s full row width back into DuckDB, and
+  `read_csv`'s auto-detect sniffer (only samples ~20,480 rows) mis-guessed
+  the CSV dialect because the first quoted comma in a player name didn't
+  appear until row 34,569. Fixed at the source — `dbt_project.yml`'s
+  `marts`/`normalized` configs now pin `csv_read_options: {quote: '"',
+  escape: '"'}` — rather than working around it in the test, since the
+  same latent risk existed for the normalized layer too. Verified against
+  real data: a clean `dbt build` (147 pass) and `pipelines.cli validate`
+  (54 mart_quality_checks, all pass).
 
 ## Consumption surfaces (backlog Section 2)
 

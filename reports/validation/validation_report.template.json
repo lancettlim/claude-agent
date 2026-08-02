@@ -247,5 +247,8 @@
     {"table_name": "tournament_team", "status": "pending", "expected_fields": null, "actual_fields": null},
     {"table_name": "tournament_team_member", "status": "pending", "expected_fields": null, "actual_fields": null}
   ],
+  "mart_quality_checks": [
+    {"table_name": "pokemon_usage_summary", "check_name": "pending", "status": "pending", "failures": null}
+  ],
   "release_blocking_findings": []
 }

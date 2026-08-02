@@ -17,7 +17,12 @@ someone remembered to add it to one of four dicts in this file (as actually
 happened to five real tests — see docs/backlog.md #37). Now a test just
 declares its own `meta.category`; any test that runs but declares no
 recognized category lands in `uncategorized_checks` instead of disappearing,
-so a failing test can never silently skip blocking a release.
+so a failing test can never silently skip blocking a release. The one
+deliberate exception is `mart_quality` (backlog.md #42): those checks are
+real and reported, but never fold into `release_blocking_findings` --
+marts branch off the normalized layer for dashboard-facing output and
+aren't part of the release package (CLAUDE.md's "Repository structure"),
+so failing one shouldn't block `pipelines.cli release`.
 
 Null-rate and coverage checks need an actual ratio (not just a failing-row
 count) in `metric_value`. dbt's run_results.json schema requires `failures`
@@ -302,6 +307,7 @@ def build_report(
     duplicate_key_checks = []
     referential_integrity_checks = []
     row_count_anomaly_checks = []
+    mart_quality_checks = []
     uncategorized_checks = []
 
     for node, result in _test_nodes_with_results(manifest, run_results):
@@ -354,6 +360,15 @@ def build_report(
                     "status": status,
                 }
             )
+        elif category == "mart_quality" and "table_name" in meta:
+            mart_quality_checks.append(
+                {
+                    "table_name": meta["table_name"],
+                    "check_name": node["name"],
+                    "status": status,
+                    "failures": result["failures"] if result else None,
+                }
+            )
         else:
             uncategorized_checks.append(
                 {
@@ -368,8 +383,15 @@ def build_report(
     duplicate_key_checks.sort(key=lambda c: c["table_name"])
     referential_integrity_checks.sort(key=lambda c: c["check_name"])
     row_count_anomaly_checks.sort(key=lambda c: c["source_name"])
+    mart_quality_checks.sort(key=lambda c: (c["table_name"], c["check_name"]))
     uncategorized_checks.sort(key=lambda c: c["test_name"])
 
+    # mart_quality_checks (backlog.md #42) is deliberately excluded here:
+    # marts branch off the normalized layer for dashboard-facing output and
+    # aren't part of the release package (CLAUDE.md's "Repository
+    # structure"), so a mart-quality failure should be visible in the
+    # report without blocking `pipelines.cli release` the way every other
+    # category here does.
     release_blocking_findings = [
         f"{entry.get('table_name') or entry.get('check_name') or entry.get('test_name') or entry.get('source_name')}: "
         f"status={entry['status']}"
@@ -397,6 +419,7 @@ def build_report(
         "uncategorized_checks": uncategorized_checks,
         "freshness_checks": freshness_checks,
         "schema_drift_checks": schema_drift_checks,
+        "mart_quality_checks": mart_quality_checks,
         "release_blocking_findings": release_blocking_findings,
     }
 

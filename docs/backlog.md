@@ -1025,7 +1025,7 @@ silent-drift risk this item closes is narrower but still real: our own
 drifting out of sync with each other through an ordinary code edit, which
 neither layer's tests caught before this pass.
 
-### 42. Mart tests
+### 42. Mart tests — DONE
 
 - **Size**: M
 - **Value**: All 32 singular tests target normalized and seed models. **Zero
@@ -1034,10 +1034,57 @@ neither layer's tests caught before this pass.
 - **Blocked by**: nothing
 - **Touches**: `dbt/tests/singular/`, `dbt/models/marts/schema.yml`
 
-Also worth noting there is not a single dbt *generic* test in the project —
-no `unique`, `not_null`, `relationships`, or `accepted_values` anywhere.
-Everything is bespoke SQL, which is a lot of surface for tests that generics
-would cover in one line.
+Took the "generics would cover it in one line" path this entry itself
+suggested, applied to all 21 marts that exist by the time this was picked
+up (not ten -- the mart layer grew across several other backlog items
+before this one landed). Every mart now carries `not_null` on its grain
+column(s) plus a uniqueness check on its real primary key: dbt's built-in
+`unique` for the 8 marts with a genuine single-column grain
+(`pokemon_champions_profile`, `pokemon_speed_tiers`, etc.), and a new
+generic test, `dbt/macros/test_unique_combination_of_columns.sql`, for the
+13 marts with a real composite grain (e.g. `pokemon_usage_summary`'s
+`(pokemon_key, event_tier)`, `pokemon_team_core_usage`'s `(pokemon_key,
+partner_pokemon_key)`) -- the standard `unique_combination_of_columns`
+pattern (the same one dbt-utils ships), reimplemented directly rather than
+adding a package dependency for one macro. This is this project's second
+generic test (the first was backlog #40's `row_count_anomaly`), so the
+"not a single generic test" observation this entry originally made no
+longer holds at all.
+
+Tagged `meta.category: mart_quality`, following #37's mechanism, and
+wired into `pipelines/validate/report.py` as a new `mart_quality_checks`
+report section -- but deliberately **excluded** from
+`release_blocking_findings`, unlike every other category: marts branch off
+the normalized layer for dashboard-facing output and aren't part of the
+release package (`CLAUDE.md`'s "Repository structure"), so a mart-quality
+failure should be visible and actionable without blocking
+`pipelines.cli release`. New `tests/unit/validate/test_report.py` cases
+cover both the categorization and the never-blocks guarantee directly.
+
+Verified against real data, and this real run caught a real, previously
+-latent bug, not a hypothetical: `dbt build` against the actual warehouse
+initially failed with a DuckDB CSV parse error on `player_signature_pokemon
+.csv` (a `unique_combination_of_columns` test was the first query ever to
+read that mart's *full* row width back into DuckDB) -- `read_csv`'s
+`auto_detect` sniffer only samples the first ~20,480 rows to guess the CSV
+dialect, and the first quoted comma in a player name ("Wyatt Thibodeaux,
+Jr.") didn't appear until row 34,569, so it wrongly concluded no quote
+character was needed at all. A single-column `not_null` test against the
+same view didn't trip it (confirmed: the optimizer can prune that down to
+one column without validating full row arity), so this was a real gap
+only a multi-column test could have caught. Fixed at the source, not
+worked around in the test: `dbt_project.yml`'s `marts`/`normalized` model
+configs now pin `csv_read_options: {quote: '"', escape: '"'}` (Python's
+`csv.DictWriter` and dbt-duckdb's own CSV writer both already always use
+`"`, so this was never actually a value that needed sniffing) while
+leaving delimiter/header/type detection on `auto_detect`. Confirmed fixed
+directly against the same file with `read_csv(..., quote=chr(34),
+escape=chr(34))`, then via a real, clean `dbt build` (147 pass, 0 mart
+test failures) and `pipelines.cli validate` (54 mart_quality_checks, all
+`pass`, `release_blocking_findings` empty). The same latent risk existed
+for `normalized/*.csv` too (e.g. `tournament_team.player_name`) even
+though nothing had tripped it yet -- fixed there in the same config change
+rather than only patching the mart that happened to surface it first.
 
 ### 43. Extractor resilience — DONE (retry/backoff; rate limiting still open)
 

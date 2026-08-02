@@ -305,6 +305,77 @@ def test_build_report_folds_schema_drift_failures_into_release_blocking_findings
     assert "pokemon: status=fail" in result["release_blocking_findings"]
 
 
+def test_build_report_categorizes_mart_quality_checks():
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.not_null_pokemon_usage_summary_pokemon_key.abc123": (
+                _manifest_node(
+                    "not_null_pokemon_usage_summary_pokemon_key",
+                    {"category": "mart_quality", "table_name": "pokemon_usage_summary"},
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.not_null_pokemon_usage_summary_pokemon_key.abc123",
+                "fail",
+                3,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+    template = _template()
+
+    assert set(result) == set(template)
+    assert result["mart_quality_checks"] == [
+        {
+            "table_name": "pokemon_usage_summary",
+            "check_name": "not_null_pokemon_usage_summary_pokemon_key",
+            "status": "fail",
+            "failures": 3,
+        }
+    ]
+
+
+def test_build_report_never_folds_mart_quality_into_release_blocking_findings():
+    """Marts branch off the normalized layer for dashboard-facing output
+    and aren't part of the release package (CLAUDE.md's "Repository
+    structure"), so a failing mart_quality check must stay visible in the
+    report without blocking pipelines.cli release -- unlike every other
+    category, which does block (backlog.md #42)."""
+    manifest = {
+        "nodes": {
+            "test.pokemon_champions.unique_pokemon_speed_tiers_pokemon_key.def456": (
+                _manifest_node(
+                    "unique_pokemon_speed_tiers_pokemon_key",
+                    {"category": "mart_quality", "table_name": "pokemon_speed_tiers"},
+                )
+            ),
+        }
+    }
+    run_results = {
+        "results": [
+            _run_result(
+                "test.pokemon_champions.unique_pokemon_speed_tiers_pokemon_key.def456",
+                "fail",
+                2,
+            ),
+        ]
+    }
+
+    result = report.build_report(
+        manifest, run_results, dataset_version="0.1.0", warehouse_path=None
+    )
+
+    assert result["mart_quality_checks"][0]["status"] == "fail"
+    assert result["release_blocking_findings"] == []
+
+
 def test_build_report_routes_unrecognized_test_to_uncategorized():
     """A test with no meta.category (e.g. a newly-added test nobody tagged
     yet) must still surface and be able to block a release -- it must not
