@@ -590,6 +590,7 @@
     <button class="tab-btn" role="tab" data-tab="matchup" aria-selected="false">Matchup</button>
     <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
     <button class="tab-btn" role="tab" data-tab="top-teams" aria-selected="false">Top Teams</button>
+    <button class="tab-btn" role="tab" data-tab="players" aria-selected="false">Players &amp; Regions</button>
   </nav>
 
   <section class="tab-panel" data-panel="overview">
@@ -604,6 +605,9 @@
     <div class="controls">
       <label>Tier
         <select id="usage-tier-filter"></select>
+      </label>
+      <label>Regulation
+        <select id="usage-regulation-filter"></select>
       </label>
       <label>Type
         <div class="type-filter-row" id="usage-type-filter"></div>
@@ -631,12 +635,14 @@
         </div>
       </label>
     </div>
+    <p class="sub" id="usage-regulation-note" hidden></p>
     <div class="grid-6xn" id="usage-grid"></div>
 
     <h3>Leaderboards</h3>
     <div class="subtabs" role="tablist">
       <button class="subtab-btn" role="tab" data-subtab="usage-leaders" aria-selected="true">Usage leaders</button>
       <button class="subtab-btn" role="tab" data-subtab="win-rate-leaders" aria-selected="false">Win rate leaders</button>
+      <button class="subtab-btn" role="tab" data-subtab="usage-success" aria-selected="false">Success</button>
       <button class="subtab-btn" role="tab" data-subtab="usage-trends" aria-selected="false">Trends</button>
     </div>
 
@@ -665,6 +671,37 @@
       <div class="table-scroll">
         <table id="win-rate-table">
           <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="win_rate">Win rate</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="usage-success" hidden>
+      <p class="sub">
+        Popular is not the same as successful. Raw usage counts a last-place
+        team's roster slot exactly like a winner's; these two views weight it
+        by where the team actually finished
+        (<code>tournament_team.placement</code>).
+        <strong>Top cut</strong> counts only appearances on a team that placed
+        1&#8211;8; <strong>placement-weighted</strong> weights every appearance
+        by 1/placement, so a win counts far more than a 200th with no cutoff
+        cliff. The <strong>Movement</strong> column is how many places a
+        Pokémon gains or loses versus its raw usage rank — a positive number is
+        a quiet top-cut staple, a negative one is a crowd favourite that
+        underperforms.
+      </p>
+      <div class="controls">
+        <label>Ranked by
+          <select id="usage-success-metric">
+            <option value="placement_weighted">Placement-weighted</option>
+            <option value="top_cut">Top cut (1&#8211;8)</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid-6xn" id="usage-success-grid"></div>
+      <div class="table-scroll">
+        <table id="usage-success-table">
+          <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="weighted_usage_share">Weighted share</th><th class="sortable" data-sort-key="top_cut_usage_share">Top-cut share</th><th class="sortable" data-sort-key="usage_share">Raw usage</th><th class="sortable" data-sort-key="rank_movement">Movement</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -705,12 +742,12 @@
     </div>
 
     <div class="subtab-panel" data-subpanel="profile-items">
-      <p class="sub">Top 5 recorded held items.</p>
+      <p class="sub">Top 5 recorded held items. <span id="profile-item-concentration"></span></p>
       <div class="grid-6xn" id="profile-item-grid"></div>
     </div>
 
     <div class="subtab-panel" data-subpanel="profile-ability" hidden>
-      <p class="sub">Top 5 recorded abilities.</p>
+      <p class="sub">Top 5 recorded abilities. <span id="profile-ability-concentration"></span></p>
       <div class="grid-6xn" id="profile-ability-grid"></div>
     </div>
 
@@ -736,7 +773,23 @@
     </div>
 
     <div class="subtab-panel" data-subpanel="profile-team-cores" hidden>
-      <p class="sub">Which Pokémon most often share a team with this Pokémon.</p>
+      <p class="sub">
+        Which Pokémon most often share a team with this Pokémon.
+        <strong>Co-occurrence</strong> is the raw pairing rate, which mostly
+        re-ranks whoever is individually popular; <strong>synergy</strong>
+        ranks by lift — how much more often the pair appears together than
+        their individual popularity alone predicts (&times;1.0 is exactly
+        chance). Synergy is restricted to pairs seen on at least 5 real teams,
+        since lift is noisy below that.
+      </p>
+      <div class="controls">
+        <label>Ranked by
+          <select id="profile-team-core-metric">
+            <option value="co_occurrence">Co-occurrence</option>
+            <option value="synergy">Synergy (lift)</option>
+          </select>
+        </label>
+      </div>
       <div class="grid-6xn" id="profile-team-core-grid"></div>
     </div>
   </section>
@@ -744,11 +797,22 @@
   <section class="tab-panel" data-panel="speed-tiers" hidden>
     <h2>Speed tiers</h2>
     <p class="sub">
-      Every currently-legal Pokémon's Champions-format base Speed stat,
-      fastest first, bucketed into the speed-tier bands documented in
-      docs/design-system.md.
+      Who actually moves first, under the scenario you pick. Everything but
+      "Base stat" is <strong>max Speed investment</strong> at Level 50 (252
+      EVs, a beneficial nature, a 31 IV) — the documented convention in
+      <code>pokemon_champions_profile</code>, since no source publishes real
+      per-roster EV spreads. Choose an opposing Speed to see who outruns it.
     </p>
     <div class="controls">
+      <label>Scenario
+        <select id="speed-tiers-scenario">
+          <option value="max_investment_speed">Max investment</option>
+          <option value="base_speed">Base stat</option>
+          <option value="plus_one_speed">+1 stage / Choice Scarf (&times;1.5)</option>
+          <option value="plus_two_speed">+2 stages / Tailwind (&times;2)</option>
+          <option value="scarf_tailwind_speed">Scarf + Tailwind (&times;3)</option>
+        </select>
+      </label>
       <label>Speed
         <div class="range-filter">
           <input type="number" id="speed-tiers-min" min="0" placeholder="min">
@@ -756,17 +820,25 @@
           <input type="number" id="speed-tiers-max" min="0" placeholder="max">
         </div>
       </label>
+      <label>Outruns
+        <input type="number" id="speed-tiers-benchmark" min="0" placeholder="e.g. 180">
+      </label>
       <label>Type
         <div class="type-filter-row" id="speed-tiers-type-filter"></div>
       </label>
     </div>
+    <p class="sub" id="speed-tiers-benchmark-note" hidden></p>
     <div class="grid-6xn" id="speed-grid"></div>
     <div class="table-scroll">
       <table id="speed-tiers-table">
         <thead>
           <tr>
             <th>Rank</th><th>Pokémon</th>
-            <th class="sortable" data-sort-key="speed">Speed</th>
+            <th class="sortable" data-sort-key="base_speed">Base</th>
+            <th class="sortable" data-sort-key="max_investment_speed">Max</th>
+            <th class="sortable" data-sort-key="plus_one_speed">+1 / Scarf</th>
+            <th class="sortable" data-sort-key="plus_two_speed">+2 / Tailwind</th>
+            <th class="sortable" data-sort-key="scarf_tailwind_speed">Scarf + TW</th>
             <th>Tier</th>
             <th class="sortable" data-sort-key="usage_share">Usage</th>
             <th class="sortable" data-sort-key="win_rate">Win rate</th>
@@ -833,6 +905,9 @@
       Pokémon fought each other.
     </p>
     <div class="damage-result" id="matchup-h2h-headline"></div>
+    <h4>Matchup profile</h4>
+    <p class="sub">Each side's overall record across every decided match its teams played, and its single best and worst opponent — both chosen by Wilson lower bound over a minimum sample, so a 1&#8209;0 record never reads as a best matchup.</p>
+    <div class="matchup-picker-grid" id="matchup-summary"></div>
     <h4>Defender's toughest opponents</h4>
     <p class="sub">Pokémon whose teams beat the defender's teams most reliably (minimum 10 recorded matches).</p>
     <div class="grid-6xn" id="matchup-h2h-grid"></div>
@@ -913,6 +988,68 @@
       Pokémon into Team Builder (skipping any no longer in the legal pool).
     </p>
     <div class="gallery-grid" id="pro-team-gallery"></div>
+  </section>
+
+  <section class="tab-panel" data-panel="players" hidden>
+    <h2>Players &amp; Regions</h2>
+    <p class="sub">
+      Who plays what. Both views are computed across a player's or a
+      country's <em>entire</em> recorded Champions history, not a single
+      event. Country codes are MunchStats' own two-letter codes, and a team
+      only appears here if its player reported one.
+    </p>
+    <div class="subtabs" role="tablist">
+      <button class="subtab-btn" role="tab" data-subtab="players-regions" aria-selected="true">By region</button>
+      <button class="subtab-btn" role="tab" data-subtab="players-signature" aria-selected="false">By player</button>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="players-regions">
+      <div class="controls">
+        <label>Country
+          <select id="players-country-filter"></select>
+        </label>
+      </div>
+      <p class="sub" id="players-country-note"></p>
+      <div class="grid-6xn" id="players-country-grid"></div>
+      <div class="table-scroll">
+        <table id="players-country-table">
+          <thead><tr><th>Rank</th><th>Pokémon</th><th class="sortable" data-sort-key="usage_share">Share of this country's picks</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="players-signature" hidden>
+      <p class="sub">
+        A player's most-fielded Pokémon across every team of theirs on record.
+        Restricted to players with at least 2 recorded teams — a "signature"
+        claim from someone with a single recorded team is just that team's
+        roster. Only three Champions events exist anywhere, so two is a
+        meaningful bar here rather than a low one: exactly one player in the
+        whole dataset has three.
+      </p>
+      <div class="controls">
+        <label>Player
+          <select id="players-player-filter"></select>
+        </label>
+      </div>
+      <p class="sub" id="players-player-note"></p>
+      <div class="grid-6xn" id="players-signature-grid"></div>
+      <h3>Most committed specialists</h3>
+      <p class="sub">
+        Players who brought their top pick to the largest share of their own
+        recorded <em>teams</em> — 100% means it was on every team they
+        fielded. Deliberately not ranked by share of roster slots: a Pokémon
+        can only appear once per six-slot team, so that share is capped at
+        16.7% and ties everyone who is fully committed.
+      </p>
+      <div class="table-scroll">
+        <table id="players-specialists-table">
+          <thead><tr><th>Rank</th><th>Player</th><th>Country</th><th>Signature Pokémon</th><th class="sortable" data-sort-key="team_share">Share of their teams</th><th>Fielded in</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
 </main>

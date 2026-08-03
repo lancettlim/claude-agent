@@ -174,6 +174,10 @@
     var moveRows = marts.pokemon_move_usage || [];
     var coreRows = marts.pokemon_team_core_usage || [];
     var h2hRows = marts.pokemon_head_to_head || [];
+    var summaryByKey = {};
+    (marts.pokemon_matchup_summary || []).forEach(function (r) {
+      summaryByKey[r.pokemon_key] = r;
+    });
     var byName = {};
     profileRows.forEach(function (r) {
       byName[r.pokemon_name] = r;
@@ -196,6 +200,7 @@
     var coUsageGridEl = document.getElementById("matchup-co-usage-grid");
     var h2hGridEl = document.getElementById("matchup-h2h-grid");
     var h2hHeadlineEl = document.getElementById("matchup-h2h-headline");
+    var summaryEl = document.getElementById("matchup-summary");
     if (!attackerSelect || !defenderSelect) return;
 
     var sortedProfiles = profileRows.slice().sort(function (a, b) {
@@ -380,6 +385,58 @@
       });
     }
 
+    // Matchup profile (pokemon_matchup_summary): each side's whole-dataset
+    // record plus its single best and worst opponent. Complements the
+    // pair-specific headline above, which says nothing when the two picked
+    // Pokémon have never met. Inherits pokemon_head_to_head's team-vs-team
+    // caveat exactly — "best matchup" means the opponent whose teams this
+    // Pokémon's teams beat most reliably, not a claim about the two
+    // Pokémon fighting each other.
+    function summaryCardHtml(role, pokemon) {
+      if (!pokemon) return "";
+      var row = summaryByKey[pokemon.pokemon_key];
+      var body;
+      if (!row) {
+        body = '<div class="damage-sub">No recorded matches for ' +
+          App.escapeHtml(pokemon.pokemon_name) + "'s teams.</div>";
+      } else {
+        // total_matchup_appearances is sum(matches_played) across every
+        // opponent pair, so one real match contributes once per opposing
+        // Pokémon (up to six) — calling it a match count would overstate
+        // the sample by roughly 6x. Labelled as pairings for that reason.
+        body =
+          '<div class="damage-headline">' + App.formatPercent(row.overall_win_rate) + "</div>" +
+          '<div class="damage-sub">across ' + row.total_matchup_appearances.toLocaleString() +
+          " opponent pairings (one match counts once per opposing Pokémon) vs. " +
+          row.distinct_opponents + " distinct Pokémon</div>" +
+          '<div class="desc-text">Best: ' +
+          (row.best_matchup_pokemon_key
+            ? App.escapeHtml(row.best_matchup_pokemon_name) + " " +
+              App.formatPercent(row.best_matchup_win_rate) +
+              " (n=" + row.best_matchup_matches + ")"
+            : "—") +
+          "</div>" +
+          '<div class="desc-text">Worst: ' +
+          (row.worst_matchup_pokemon_key
+            ? App.escapeHtml(row.worst_matchup_pokemon_name) + " " +
+              App.formatPercent(row.worst_matchup_win_rate) +
+              " (n=" + row.worst_matchup_matches + ")"
+            : "—") +
+          "</div>";
+      }
+      return (
+        '<div class="matchup-side"><h4>' + role + " · " +
+        App.escapeHtml(pokemon.pokemon_name) + "</h4>" + body + "</div>"
+      );
+    }
+
+    function drawMatchupSummary(attacker, defender) {
+      if (!summaryEl) return;
+      var html = summaryCardHtml("Attacker", attacker) + summaryCardHtml("Defender", defender);
+      summaryEl.innerHTML =
+        html || '<p class="empty-state">Pick an attacker and a defender.</p>';
+    }
+
     function drawCoUsage(defender) {
       if (!coUsageGridEl) return;
       var rows = defender
@@ -414,6 +471,7 @@
       if (defenderStatsEl) defenderStatsEl.textContent = statLine(defender);
       drawTypeGrid(defender);
       drawHeadToHead(attacker, defender);
+      drawMatchupSummary(attacker, defender);
       drawCoUsage(defender);
 
       var moveName = moveSelect.value;

@@ -299,6 +299,36 @@ holds everything not yet committed to.
   out importer/exporter); Team Builder slots now show stats/top-ability/
   top-4-moves per pick, plus an "Export as pokepaste text" button. See
   `docs/design-system.md` for the full component/token reference.
+- [x] **Mart-wiring pass (2026-08-03)**: wire every analytics mart the
+  backlog had shipped-but-left-unsurfaced into the dashboard.
+  `pipelines/dashboard/data.py`'s `MART_FIELDS` listed 11 marts while
+  `dbt build` produced 23, so eight real, tested, non-degenerate marts
+  were readable only through `docs/local-queries.md`. All eight are now
+  wired: **Usage** gained a regulation filter (`pokemon_usage_by_
+  regulation`, #12) and a **Success** subtab (`pokemon_placement_weighted_
+  usage`, #8) with a rank-movement badge; **Pokémon Profile** gained
+  build-concentration badges (`pokemon_build_concentration`, #14) and a
+  co-occurrence/synergy-lift toggle on Team Cores (`pokemon_team_synergy`,
+  #9); **Speed Tiers** now reads `pokemon_speed_tiers` (#16) with a
+  scenario selector (base / max investment / ×1.5 / ×2 / ×3) and an
+  "Outruns" benchmark, replacing the flat base-speed view; **Matchup**
+  gained a per-side Matchup-profile panel (`pokemon_matchup_summary`); and
+  a new **Players & Regions** tab surfaces both halves of #7
+  (`pokemon_usage_by_country`, `player_signature_pokemon`).
+  `stat_change_leaderboard` (#17), the archetype marts, and
+  `roster_source_agreement` stay deliberately unwired — see
+  `docs/dashboard.md`'s "Marts wired in the mart-wiring pass" for why, plus
+  the payload-slicing rationale for the two large marts. Verified against a
+  real `extract all` + `dbt build` + `build-dashboard` run, driven in
+  Chromium with zero console errors — which caught two real data-shape
+  problems that the mart columns alone would have shipped as misleading
+  views: a "signature Pokémon" share is structurally capped at 16.7% (a
+  Pokémon appears at most once on a six-slot team), so the specialists
+  table ranks on share of the player's *teams* instead; and only three
+  Champions events exist at all, so a `>= 3` recorded-teams floor left the
+  By-player view showing exactly one player (2,329 players have one team,
+  358 have two, one has three) — the floor is 2. Both are documented in
+  `docs/dashboard.md`.
 - [ ] ARCHIVED (excluded from active scope, 2026-08-02): further dashboard
   capability items not covered by the above redesigns: a tournament-event/
   date filter once multiple snapshots exist (still blocked — only one

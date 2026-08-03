@@ -42,6 +42,26 @@ By section:
 | 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 0 | 15 |
 | **Total** | **41** | **3** | **0** | **0** | **5** | **49** |
 
+**2026-08-03, mart-wiring pass: every shipped mart that answers a
+competitive question is now actually on the dashboard.** This file's own
+"DONE" statuses were accurate about the *data* and quietly incomplete about
+the *surface* — six entries (#7, #8, #9, #12, #14, #16) ended with some
+form of "not yet wired into the dashboard UI," and
+`pipelines/dashboard/data.py` read 11 of the 23 marts `dbt build`
+produces. All eight unsurfaced marts are wired now; the three that remain
+unwired are unwired on purpose and say so (#17's `stat_change_leaderboard`,
+the archetype marts, `roster_source_agreement`). See each entry's updated
+note and `docs/dashboard.md`'s "Marts wired in the mart-wiring pass".
+
+Verifying against the real page rather than the mart columns caught two
+data-shape problems that would otherwise have shipped as confident-looking
+but misleading views — the same pattern several earlier passes hit: a
+"signature Pokémon" share is structurally capped at 16.7% (a Pokémon
+appears at most once on a six-slot team), and only three Champions events
+exist at all, so the ≥3-recorded-teams floor this file's #7 entry implied
+left the player view showing exactly one player. Both are recorded in
+`docs/dashboard.md`.
+
 Takeaways: **every unblocked item in the backlog is now done.** Sections 0,
 1's "buildable today" subsection (except #17, a deliberate non-build), 2,
 and 3 are all fully closed out. This pass closed the remaining six "open,
@@ -289,8 +309,16 @@ picks at non-trivial sample sizes (e.g. a French player fielding
 Incineroar in 11 of 11 recorded teams' legal-pool slots, a 29.7% overall
 share).
 
-Not wired into the dashboard UI (real, queryable mart output; a
-country/player drill-down view is separate, undone follow-up work).
+**Wired into the dashboard on 2026-08-03** by the mart-wiring pass, as a
+new **Players & Regions** tab (By region / By player subtabs) — see
+`docs/dashboard.md`'s "Marts wired in the mart-wiring pass". Two things
+that entry's own figures got wrong, corrected there against the real
+Champions-scoped marts: `player_usage_share` is structurally capped at
+16.7% (a Pokémon appears at most once per six-slot team), so the
+specialists view ranks on share of a player's *teams* instead; and the
+"a French player fielding Incineroar in 11 of 11 recorded teams" example
+above predates the format-scoping fix in #25 — no player can have more
+than three recorded teams, because only three Champions events exist.
 Related polish still open: `docs/dashboard.md` notes country codes render
 as plain two-letter text because no flag-emoji/ISO lookup exists.
 
@@ -310,10 +338,14 @@ use a hard top-8 cutoff (the standard VGC/Champions bracket size);
 `placement_weighted_score`/`weighted_usage_share` use a continuous
 inverse-placement (`1/placement`) weight per appearance instead, so a
 1st-place finish counts far more than a 200th with no cutoff
-discontinuity. Not yet wired into the dashboard UI — the mart is real,
-queryable output (verified against real MunchStats data: Incineroar leads
-both views), but surfacing it as a dashboard tab/section is separate,
-undone follow-up work.
+discontinuity. **Wired into the dashboard on 2026-08-03** as the Usage
+tab's **Success** subtab (both views selectable), with a client-side
+rank-movement badge comparing each Pokémon's weighted rank against its
+raw `pokemon_usage_summary.usage_rank` — the "quiet top-cut staple vs.
+crowd favourite" read this entry was written for. (The "Incineroar leads
+both views" note above is from the pre-#25 format-mixed corpus; on the
+Champions-scoped data it's Kingambit, with Incineroar +3 places on top-cut
+share.)
 
 #### 9. Team synergy beyond raw co-occurrence — DONE (pairs; triples still open)
 
@@ -334,7 +366,13 @@ is noisy at low pair counts. Verified against real data: 10,336 pair rows;
 spot-checked Incineroar's top partners by lift (Vileplume, Slowking,
 Steelix, Hawlucha-Mega, Sceptile) against its top partners by raw
 co-occurrence and confirmed they're a different, less-generically-popular
-set, as intended. Still open: extending past pairs to triples for real
+set, as intended. **Wired into the dashboard on 2026-08-03**: the Pokémon
+Profile tab's Team Cores section is now rankable by co-occurrence or by
+lift, showing `×N.N` with `pair_team_count` alongside it (the dashboard's
+one non-percentage headline value — see `docs/design-system.md`'s
+"Multiplier values"). The floor this entry asks consumers to apply is
+applied there: pairs below 5 shared teams never reach the page. Still
+open: extending past pairs to triples for real
 "core" detection, as this entry originally suggested — a bigger
 combinatorial problem than the pairwise case, left for a follow-up.
 
@@ -403,7 +441,11 @@ temporal "usage during regulation X" signal exists to slice by), so this
 cross-joins the existing overall `usage_count` against
 `legality_snapshot`'s regulation membership at the latest `snapshot_date`,
 with `usage_share`/`usage_rank` recomputed within each `regulation_code`
-partition. Not yet wired into the dashboard UI.
+partition. **Wired into the dashboard on 2026-08-03** as the Usage tab's
+Regulation filter: selecting one swaps the leaderboard's source to this
+mart and *disables* the tier select, since the two dimensions genuinely
+can't be combined (this mart's own header explains why) — disabled rather
+than silently ignored.
 
 #### 13. Win-rate confidence intervals — DONE
 
@@ -442,8 +484,11 @@ before this item was picked up). Shipped as a new sibling mart,
 `dbt/models/marts/pokemon_build_concentration.sql`: a Herfindahl-Hirschman
 Index (sum of squared shares) over each of `pokemon_item_usage.item_share`
 and `pokemon_ability_usage.ability_share` per Pokémon, plus how many
-distinct items/abilities were observed at all. Not yet wired into the
-dashboard UI.
+distinct items/abilities were observed at all. **Wired into the dashboard
+on 2026-08-03** as a Locked in / Semi-contested / Contested badge above
+the Pokémon Profile tab's Items and Ability grids, with the "only one
+recorded" case labelled separately for exactly the reason this entry
+gives — see `docs/design-system.md`'s "Build-concentration badge".
 
 #### 15. Data-derived archetype clustering — SOFTER STEP DONE, full clustering still open
 
@@ -527,9 +572,14 @@ build` against the existing warehouse): 312 legal-pool rows, correct
 values end-to-end for Dragapult (213/319/319/426/426/639) and internally
 consistent for every row (`plus_one_speed == scarf_speed`,
 `plus_two_speed == tailwind_speed`, `scarf_tailwind_speed ==
-plus_two_speed * 1.5`). Not yet wired into the dashboard UI — the Speed
-Tiers tab still buckets on raw `speed`; switching it to these columns is
-separate, undone follow-up work. Item #25 (real per-roster EVs) would
+plus_two_speed * 1.5`). **Wired into the dashboard on 2026-08-03**: the
+Speed Tiers tab now reads this mart through a scenario selector (base /
+max investment / ×1.5 / ×2 / ×3), with the grid, the range filter and a
+new "Outruns" benchmark all following the selected column. One thing this
+entry didn't anticipate: the Blazing/Fast/Average/Slow badge stays pinned
+to *base* speed, because `SPEED_TIERS`' thresholds are calibrated to the
+base-stat scale and would read "Blazing" for every row against a ×3
+number. Item #25 (real per-roster EVs) would
 still make this exact instead of assumed, unchanged from this entry's own
 original note.
 
@@ -552,12 +602,15 @@ state is worse than no section. So the mart stays deliberately unwired,
 not accidentally: recorded here so it doesn't read as an open gap.
 Revisit only alongside #21, when Blocker B actually resolves.
 
-Mart-count note, corrected: `MART_FIELDS` lists nine marts; `dbt build`
-now produces fifteen (five shipped by this pass — #8, #10, #12, #14, plus
-`pokemon_win_rate_summary`'s new Wilson columns — landed as new marts not
-wired into `MART_FIELDS` either, for the same "real output, dashboard
-surfacing is separate work" reason, not the Blocker-B reason this item
-covers).
+Mart-count note, updated 2026-08-03: this gap is now closed. It had grown
+worse before it got better — `MART_FIELDS` listed 11 marts against the 23
+`dbt build` produces — and the mart-wiring pass wired all eight that were
+unsurfaced for the "real output, dashboard surfacing is separate work"
+reason. What's left unwired is only the three that are unwired *on
+purpose*: this item's own `stat_change_leaderboard` (Blocker B), the two
+archetype marts (tab removed by explicit request), and
+`roster_source_agreement` (a data-quality check, not an analytics view).
+See `docs/dashboard.md`'s "Marts wired in the mart-wiring pass".
 
 ### Blocked on snapshot history (Blocker A)
 
