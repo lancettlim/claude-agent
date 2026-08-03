@@ -200,3 +200,62 @@ seeds:
         description: stg_pokebase.form_name value.
       - name: pokeapi_form_name
         description: The matching form_name in stg_pokeapi/pokemon.
+  - name: limitless_slug_to_pokeapi_form
+    description: >
+      Controlled slug/form mapping from every `pokemon_slug` in
+      stg_limitless to PokéAPI's `form_name`. Limitless follows PokéAPI's
+      own form-naming convention closely, so this is mostly an identity
+      map: of the 83 distinct slugs seen in real Champions team lists, 78
+      match a PokéAPI form_name outright.
+
+      The five that don't (aegislash, basculegion, maushold, mimikyu,
+      palafin) are species whose PokéAPI entry has no bare-species variety,
+      only explicit ones. Each resolves to the same default battle form
+      munchstats_name_to_pokeapi_form.csv already picks for the identical
+      case (aegislash-shield, basculegion-male, maushold-family-of-four,
+      mimikyu-disguised, palafin-zero), rather than introducing a second
+      convention for the same question.
+
+      Known limitation, surfaced by roster_source_agreement: Limitless
+      publishes a bare "maushold" slug with no family-size distinction, so
+      the three real Maushold-Family-of-Three teams MunchStats reports are
+      mapped here to family-of-four. That is a genuine ambiguity in the
+      upstream data, not a resolvable mapping — it is left visible in the
+      agreement mart rather than special-cased away.
+    columns:
+      - name: limitless_pokemon_slug
+        description: stg_limitless.pokemon_slug value.
+      - name: pokeapi_form_name
+        description: The matching form_name in stg_pokeapi/pokemon.
+  - name: limitless_mega_item_to_pokeapi_form
+    description: >
+      Resolves a Limitless roster slot to its Mega-evolved form, keyed on
+      (species slug, held item). Limitless publishes the *base* species
+      holding its Mega Stone ("Charizard" + "Charizardite Y") where
+      MunchStats publishes the evolved form ("Charizard-Mega-Y"). Both
+      describe the same team, but the Limitless reading taken literally
+      joins to base-species stats, which are not the stats that Pokémon
+      played with — so this seed is a correctness fix, not a display
+      convenience.
+
+      Keyed on the item as well as the slug because the item is what
+      actually determines the outcome: the same species holding a Focus
+      Sash stays in its base form, and Charizard's two Megas are told apart
+      by the stone's own X/Y suffix. Built by matching every observed
+      (slug, item) pair against PokéAPI's real `<slug>-mega*` forms, with
+      two cases the mechanical rule could not derive: "Eviolite" is
+      excluded explicitly (a generic item that ends in -ite and would
+      otherwise read as a Mega Stone), and Floette's Mega evolves from the
+      Eternal Flower form onto `floette-mega` rather than a
+      `floette-eternal-mega` that does not exist.
+
+      This mapping was found empirically, not anticipated:
+      roster_source_agreement reported 0% exact cross-source agreement
+      until it was applied, and 97.9-100% afterwards.
+    columns:
+      - name: limitless_pokemon_slug
+        description: stg_limitless.pokemon_slug value (the base species).
+      - name: item_name
+        description: The Mega Stone held in that slot, as Limitless prints it.
+      - name: pokeapi_form_name
+        description: The Mega form's form_name in stg_pokeapi/pokemon.

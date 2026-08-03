@@ -1,0 +1,149 @@
+{
+  "source_name": "RK9.gg",
+  "source_url": "https://rk9.gg",
+  "refresh_cadence": "daily check; a concluded event's pairings are immutable and reused from the previous snapshot",
+  "records_captured": [
+    "round-by-round tournament pairings",
+    "per-match outcome (win/tie/bye)",
+    "per-player running record at the time of the round"
+  ],
+  "known_risks": [
+    "Rate-limiting/ToS posture for sustained scheduled access not independently verified",
+    "Junior and Senior division matches have no MunchStats roster counterpart, so they cannot be resolved to a team_id",
+    "Player identity joins on (name, country), which upstream may spell inconsistently between the pairings and roster feeds"
+  ],
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "required": true,
+      "description": "RK9 event identifier; identical to MunchStats' tournament id and this dataset's tournament_event.event_id"
+    },
+    {
+      "name": "pod_id",
+      "type": "string",
+      "required": true,
+      "description": "RK9's numeric pod identifier for the division (pod numbering is not stable across events; join on division instead)"
+    },
+    {
+      "name": "division",
+      "type": "string",
+      "required": true,
+      "description": "Human division label as printed on the pairings tab strip, e.g. \"Masters\", \"Senior\", \"Junior\""
+    },
+    {
+      "name": "round_number",
+      "type": "integer",
+      "required": true,
+      "description": "Swiss/top-cut round number, 1-based"
+    },
+    {
+      "name": "table_number",
+      "type": "integer",
+      "required": false,
+      "description": "Physical table the match was played at; blank for a bye, which is assigned no table"
+    },
+    {
+      "name": "player1_name",
+      "type": "string",
+      "required": true,
+      "description": "Player seated in the first cell, as printed by RK9"
+    },
+    {
+      "name": "player1_country",
+      "type": "string",
+      "required": false,
+      "description": "Two-letter country code for player 1; blank when RK9 reports none"
+    },
+    {
+      "name": "player1_wins",
+      "type": "integer",
+      "required": false,
+      "description": "Player 1's match wins as of this round, from the printed (W-L-T) record"
+    },
+    {
+      "name": "player1_losses",
+      "type": "integer",
+      "required": false,
+      "description": "Player 1's match losses as of this round"
+    },
+    {
+      "name": "player1_ties",
+      "type": "integer",
+      "required": false,
+      "description": "Player 1's match ties as of this round"
+    },
+    {
+      "name": "player2_name",
+      "type": "string",
+      "required": false,
+      "description": "Player seated in the second cell; blank for a bye, where there is no opponent"
+    },
+    {
+      "name": "player2_country",
+      "type": "string",
+      "required": false,
+      "description": "Two-letter country code for player 2; blank for a bye or when RK9 reports none"
+    },
+    {
+      "name": "player2_wins",
+      "type": "integer",
+      "required": false,
+      "description": "Player 2's match wins as of this round"
+    },
+    {
+      "name": "player2_losses",
+      "type": "integer",
+      "required": false,
+      "description": "Player 2's match losses as of this round"
+    },
+    {
+      "name": "player2_ties",
+      "type": "integer",
+      "required": false,
+      "description": "Player 2's match ties as of this round"
+    },
+    {
+      "name": "outcome",
+      "type": "string",
+      "required": true,
+      "description": "Derived structurally from the winner/loser cell classes: player1_win | player2_win | tie | bye"
+    },
+    {
+      "name": "is_complete",
+      "type": "boolean",
+      "required": true,
+      "description": "Whether RK9 marked the match container complete; an in-progress round reports false"
+    },
+    {
+      "name": "source_name",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: originating source name"
+    },
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: the exact pairings round URL this row was read from"
+    },
+    {
+      "name": "source_record_id",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: event/pod/round/table/player-1 composite; a bye has no table number, so player 1 disambiguates it"
+    },
+    {
+      "name": "extracted_at_utc",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: UTC ISO-8601 timestamp of the extraction run"
+    },
+    {
+      "name": "dataset_version",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: dataset version this snapshot was staged toward"
+    }
+  ]
+}

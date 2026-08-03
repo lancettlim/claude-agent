@@ -2,9 +2,13 @@ name: Scheduled extraction
 
 # Runs pipelines/extract/*.py on the refresh cadences docs/dataset-spec.md
 # specifies per source (see "Refresh policy"): PokéAPI weekly, OP.GG/
-# MunchStats/PokéBase daily. Bulbagarden is deliberately excluded — its
+# MunchStats/PokéBase/RK9/Limitless daily. Bulbagarden is deliberately excluded — its
 # extractor's docstring flags an unverified rate-limit/ToS posture for
 # sustained automated access, so it stays on-demand (see backlog.md #3).
+# RK9 and Limitless flag the same unverified posture, but unlike
+# Bulbagarden both are scoped to Champions-format events only, so a
+# scheduled run costs a few hundred requests rather than a full crawl —
+# see those extractors' docstrings.
 #
 # data/staging/ is gitignored (pipelines/cli.py's snapshot history — see
 # backlog.md #1 — would otherwise grow unboundedly in git history), so
@@ -15,12 +19,12 @@ name: Scheduled extraction
 # only ever be written once).
 on:
   schedule:
-    - cron: "0 6 * * *" # daily 06:00 UTC: OP.GG, MunchStats, PokéBase
+    - cron: "0 6 * * *" # daily 06:00 UTC: OP.GG, MunchStats, PokéBase, RK9, Limitless
     - cron: "0 7 * * 1" # weekly, Monday 07:00 UTC: PokéAPI
   workflow_dispatch:
     inputs:
       source:
-        description: "Source to extract (pokeapi | opgg | munchstats | pokebase | bulbagarden | all); defaults to the triggering schedule's normal set"
+        description: "Source to extract (pokeapi | opgg | munchstats | rk9 | limitless | pokebase | bulbagarden | all); defaults to the triggering schedule's normal set"
         required: false
         default: ""
 
@@ -57,7 +61,7 @@ jobs:
           elif [ "${{ github.event.schedule }}" = "0 7 * * 1" ]; then
             echo "sources=pokeapi" >> "$GITHUB_OUTPUT"
           else
-            echo "sources=opgg munchstats pokebase" >> "$GITHUB_OUTPUT"
+            echo "sources=opgg munchstats rk9 limitless pokebase" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run extraction

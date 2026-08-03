@@ -695,14 +695,92 @@ item's `docs/backlog.md` entry.
   generically-popular partner set than raw co-occurrence does. Extending
   past pairs to triples stays open, as the backlog entry itself flags.
 
+## Backlog #25-#27 — the last three blocked items (2026-08-03)
+
+The three items `docs/backlog.md` had recorded as permanently blocked on
+missing sources. Checking each against the live source rather than against
+its own description resolved all three; two of the three blockers were
+stale. See `docs/backlog.md` #25-#27 for the full write-ups.
+
+- [x] Backlog #27: real head-to-head matchups via RK9 — the entry said "no
+  signal to derive this from," but named the answer itself
+  ("round-by-round pairing data from tournament software") without
+  following it up. That software is RK9, already this dataset's upstream
+  via MunchStats, and it serves pairings over plain HTTP
+  (`rk9.gg/pairings/{event_id}?pod={p}&rnd={n}`). No event-level ID mapping
+  was needed: MunchStats reuses RK9's own event ids, so
+  `tournament_event.event_id` *is* the pairings key. New
+  `pipelines/extract/rk9.py` (rounds enumerated from the division tab strip,
+  **not** the fragments' `hx-get` attributes — the active round is rendered
+  inline and has none, so reading only those drops every event's final
+  round), new normalized entity `tournament_match` with four release gates,
+  and new `pokemon_head_to_head`/`pokemon_matchup_summary` marts surfaced in
+  the dashboard's Matchup tab. Verified against real data: 13,201 matches
+  across the three Champions events (13,127 decided, 69 byes, 5 ties),
+  99.8% of 24,139 Masters pairing slots resolved to a `team_id`, and
+  competitively sensible output (Incineroar's worst matchup is Lycanroc-Dusk
+  at 39.1% over 289 matches). Honest limit, stated in every consumer: the
+  grain is *team vs team* — no source names which four of six Pokémon were
+  brought, so figures are attributed to the whole roster.
+- [x] Backlog #26: Limitless VGC — both stated blockers were false (it needs
+  no browser automation; it is server-rendered) and so was its value
+  statement (it does *not* extend Champions history — only three Champions
+  events exist anywhere, and MunchStats had all three; per event Limitless
+  is narrower, publishing the day-2 cut only). Built for its real value
+  instead: canonical shared team identity (`team_list`/`team_list_member`,
+  359 compositions, 44 fielded by more than one player) and independent
+  cross-validation of MunchStats rosters (`roster_source_agreement`). That
+  validation earned its keep immediately — it reported **0% exact
+  agreement** on first run, surfacing a real modelling error where Limitless
+  publishes the base species holding its Mega Stone while MunchStats
+  publishes the evolved form, so Limitless rows were joining to
+  base-species stats. Fixed via a `limitless_mega_item_to_pokeapi_form`
+  seed; agreement is now 97.9-100% exact, 99.2-100% per slot.
+- [x] Backlog #25: EV spreads via Victory Road — **resolved as
+  unbuildable**, and the entry's other justification turned out to be a
+  measurement artifact hiding a real bug. EVs are not published by any
+  source: official team sheets (RK9's own, which every source here derives
+  from) carry ability, item, nature and moves and nothing more, verified
+  directly against both `rk9.gg/teamlist/public/...` and
+  `limitlessvgc.com/teams/...`. Victory Road is separately unreachable
+  (`victory-road.com` has no DNS record at all; the real
+  `victoryroadvgc.com` is permitted by egress policy but its origin resets
+  the TLS handshake), but that is beside the point.
+- [x] The "MunchStats nature coverage is only ~17%" claim (documented in
+  five files) was **not** a coverage gap: 17.2% is the Champions *share* of
+  a corpus that also held standard VGC events. Within Champions, nature is
+  100% and `tera_type` is 0%; standard VGC is the exact reverse. Root cause:
+  `tournament_event` never captured `format`, so every usage and win-rate
+  mart silently blended two different games. Fixed by threading
+  `event_format` through extraction and adding
+  `dbt/models/intermediate/int_champions_roster.sql`, which all 14
+  roster-derived marts now read. The correction is large and visible:
+  Incineroar drops from #1 (7,641 appearances) to #5 (1,029), and
+  Gholdengo/Dragonite/Whimsicott/Farigiraf leave the Champions top 8
+  entirely. Consequently `pokemon_tera_type_usage` is permanently empty for
+  Champions and was removed (backlog #10 reopened), following the same
+  precedent as the stat-change leaderboard and legal-pool trend sections.
+
 ## Release readiness (v1 definition of done)
 
 All release gates pass as of this writing (see
 `reports/validation/validation_report.json`: `release_blocking_findings: []`)
-and **`dataset_version 0.2.0` has been published** (the current latest;
-`0.1.0` was the first release) —
-`releases/data/0.2.0/*.csv`, `releases/manifests/manifest-0.2.0.json`,
-`releases/changelogs/CHANGELOG-0.2.0.md`.
+and **`dataset_version 0.3.0` has been published** (the current latest;
+`0.1.0` was the first release, `0.2.0` the first with Bulbagarden data) —
+`releases/data/0.3.0/*.csv`, `releases/manifests/manifest-0.3.0.json`,
+`releases/changelogs/CHANGELOG-0.3.0.md`. 0.3.0 is a MINOR bump: it adds
+the `tournament_match`, `team_list` and `team_list_member` entities
+(backlog #26/#27) with no breaking changes to existing ones, and is the
+first release whose usage figures are scoped to the Champions format
+(backlog #25 — see that section above; the corrected numbers differ
+substantially from 0.2.0's).
+
+Cutting it also fixed a real, previously-unhit bug in
+`pipelines/release/build.py`: `SOURCES` still pointed at pre-backlog-#1 flat
+staging paths (`data/staging/pokeapi.csv`), which no longer exist now that
+snapshots are date-partitioned, so `_build_sources` would have raised
+`FileNotFoundError` for every source. It went unnoticed because no release
+had been cut since that change landed.
 
 - [x] Coverage: >=95% of OP.GG legal pool mapped to canonical `pokemon_id`
   (currently 98.4%, 312/317 legal-pool rows)
@@ -717,7 +795,8 @@ and **`dataset_version 0.2.0` has been published** (the current latest;
 - [x] Data quality: referential integrity checks pass for Pokémon/team/event
   joins
 - [x] Export: versioned CSV outputs for all core entities (`pipelines/release/build.py`,
-  `python -m pipelines.cli release --version X.Y.Z`)
+  `python -m pipelines.cli release --version X.Y.Z`) — twelve tables as of
+  0.3.0
 - [x] Export: versioned JSON manifest with source lineage and run stats (same
   command; also writes `releases/changelogs/CHANGELOG-<version>.md`)
 - [x] Validate example analysis queries (`dbt/analyses/`, see its `README.md`):
@@ -729,6 +808,10 @@ and **`dataset_version 0.2.0` has been published** (the current latest;
 
 ## Deferred (post-v1)
 
-See "Deferred sources" in `dataset-spec.md` for the remaining deferred
-sources (Limitless VGC, Victory Road) and the rationale for deferring each
-one past v1.
+No sources remain deferred. Both former entries were resolved on
+2026-08-03: Limitless VGC was brought into scope (for shared team identity
+and cross-source validation, not the historical coverage it was deferred
+for), and Victory Road was closed as unbuildable — the EV data it was
+wanted for is published by no source at all. RK9.gg was added in the same
+pass to supply match-level results. See "Formerly deferred sources" and
+"Added sources" in `dataset-spec.md`.

@@ -17,6 +17,12 @@ models:
     description: "Team-level tournament metadata. See data/normalized/tournament_team.schema.json."
   - name: tournament_team_member
     description: "One row per Pokémon on a normalized tournament team. See data/normalized/tournament_team_member.schema.json."
+  - name: tournament_match
+    description: "One row per played match: who faced whom, in which round, and who won, sourced from RK9 pairings. Grain is team vs team, not Pokémon vs Pokémon — no source publishes a per-battle Pokémon-level log. See data/normalized/tournament_match.schema.json."
+  - name: team_list
+    description: "One row per canonical Limitless team-list id: a team composition identity reused across the players and events that fielded it. Covers the day-2 cut only. See data/normalized/team_list.schema.json."
+  - name: team_list_member
+    description: "One row per Pokémon on a canonical team list, with held item, ability, nature and moves. No EV/IV spread: official team sheets do not publish one. See data/normalized/team_list_member.schema.json."
   - name: pokemon_asset
     description: "Sprite/menu-icon image manifest for Pokémon/form references, sourced from Bulbagarden Archives. See data/normalized/pokemon_asset.schema.json."
   - name: move_detail

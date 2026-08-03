@@ -90,6 +90,26 @@ sources:
           - row_count_anomaly:
               config:
                 meta: {category: row_count_anomaly, source_name: munchstats}
+      - name: rk9_pairings
+        description: "Raw RK9 round-by-round tournament pairings and match outcomes. See data/staging/rk9_pairings.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 4, period: day}
+        data_tests:
+          - row_count_anomaly:
+              config:
+                meta: {category: row_count_anomaly, source_name: rk9_pairings}
+      - name: limitless
+        description: "Raw Limitless VGC canonical team lists per tournament/player. See data/staging/limitless.schema.json."
+        loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"
+        freshness:
+          warn_after: {count: 2, period: day}
+          error_after: {count: 4, period: day}
+        data_tests:
+          - row_count_anomaly:
+              config:
+                meta: {category: row_count_anomaly, source_name: limitless}
       - name: pokebase
         description: "Raw PokéBase per-regulation Champions legal-pool membership. See data/staging/pokebase.schema.json."
         loaded_at_field: "CAST(extracted_at_utc AS TIMESTAMP)"

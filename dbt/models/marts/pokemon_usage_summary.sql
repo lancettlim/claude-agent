@@ -19,7 +19,7 @@ with overall as (
     member.pokemon_key,
     cast(null as varchar) as event_tier,
     count(*) as usage_count
-  from {{ ref('tournament_team_member') }} member
+  from {{ ref('int_champions_roster') }} member
   inner join {{ ref('pokemon_stat_champions') }} champions
     on champions.pokemon_key = member.pokemon_key
     and champions.is_legal = true
@@ -30,7 +30,7 @@ by_tier as (
     member.pokemon_key,
     event.event_tier,
     count(*) as usage_count
-  from {{ ref('tournament_team_member') }} member
+  from {{ ref('int_champions_roster') }} member
   inner join {{ ref('pokemon_stat_champions') }} champions
     on champions.pokemon_key = member.pokemon_key
     and champions.is_legal = true

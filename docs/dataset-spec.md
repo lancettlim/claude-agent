@@ -35,13 +35,42 @@ These four sources provide strong coverage of canonical values, format
 modifications, regulation-aware legality, and real competitive usage while
 keeping ingestion complexity manageable for v1.
 
-## Deferred sources
+## Formerly deferred sources — resolved 2026-08-03
 
-The following sources remain useful for later phases but are explicitly deferred
-from v1 ingestion and release requirements:
+Both sources previously listed here have been resolved, and neither
+resolution matched its deferral reason (see `docs/backlog.md` #25/#26):
 
-- **Limitless VGC** — defer until historical event coverage expansion
-- **Victory Road** — defer until detailed moveset/EV enrichment is prioritized
+- **Limitless VGC** — **now in scope.** Deferred "until historical event
+  coverage expansion," which turned out to be the wrong reason to want it:
+  it does not extend Champions history at all (only three Champions-format
+  events exist anywhere, and MunchStats already had all three), and per
+  event it is narrower, publishing the day-2 cut only. It was brought in
+  for a different, real value: canonical shared team-list identity (one
+  team id reused across every player and event that fielded that
+  composition, which MunchStats cannot express) and an independent second
+  reading of the same rosters to cross-validate against. Feeds `team_list`
+  and `team_list_member`.
+- **Victory Road** — **will not be ingested; the data does not exist.**
+  Deferred "until detailed moveset/EV enrichment is prioritized." When it
+  was prioritized, the EV half proved unavailable from any source:
+  official tournament team sheets — RK9's own, which every source in this
+  catalog ultimately derives from — publish ability, held item, nature and
+  moves and nothing else. Verified directly against RK9's and Limitless'
+  team-list pages: no EV or IV data on either. The moveset half was
+  already covered by MunchStats and Limitless at 100% for Champions
+  events. Treat EV/IV spreads as structurally unavailable rather than
+  pending. (Victory Road is also unreachable from this project's egress —
+  see `docs/data-sources.md` — but that is incidental to the conclusion.)
+
+## Added sources (post-v1)
+
+- **RK9.gg** — added 2026-08-03 to supply match-level head-to-head results
+  (`tournament_match`). RK9 is the tournament software the events run on and
+  the upstream MunchStats already scrapes for rosters; it publishes
+  round-by-round pairings over plain HTTP, and reuses the same event ids
+  MunchStats does, so no event-level mapping is needed. See
+  `docs/data-sources.md` for the extraction technique and
+  `docs/backlog.md` #27 for why this was previously believed impossible.
 
 ## Image asset source (Phase 4 addition)
 
@@ -138,6 +167,51 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **Optional fields**: `item_name`, `ability`, `tera_type`, `nature`,
     `moves` (pipe-delimited) — nullable since MunchStats doesn't report a
     full build for every roster slot
+- `tournament_match`
+  - **Purpose**: match-level head-to-head results — who faced whom, in
+    which round, and who won — sourced from RK9 pairings. Added
+    2026-08-03 (`docs/backlog.md` #27)
+  - **Primary key**: `match_id`
+  - **Join keys**: `event_id`, `team_id_1`, `team_id_2`, `winner_team_id`
+  - **Required fields**: `match_id`, `event_id`, `division`,
+    `round_number`, `outcome`, `is_complete`, `source_name`, `source_url`,
+    `source_record_id`, `extracted_at_utc`, `dataset_version`
+  - **Optional fields**: `table_number` (a bye is assigned none);
+    `player_id_1`/`team_id_1`/`player_id_2`/`team_id_2` (null for a bye's
+    absent opponent, and for the Junior/Senior divisions, which MunchStats
+    does not scrape rosters for); `winner_team_id` (null for a tie or bye)
+  - **Grain caveat, which every consumer must state**: an outcome is *team
+    vs team*, not Pokémon vs Pokémon. No source publishes a per-battle log
+    naming which four of a team's six Pokémon were brought or which
+    defeated which
+- `team_list`
+  - **Purpose**: canonical team-composition identity, reused across the
+    players and events that fielded it, sourced from Limitless VGC. Added
+    2026-08-03 (`docs/backlog.md` #26)
+  - **Primary key**: `team_list_id`
+  - **Join keys**: `team_list_id`, `first_seen_event_id`
+  - **Required fields**: `team_list_id`, `tournament_count`,
+    `player_count`, `best_placement`, `first_seen_date`,
+    `first_seen_tournament_id`, `regulation_set`, `source_name`,
+    `source_url`, `source_record_id`, `extracted_at_utc`,
+    `dataset_version`
+  - **Optional fields**: `first_seen_event_id` (blank if the Limitless
+    tournament page carries no RK9 link)
+  - **Coverage caveat**: Limitless publishes team lists for the day-2 cut
+    only (156 of 1,096 players at NAIC 2026), so this is a top-cut view
+- `team_list_member`
+  - **Purpose**: one row per Pokémon on a canonical team list, with the
+    build the published team sheet carries
+  - **Primary key**: `team_list_member_id`
+  - **Join keys**: `team_list_id`, `pokemon_key`, `pokemon_id`
+  - **Required fields**: `team_list_member_id`, `team_list_id`,
+    `pokemon_key`, `pokemon_id`, `slot_number`, `source_name`,
+    `source_url`, `source_record_id`, `extracted_at_utc`,
+    `dataset_version`
+  - **Optional fields**: `item_name` (empty when a Pokémon deliberately
+    holds nothing), `ability`, `nature`, `moves` (pipe-delimited)
+  - **No EV/IV fields, permanently**: official team sheets do not publish
+    them — see "Formerly deferred sources" above
 - `pokemon_asset`
   - **Purpose**: sprite/menu-icon image manifest for Pokémon/form
     references, sourced from Bulbagarden Archives

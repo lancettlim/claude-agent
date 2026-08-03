@@ -23,7 +23,7 @@ select
   row_number() over (
     partition by team.player_country order by count(*) desc
   ) as country_usage_rank
-from {{ ref('tournament_team_member') }} member
+from {{ ref('int_champions_roster') }} member
 inner join {{ ref('pokemon_stat_champions') }} champions
   on champions.pokemon_key = member.pokemon_key
   and champions.is_legal = true

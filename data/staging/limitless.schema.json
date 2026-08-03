@@ -1,0 +1,150 @@
+{
+  "source_name": "Limitless VGC",
+  "source_url": "https://limitlessvgc.com",
+  "refresh_cadence": "daily check; published team lists for a concluded event do not change",
+  "records_captured": [
+    "tournament metadata with regulation set",
+    "canonical shared team-list identity",
+    "per-slot item/ability/nature/moveset"
+  ],
+  "known_risks": [
+    "Rate-limiting/ToS posture for sustained scheduled access not independently verified",
+    "Only the day-2 cut is published (156 of 1096 players at NAIC 2026), so this is a top-cut view, not full event coverage",
+    "No EV or IV spreads are published; official team sheets do not carry them (see docs/data-sources.md's Victory Road entry)",
+    "Pokémon are identified by Limitless' own slug, which needs a controlled mapping seed to reach pokemon_key"
+  ],
+  "fields": [
+    {
+      "name": "limitless_team_id",
+      "type": "string",
+      "required": true,
+      "description": "Limitless' canonical team-list id; shared across every player and event that fielded the same composition"
+    },
+    {
+      "name": "tournament_id",
+      "type": "string",
+      "required": true,
+      "description": "Limitless' own tournament id (not the RK9/MunchStats event_id; these are different ID spaces)"
+    },
+    {
+      "name": "rk9_event_id",
+      "type": "string",
+      "required": false,
+      "description": "RK9 event id this tournament links out to; equals tournament_event.event_id, and is the join key back to MunchStats-sourced events. Blank when the tournament page carries no RK9 link"
+    },
+    {
+      "name": "tournament_name",
+      "type": "string",
+      "required": true,
+      "description": "Tournament display name, e.g. \"NAIC 2026, New Orleans\""
+    },
+    {
+      "name": "tournament_date",
+      "type": "string",
+      "required": true,
+      "description": "Tournament date as ISO-8601 (YYYY-MM-DD)"
+    },
+    {
+      "name": "regulation_set",
+      "type": "string",
+      "required": true,
+      "description": "Regulation set slug the event was played under, e.g. \"m-a\" for Champions"
+    },
+    {
+      "name": "placement",
+      "type": "integer",
+      "required": true,
+      "description": "Final standing of this player at this tournament"
+    },
+    {
+      "name": "player_name",
+      "type": "string",
+      "required": true,
+      "description": "Player display name as reported by Limitless"
+    },
+    {
+      "name": "player_country",
+      "type": "string",
+      "required": false,
+      "description": "Player's two-letter country code, if reported"
+    },
+    {
+      "name": "limitless_player_id",
+      "type": "string",
+      "required": false,
+      "description": "Limitless' own player id; blank when the standings row carries no player link"
+    },
+    {
+      "name": "slot_number",
+      "type": "integer",
+      "required": true,
+      "description": "1-based roster slot within the team list"
+    },
+    {
+      "name": "pokemon_slug",
+      "type": "string",
+      "required": true,
+      "description": "Limitless' own species/form slug, e.g. \"arcanine-hisui\"; resolved to pokemon_key via the limitless_slug_to_pokeapi_form seed"
+    },
+    {
+      "name": "pokemon_display_name",
+      "type": "string",
+      "required": true,
+      "description": "Human-readable species/form name as printed on the team list"
+    },
+    {
+      "name": "item_name",
+      "type": "string",
+      "required": false,
+      "description": "Held item; blank when the published list omits one"
+    },
+    {
+      "name": "ability",
+      "type": "string",
+      "required": false,
+      "description": "Ability; blank when the published list omits one"
+    },
+    {
+      "name": "nature",
+      "type": "string",
+      "required": false,
+      "description": "Nature (printed as \"Stat Alignment\" on official team sheets); blank when omitted"
+    },
+    {
+      "name": "moves",
+      "type": "string",
+      "required": false,
+      "description": "Pipe-delimited move names for this slot"
+    },
+    {
+      "name": "source_name",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: originating source name"
+    },
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: the team-list URL this row was read from"
+    },
+    {
+      "name": "source_record_id",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: tournament/team/player/slot composite"
+    },
+    {
+      "name": "extracted_at_utc",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: UTC ISO-8601 timestamp of the extraction run"
+    },
+    {
+      "name": "dataset_version",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: dataset version this snapshot was staged toward"
+    }
+  ]
+}

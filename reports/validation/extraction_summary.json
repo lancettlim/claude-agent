@@ -1,17 +1,40 @@
 {
   "description": "Phase 1 ingestion check: source availability and row-level parsing success for each staging extractor. Distinct from validation_report.json, which gates normalized-table release readiness.",
-  "generated_at_utc": "2026-08-02T14:37:05Z",
+  "generated_at_utc": "2026-08-03T08:46:23Z",
   "dataset_version": "0.2.0",
   "sources": [
+    {
+      "source_name": "Bulbagarden Archives",
+      "endpoint": "https://archives.bulbagarden.net/w/api.php (Category:Champions_menu_sprites)",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 368,
+      "requests_succeeded": 368,
+      "request_success_rate": 1.0,
+      "rows_written": 359,
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:26:35Z"
+    },
+    {
+      "source_name": "Limitless VGC",
+      "endpoint": "https://limitlessvgc.com/tournaments, /tournaments/{id}, /teams/{id}",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 363,
+      "requests_succeeded": 363,
+      "request_success_rate": 1.0,
+      "rows_written": 2616,
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:41:54Z"
+    },
     {
       "source_name": "MunchStats",
       "endpoint": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/stats/tournaments/",
       "availability": "reachable, HTTP 200 for all requests",
-      "requests_attempted": 61,
-      "requests_succeeded": 61,
+      "requests_attempted": 92,
+      "requests_succeeded": 92,
       "request_success_rate": 1.0,
       "rows_written": 106134,
-      "required_field_null_rate": 0.0
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:46:23Z"
     },
     {
       "source_name": "OP.GG Pok\u00e9mon Champions",
@@ -21,7 +44,8 @@
       "requests_succeeded": 1,
       "request_success_rate": 1.0,
       "rows_written": 317,
-      "required_field_null_rate": 0.0
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:26:02Z"
     },
     {
       "source_name": "Pok\u00e9API",
@@ -32,7 +56,7 @@
       "request_success_rate": 1.0,
       "rows_written": 1351,
       "required_field_null_rate": 0.0,
-      "checked_at_utc": "2026-08-02T14:35:52Z"
+      "checked_at_utc": "2026-08-03T08:28:18Z"
     },
     {
       "source_name": "Pok\u00e9API (ability detail)",
@@ -43,7 +67,7 @@
       "request_success_rate": 0.9957,
       "rows_written": 233,
       "required_field_null_rate": 0.0,
-      "checked_at_utc": "2026-08-02T14:36:51Z"
+      "checked_at_utc": "2026-08-03T08:29:21Z"
     },
     {
       "source_name": "Pok\u00e9API (item detail)",
@@ -54,7 +78,7 @@
       "request_success_rate": 1.0,
       "rows_written": 204,
       "required_field_null_rate": 0.0,
-      "checked_at_utc": "2026-08-02T14:37:05Z"
+      "checked_at_utc": "2026-08-03T08:29:39Z"
     },
     {
       "source_name": "Pok\u00e9API (move detail)",
@@ -65,7 +89,7 @@
       "request_success_rate": 0.9982,
       "rows_written": 568,
       "required_field_null_rate": 0.0,
-      "checked_at_utc": "2026-08-02T14:36:33Z"
+      "checked_at_utc": "2026-08-03T08:29:04Z"
     },
     {
       "source_name": "Pok\u00e9Base",
@@ -75,7 +99,19 @@
       "requests_succeeded": 1,
       "request_success_rate": 1.0,
       "rows_written": 311,
-      "required_field_null_rate": 0.0
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:26:06Z"
+    },
+    {
+      "source_name": "RK9.gg",
+      "endpoint": "https://rk9.gg/pairings/{event_id}?pod={pod}&rnd={round}",
+      "availability": "reachable, HTTP 200 for all requests",
+      "requests_attempted": 1,
+      "requests_succeeded": 1,
+      "request_success_rate": 1.0,
+      "rows_written": 13201,
+      "required_field_null_rate": 0.0,
+      "checked_at_utc": "2026-08-03T08:26:00Z"
     }
   ]
 }

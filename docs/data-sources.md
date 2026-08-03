@@ -109,36 +109,123 @@ directly by `pipelines/render/assets.py` as plain, deterministically-named raw
 GitHub file URLs (no listing/discovery call needed).
 
 ## 6. Limitless VGC
-**Best for:** Historical tournament brackets, player win rates, and macro competitive statistics
+**Best for:** Canonical shared team-list identity, and independent cross-validation of MunchStats rosters
 
-Limitless archives grassroots and official VGC event brackets, providing a comprehensive history of tournament placements, player performance metrics, and macro-level competitive trends across regions.
+Limitless publishes tournament standings and the team lists behind them. Its
+distinguishing feature is not coverage but **identity**: a `/teams/<id>` is a
+canonical team *composition*, reused across every player and event that
+fielded it, where MunchStats mints a fresh team id per player per event. That
+is what makes `team_list`/`team_list_member` possible, and it is the reason
+this source is in scope.
+
+**Two corrections to this entry's earlier description**, both established by
+measurement (backlog.md #26):
+
+- **No browser automation is needed.** limitlessvgc.com is server-rendered
+  and every page below is a plain HTTP GET, with most fields on `data-`
+  attributes. The previous "use a Table Capture extension to screenshot
+  tables" recipe was never necessary.
+- **It does not extend tournament history.** Only three Champions-format
+  (`m-a`) events exist anywhere as of this writing, and MunchStats already
+  has all three. Limitless' other tournaments are standard VGC (regulations
+  F/H/I), which is out of v1 scope. It is in fact *narrower* per event:
+  team lists are published for the day-2 cut only (156 of 1,096 players at
+  NAIC 2026).
 
 **Key coverage:**
-- Tournament brackets and standings by event
-- Player historical records and win rates
-- Regional and national competition data
-- Historical metagame snapshots
+- Canonical team-composition ids, shared across players and events
+- Per-slot held item, ability, nature and moveset (100% populated for
+  Champions events); no EV/IV spreads — see source 7
+- Standings with placement, player and country, for the day-2 cut
+- The event's regulation set, and its RK9 event id
 
 **How to extract:**
-1. Navigate to their historical brackets page
-2. Use a browser table extraction tool (e.g., Table Capture extension) to screenshot tables
-3. Convert to CSV format and import into your analysis pipeline
-4. Alternatively, contact Limitless for bulk data exports if available
+1. `GET https://limitlessvgc.com/tournaments?time=all` — one `<tr>` per
+   tournament carrying `data-date`/`data-country`/`data-name`/`data-format`/
+   `data-players`/`data-winner` plus a `/tournaments/<id>` link.
+   `data-format` is the regulation set, so Champions events are selectable
+   without fetching them.
+2. `GET /tournaments/<id>` — standings rows carrying `data-rank`/`data-name`/
+   `data-country`, a `/players/<id>` link, and a `/teams/<id>` link where a
+   list was published. This page also links out to the event on RK9, which
+   yields `rk9_event_id` — a real join key to `tournament_event`, since
+   MunchStats reuses RK9's ids (names and dates agree between the sources on
+   neither).
+3. `GET /teams/<id>` — the team list: six `div.pkmn[data-id]` blocks with
+   item, ability, nature and moves. Fetch per distinct team id, not per
+   player; teams are shared.
+4. Join to canonical records via the `limitless_slug_to_pokeapi_form` seed,
+   plus `limitless_mega_item_to_pokeapi_form` — Limitless publishes the base
+   species holding its Mega Stone where MunchStats publishes the evolved
+   form, so a Mega slot needs the item to resolve correctly (see
+   `dbt/seeds/schema.yml`).
 
-## 7. Victory Road
-**Best for:** Certified champion team building, detailed EV spreads, and verified movesets
+## 7. Victory Road — UNREACHABLE, and its unique value does not exist
+**Previously listed for:** detailed EV spreads and verified movesets
 
-Victory Road archives complete team slates from certified tournament champions, including full team compositions, EV distributions, item assignments, and move choices. This is the most detailed source for understanding how top players actually built their championship teams.
+**Status: not ingestible, and superseded.** This entry previously pointed at
+`victory-road.com` and described exporting "Showdown Paste" format teams.
+Both halves were wrong, and the correction is worth recording rather than
+silently deleting (backlog.md #25):
+
+1. **`victory-road.com` does not resolve at all** — it has no DNS record. The
+   real site is `victoryroadvgc.com`.
+2. **`victoryroadvgc.com` is unreachable from this project's egress.** It is
+   permitted by network policy (a CONNECT tunnel is established, HTTP 200)
+   but the origin resets the TLS handshake immediately after ClientHello.
+   Reproduced across TLS 1.2 and 1.3, with and without ALPN, via curl and
+   `openssl s_client`, while control hosts complete the handshake normally.
+   This is not something the pipeline can work around.
+3. **Most importantly, the EV spreads this source was wanted for are not
+   published by anyone.** Official tournament team sheets — RK9's own, which
+   both Limitless and MunchStats ultimately derive from — report Ability,
+   Held Item, "Stat Alignment" (nature) and moves, and nothing else.
+   Verified directly against `rk9.gg/teamlist/public/{event}/{team}` and
+   `limitlessvgc.com/teams/{id}`: zero EV or IV data on either. Any EV
+   spread published elsewhere is community-reconstructed, not sourced.
+
+The other half of what this entry promised — verified movesets, items,
+abilities and natures — is already fully covered by MunchStats and
+Limitless at 100% for Champions events (source 6 below).
+
+Treat EV/IV spreads as **structurally unavailable**, not merely deferred.
+Reopen only if a source begins publishing them with real provenance.
+
+## 8. RK9.gg
+**Best for:** Round-by-round pairings and real head-to-head match outcomes
+
+RK9 is the tournament software the events themselves run on — MunchStats
+scrapes it for rosters, and Limitless links out to it. It publishes the
+pairings for every round: who played whom, at which table, and who won. This
+is the only source in this catalog that answers "what actually beats X",
+and it closes backlog.md #27, which had been recorded as underivable on the
+grounds that MunchStats reports only team-level records.
 
 **Key coverage:**
-- Complete team roster with all 6 Pokémon
-- Exact EV and IV spreads per Pokémon
-- Move and item choices for each team member
-- Tournament context and placement
+- One row per played match, per round, per division (Masters/Senior/Junior)
+- Winner/loser, ties, and byes
+- Each player's running win/loss/tie record at that point in the event
+- Player name and country, which resolve to this dataset's own team ids
 
 **How to extract:**
-1. Browse [victory-road.com](https://victory-road.com) or similar archives
-2. Export teams using their "Showdown Paste" format
-3. Feed paste data into a Python string parser to convert to tabular format:
-   - Example: Split on newlines, extract Pokémon names, stats, moves, items
-4. Store in CSV with schema: `pokemon_id | pokemon_name | evs | moveset | item | team_id`
+1. `GET https://rk9.gg/pairings/{event_id}` — the shell. Its division tab
+   strip (`<a id="P{pod}-tab" ...>Masters in Round 17</a>`) names every pod,
+   its division label, and the highest round reached.
+2. `GET https://rk9.gg/pairings/{event_id}?pod={pod}&rnd={n}` — one round's
+   pairings as an HTML fragment. htmx lazy-loads these in the browser; a
+   plain GET works identically. Enumerate rounds from the tab strip, **not**
+   from the fragments' own `hx-get` attributes: the currently active round is
+   rendered inline and has no `hx-get`, so reading only those silently drops
+   the final round of every event.
+3. Parse by cell: every cell carries
+   `id="cell-{pod}-{round}-{index}-{slot}"`, slots 1 and 2 being the players
+   and slot 3 the table number, with `winner`/`loser` on the player cell's
+   class list. An empty second cell is a bye.
+4. `event_id` needs no mapping: MunchStats reuses RK9's own event ids, so
+   this joins straight to `tournament_event.event_id`. Players resolve to
+   `team_id` on (name, country) — measured at 99.8% across 24,139 Masters
+   pairing slots.
+
+Note the grain honestly: an outcome is **team vs team**. RK9 publishes no
+per-battle log naming which four of a team's six Pokémon were brought, or
+which knocked out which. That remains genuinely unsourced.

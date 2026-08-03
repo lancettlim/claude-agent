@@ -14,10 +14,13 @@
  * ability, and up to 4 moves are all user-selectable (defaulting to that
  * Pokémon's top recorded choices), drawn from real recorded usage data
  * (pokemon_item_usage/pokemon_ability_usage/pokemon_move_usage) — never
- * invented options. There is deliberately no stat/EV/nature selector: no
- * source in this dataset reports real EV/IV data and MunchStats' nature
- * coverage is only ~17%, so building one would mean presenting invented
- * numbers as if they were sourced (see docs/backlog.md item #25). */
+ * invented options. There is deliberately no stat/EV selector: no source
+ * publishes real EV/IV data at all -- official tournament team sheets
+ * carry ability, item, nature and moves and nothing more -- so building
+ * one would mean presenting invented numbers as if they were sourced (see
+ * docs/backlog.md item #25 and docs/data-sources.md's Victory Road entry).
+ * Nature IS published (100% of Champions roster slots) but is not part of
+ * this builder's model. */
 (function () {
   "use strict";
 

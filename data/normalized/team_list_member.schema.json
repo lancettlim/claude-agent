@@ -1,0 +1,96 @@
+{
+  "table_name": "team_list_member",
+  "purpose": "one row per Pokemon on a canonical team list, with the build details the published team sheet carries",
+  "primary_key": "team_list_member_id",
+  "join_keys": [
+    "team_list_id",
+    "pokemon_key",
+    "pokemon_id"
+  ],
+  "fields": [
+    {
+      "name": "team_list_member_id",
+      "type": "string",
+      "required": true,
+      "description": "Primary key; team_list_id and slot number"
+    },
+    {
+      "name": "team_list_id",
+      "type": "string",
+      "required": true,
+      "description": "Foreign key to team_list.team_list_id"
+    },
+    {
+      "name": "pokemon_key",
+      "type": "string",
+      "required": true,
+      "description": "Foreign key to pokemon.pokemon_key; Mega slots resolve to the evolved form"
+    },
+    {
+      "name": "pokemon_id",
+      "type": "integer",
+      "required": true,
+      "description": "Canonical National Pokedex id"
+    },
+    {
+      "name": "slot_number",
+      "type": "integer",
+      "required": true,
+      "description": "1-based roster slot within the team list"
+    },
+    {
+      "name": "item_name",
+      "type": "string",
+      "required": false,
+      "description": "Held item; empty when the Pokemon deliberately holds none"
+    },
+    {
+      "name": "ability",
+      "type": "string",
+      "required": false,
+      "description": "Ability as printed on the team sheet"
+    },
+    {
+      "name": "nature",
+      "type": "string",
+      "required": false,
+      "description": "Nature, printed as \"Stat Alignment\" on official team sheets"
+    },
+    {
+      "name": "moves",
+      "type": "string",
+      "required": false,
+      "description": "Pipe-delimited move names for this slot"
+    },
+    {
+      "name": "source_name",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: originating source name"
+    },
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: source URL for this record"
+    },
+    {
+      "name": "source_record_id",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: upstream record identifier"
+    },
+    {
+      "name": "extracted_at_utc",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: UTC ISO-8601 timestamp of the extraction run"
+    },
+    {
+      "name": "dataset_version",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: dataset version this record was published under"
+    }
+  ]
+}

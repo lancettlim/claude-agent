@@ -15,7 +15,7 @@
 --     no cutoff discontinuity.
 with legal_appearances as (
   select member.pokemon_key, team.placement
-  from {{ ref('tournament_team_member') }} member
+  from {{ ref('int_champions_roster') }} member
   inner join {{ ref('tournament_team') }} team
     on team.team_id = member.team_id
   inner join {{ ref('pokemon_stat_champions') }} champions

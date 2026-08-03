@@ -37,7 +37,7 @@ IMAGES_SUBDIR = "images"
 # releases/data/<version>/*.csv. Kept here rather than derived from
 # report.py's test-driven categorization (backlog #37): this is "which
 # entities does the release package ship," a fixed product decision, not
-# "which dbt tests exist" -- the two happen to overlap for these nine tables
+# "which dbt tests exist" -- the two happen to overlap for these twelve tables
 # today, but report.py's duplicate_key_checks now also covers non-release
 # reference tables (ability_detail, item_detail, move_detail,
 # archetype_pokemon_map) that don't belong in this list.
@@ -50,17 +50,27 @@ TABLES: dict[str, str] = {
     "tournament_event": "event_id",
     "tournament_team": "team_id",
     "tournament_team_member": "team_member_id",
+    "tournament_match": "match_id",
+    "team_list": "team_list_id",
+    "team_list_member": "team_list_member_id",
     "pokemon_asset": "pokemon_asset_key",
 }
 
-# source_name -> (source_url, staging_filename), matching
-# releases/manifests/manifest.template.json's sources array.
+# source_name -> (source_url, staging subdirectory), matching
+# releases/manifests/manifest.template.json's sources array. The value is a
+# per-source *directory* under data/staging/, not a flat CSV filename:
+# backlog.md #1 moved staging to date-partitioned data/staging/<source>/
+# <date>.csv snapshots, and this mapping still pointed at the pre-#1 flat
+# paths -- so _build_sources raised FileNotFoundError for every source. It
+# went unnoticed because no release had been cut since that change.
 SOURCES: dict[str, tuple[str, str]] = {
-    "PokéAPI": ("https://github.com/PokeAPI/pokeapi", "pokeapi.csv"),
-    "OP.GG Pokémon Champions": ("https://op.gg/pokemon-champions/pokedex", "opgg_champions.csv"),
-    "MunchStats": ("https://github.com/PizzaTimeJoshua/munchstats", "munchstats.csv"),
-    "PokéBase": ("https://pokebase.app/pokemon-champions/pokemon", "pokebase.csv"),
-    "Bulbagarden Archives": ("https://archives.bulbagarden.net/w/api.php", "bulbagarden.csv"),
+    "PokéAPI": ("https://github.com/PokeAPI/pokeapi", "pokeapi"),
+    "OP.GG Pokémon Champions": ("https://op.gg/pokemon-champions/pokedex", "opgg_champions"),
+    "MunchStats": ("https://github.com/PizzaTimeJoshua/munchstats", "munchstats"),
+    "PokéBase": ("https://pokebase.app/pokemon-champions/pokemon", "pokebase"),
+    "Bulbagarden Archives": ("https://archives.bulbagarden.net/w/api.php", "bulbagarden"),
+    "RK9.gg": ("https://rk9.gg", "rk9_pairings"),
+    "Limitless VGC": ("https://limitlessvgc.com", "limitless"),
 }
 
 CHANGELOG_TEMPLATE = (REPO_ROOT / "releases" / "changelogs" / "CHANGELOG.template.md").read_text()
@@ -88,10 +98,23 @@ def _load_validation_report(validation_report_path: Path) -> dict[str, Any]:
     return report
 
 
+def _latest_snapshot(staging_dir: Path, staging_subdir: str) -> Path | None:
+    """Newest dated snapshot for a source, or None if it has never been
+    extracted. Filenames are YYYY-MM-DD.csv, so lexicographic order is
+    chronological -- the same convention pipelines/cli.py's own
+    _latest_snapshot_path uses."""
+    source_dir = staging_dir / staging_subdir
+    if not source_dir.is_dir():
+        return None
+    snapshots = sorted(source_dir.glob("*.csv"))
+    return snapshots[-1] if snapshots else None
+
+
 def _build_sources(staging_dir: Path) -> list[dict[str, Any]]:
     sources = []
-    for source_name, (source_url, filename) in SOURCES.items():
-        rows = _read_csv_rows(staging_dir / filename)
+    for source_name, (source_url, staging_subdir) in SOURCES.items():
+        snapshot = _latest_snapshot(staging_dir, staging_subdir)
+        rows = _read_csv_rows(snapshot) if snapshot is not None else []
         sources.append(
             {
                 "source_name": source_name,
