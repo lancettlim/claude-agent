@@ -1,0 +1,115 @@
+{
+  "table_name": "tournament_match",
+  "purpose": "match-level head-to-head tournament results: who faced whom, in which round, and who won",
+  "primary_key": "match_id",
+  "join_keys": [
+    "event_id",
+    "team_id_1",
+    "team_id_2",
+    "winner_team_id"
+  ],
+  "fields": [
+    {
+      "name": "match_id",
+      "type": "string",
+      "required": true,
+      "description": "Primary key; deterministic hash of event/pod/round/table/player-1"
+    },
+    {
+      "name": "event_id",
+      "type": "string",
+      "required": true,
+      "description": "Foreign key to tournament_event.event_id"
+    },
+    {
+      "name": "division",
+      "type": "string",
+      "required": true,
+      "description": "Age division the match was played in, e.g. \"Masters\", \"Senior\", \"Junior\""
+    },
+    {
+      "name": "round_number",
+      "type": "integer",
+      "required": true,
+      "description": "Swiss/top-cut round number, 1-based"
+    },
+    {
+      "name": "table_number",
+      "type": "integer",
+      "required": false,
+      "description": "Physical table the match was played at; null for a bye"
+    },
+    {
+      "name": "player_id_1",
+      "type": "string",
+      "required": false,
+      "description": "Foreign key to tournament_team.player_id for the first player; null when the player has no roster on record"
+    },
+    {
+      "name": "team_id_1",
+      "type": "string",
+      "required": false,
+      "description": "Foreign key to tournament_team.team_id for the first player; null when unresolved"
+    },
+    {
+      "name": "player_id_2",
+      "type": "string",
+      "required": false,
+      "description": "Foreign key to tournament_team.player_id for the second player; null for a bye or when unresolved"
+    },
+    {
+      "name": "team_id_2",
+      "type": "string",
+      "required": false,
+      "description": "Foreign key to tournament_team.team_id for the second player; null for a bye or when unresolved"
+    },
+    {
+      "name": "winner_team_id",
+      "type": "string",
+      "required": false,
+      "description": "Foreign key to tournament_team.team_id for the winning side; null for a tie, a bye, or an unresolved winner"
+    },
+    {
+      "name": "outcome",
+      "type": "string",
+      "required": true,
+      "description": "player1_win | player2_win | tie | bye, derived from RK9's winner/loser cell markup"
+    },
+    {
+      "name": "is_complete",
+      "type": "boolean",
+      "required": true,
+      "description": "Whether RK9 marked the match complete; an in-progress round reports false"
+    },
+    {
+      "name": "source_name",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: originating source name"
+    },
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: the exact pairings round URL this row was read from"
+    },
+    {
+      "name": "source_record_id",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: upstream record identifier"
+    },
+    {
+      "name": "extracted_at_utc",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: UTC ISO-8601 timestamp of the extraction run"
+    },
+    {
+      "name": "dataset_version",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: dataset version this record was published under"
+    }
+  ]
+}

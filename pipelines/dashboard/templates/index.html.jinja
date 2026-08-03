@@ -780,11 +780,11 @@
   <section class="tab-panel" data-panel="matchup" hidden>
     <h2>Matchup</h2>
     <p class="sub">
-      Type effectiveness, teammate co-usage, and a stats/setup/weather-aware
-      damage calculator — see docs/design-system.md's "Matchup tab" for what
-      this does and doesn't model (no per-battle head-to-head outcome data
-      exists in this dataset; co-usage is a teammate-pairing proxy, not a
-      real matchup-outcome signal).
+      Real head-to-head records, type effectiveness, teammate co-usage, and a
+      stats/setup/weather-aware damage calculator — see
+      docs/design-system.md's "Matchup tab" for what this does and doesn't
+      model. Head-to-head is measured <strong>team vs team</strong>: no source
+      publishes which Pokémon were actually brought to a given match.
     </p>
     <div class="matchup-picker-grid">
       <div class="matchup-side">
@@ -824,8 +824,21 @@
     <p class="sub">The attacker's type(s) against the defender's type(s).</p>
     <div class="type-effect-grid" id="matchup-type-grid"></div>
 
+    <h3>Head-to-head record</h3>
+    <p class="sub">
+      How often teams fielding the attacker actually beat teams fielding the
+      defender, from real tournament pairings. Ranked by a 95% Wilson lower
+      bound, so a 1&#8209;0 record doesn't outrank a well-established one.
+      This is a <strong>team-level</strong> result, not a claim that these two
+      Pokémon fought each other.
+    </p>
+    <div class="damage-result" id="matchup-h2h-headline"></div>
+    <h4>Defender's toughest opponents</h4>
+    <p class="sub">Pokémon whose teams beat the defender's teams most reliably (minimum 10 recorded matches).</p>
+    <div class="grid-6xn" id="matchup-h2h-grid"></div>
+
     <h3>Co-usage</h3>
-    <p class="sub">Pokémon most often teamed with the defender in real tournament rosters (a teammate-pairing proxy, not a battle-outcome signal).</p>
+    <p class="sub">Pokémon most often teamed with the defender in real tournament rosters. This is a teammate-pairing view, not a matchup signal — the head-to-head section above is the matchup signal.</p>
     <div class="grid-6xn" id="matchup-co-usage-grid"></div>
   </section>
 

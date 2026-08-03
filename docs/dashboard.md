@@ -222,11 +222,15 @@ gallery entry:
    (`pipelines/dashboard/build.py`'s `_load_reference_teams` just copies
    the already-rendered PNGs into the published site).
 
-**Known gaps, not code bugs**: MunchStats's real tournament data doesn't
-report Nature at all for most entries (~17% coverage as of this writing;
-see `pipelines/extract/munchstats.py`'s docstring) — `nature` on a
-gallery card built from a hand-authored spec (rather than a real
-`team_id`) is only as complete as what you write into the spec. Country
+**Known gaps, not code bugs**: `nature` on a gallery card built from a
+hand-authored spec (rather than a real `team_id`) is only as complete as
+what you write into the spec. (An earlier note here claimed MunchStats
+reports Nature for only ~17% of entries. That was a measurement artifact,
+now corrected: 17.2% is the *Champions share* of a corpus that also
+contained standard VGC events. Within Champions events nature coverage is
+100% — and `tera_type` is 0%, because the format has no Tera mechanic.
+Standard VGC is the exact reverse. See
+`dbt/models/intermediate/int_champions_roster.sql`.) Country
 codes are two-letter (e.g. "US", "GB") per MunchStats's own format,
 rendered as plain text — no flag-emoji/ISO-lookup table exists yet.
 

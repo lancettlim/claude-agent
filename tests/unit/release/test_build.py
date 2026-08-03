@@ -77,30 +77,49 @@ def _populate_normalized_and_staging(tmp_path, *, include_missing_asset=False):
     asset_cache_dir.mkdir(parents=True, exist_ok=True)
     (asset_cache_dir / "0001.png").write_bytes(b"fake-png-1")
     (asset_cache_dir / "0002.png").write_bytes(b"fake-png-2")
+    # Staging is date-partitioned per source (backlog.md #1), so each
+    # source is a directory of YYYY-MM-DD.csv snapshots, not a flat file.
+    # Two snapshots for pokeapi so the "newest wins" resolution is exercised
+    # rather than assumed.
     _write_csv(
-        staging_dir / "pokeapi.csv",
+        staging_dir / "pokeapi" / "2026-01-01.csv",
         [{"extracted_at_utc": "2026-01-01T00:00:00Z", "pokemon_id": "1"}],
     )
     _write_csv(
-        staging_dir / "opgg_champions.csv",
+        staging_dir / "pokeapi" / "2026-01-02.csv",
+        [
+            {"extracted_at_utc": "2026-01-02T00:00:00Z", "pokemon_id": "1"},
+            {"extracted_at_utc": "2026-01-02T00:00:00Z", "pokemon_id": "2"},
+        ],
+    )
+    _write_csv(
+        staging_dir / "opgg_champions" / "2026-01-01.csv",
         [{"extracted_at_utc": "2026-01-01T01:00:00Z", "pokemon_id": "1"}],
     )
     _write_csv(
-        staging_dir / "munchstats.csv",
+        staging_dir / "munchstats" / "2026-01-01.csv",
         [{"extracted_at_utc": "2026-01-01T02:00:00Z", "event_id": "e1"}],
     )
     _write_csv(
-        staging_dir / "pokebase.csv",
+        staging_dir / "pokebase" / "2026-01-01.csv",
         [{"extracted_at_utc": "2026-01-01T03:00:00Z", "pokemon_id": "1"}],
     )
     _write_csv(
-        staging_dir / "bulbagarden.csv",
+        staging_dir / "bulbagarden" / "2026-01-01.csv",
         [
             {
                 "extracted_at_utc": "2026-01-01T04:00:00Z",
                 "bulbagarden_title": "File:Menu CP 0001.png",
             }
         ],
+    )
+    _write_csv(
+        staging_dir / "rk9_pairings" / "2026-01-01.csv",
+        [{"extracted_at_utc": "2026-01-01T05:00:00Z", "event_id": "e1"}],
+    )
+    _write_csv(
+        staging_dir / "limitless" / "2026-01-01.csv",
+        [{"extracted_at_utc": "2026-01-01T06:00:00Z", "limitless_team_id": "1"}],
     )
     return normalized_dir, staging_dir, asset_cache_dir
 
@@ -160,13 +179,13 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     assert manifest["known_limitations"] == ["example limitation"]
     assert len(manifest["tables"]) == len(build.TABLES)
     assert all(t["row_count"] == 2 for t in manifest["tables"])
-    assert {s["source_name"] for s in manifest["sources"]} == {
-        "PokéAPI",
-        "OP.GG Pokémon Champions",
-        "MunchStats",
-        "PokéBase",
-        "Bulbagarden Archives",
-    }
+    assert {s["source_name"] for s in manifest["sources"]} == set(build.SOURCES)
+    # Each source's row count/timestamp comes from its NEWEST dated snapshot,
+    # not the first or an arbitrary one: pokeapi has two, and the later one
+    # has two rows.
+    pokeapi_source = next(s for s in manifest["sources"] if s["source_name"] == "PokéAPI")
+    assert pokeapi_source["record_count"] == 2
+    assert pokeapi_source["extracted_at_utc"] == "2026-01-02T00:00:00Z"
     assert manifest["images"] == {"count": 2, "missing": 0, "directory": "images/"}
 
     for table_name in build.TABLES:
@@ -236,3 +255,24 @@ def test_build_quality_checks_reflect_report(tmp_path):
     assert checks_by_name["required_field_null_rate"]["status"] == "pass"
     assert checks_by_name["duplicate_primary_key_violations"]["metric_value"] == 0
     assert checks_by_name["referential_integrity"]["status"] == "pass"
+
+
+def test_build_sources_handles_a_source_that_was_never_extracted(tmp_path):
+    """A source directory that doesn't exist yet (fresh clone, or a source
+    like Bulbagarden that only runs on demand) must report zero records
+    rather than raising -- the release gate decides what may ship, not an
+    incidental FileNotFoundError here."""
+    staging_dir = tmp_path / "staging"
+    _write_csv(
+        staging_dir / "pokeapi" / "2026-01-01.csv",
+        [{"extracted_at_utc": "2026-01-01T00:00:00Z", "pokemon_id": "1"}],
+    )
+
+    sources = build._build_sources(staging_dir)
+
+    by_name = {s["source_name"]: s for s in sources}
+    assert by_name["PokéAPI"]["record_count"] == 1
+    for name in build.SOURCES:
+        if name != "PokéAPI":
+            assert by_name[name]["record_count"] == 0
+            assert by_name[name]["extracted_at_utc"] is None

@@ -55,16 +55,20 @@ source of truth for product-level goals/non-goals.
 
 ## V1 scope at a glance
 
-- **In-scope sources (v1)**: PokéAPI (canonical stats), OP.GG Pokémon
+- **In-scope sources**: PokéAPI (canonical stats), OP.GG Pokémon
   Champions (legal pool + rebalanced stats), MunchStats (tournament/roster
   usage), PokéBase (per-regulation legal-pool membership), Bulbagarden
-  Archives (Champions-menu sprite images, added in Phase 4 — see below)
-- **Deferred sources**: Limitless VGC, Victory Road (see
-  `docs/dataset-spec.md` for why)
+  Archives (Champions-menu sprite images, added in Phase 4 — see below),
+  RK9.gg (round-by-round pairings and match outcomes) and Limitless VGC
+  (canonical shared team-list identity), both added 2026-08-03
+- **Deferred sources**: none. Limitless VGC was brought into scope and
+  Victory Road was closed as unbuildable — the EV data it was wanted for is
+  published by no source at all (see `docs/dataset-spec.md`'s "Formerly
+  deferred sources" and `docs/backlog.md` #25/#26)
 - **Core entities**: `pokemon`, `pokemon_stat_canonical`,
   `pokemon_stat_champions`, `pokemon_stat_delta`, `legality_snapshot`,
   `tournament_event`, `tournament_team`, `tournament_team_member`,
-  `pokemon_asset`
+  `tournament_match`, `team_list`, `team_list_member`, `pokemon_asset`
 - **Release package**: one CSV per core entity, an `images/` directory of
   the sprites `pokemon_asset.csv` references, plus `manifest.json` and
   `CHANGELOG.md`, versioned as `MAJOR.MINOR.PATCH`
@@ -134,6 +138,26 @@ published to `releases/`.
   goals/scope change) rather than letting the docs drift from actual
   implementation.
 
+**Champions-format scoping.** MunchStats indexes standard VGC events
+alongside Champions ones. `tournament_event.event_format` distinguishes
+them, and every roster-derived mart reads
+`dbt/models/intermediate/int_champions_roster.sql` rather than
+`tournament_team_member` directly. Do not bypass it when adding a mart:
+before this existed, every usage and win-rate figure blended two different
+games (Incineroar read as the #1 most-used Pokémon at 7,641 appearances
+when its real Champions figure is 1,029, at #5).
+
+**Team-vs-team grain.** `tournament_match` and the head-to-head marts
+report which *team* beat which, not which Pokémon beat which — no source
+publishes a per-battle log naming the four of six actually brought. Any new
+consumer of that data must say so where it's displayed.
+
+**EV/IV spreads do not exist.** Official tournament team sheets publish
+ability, held item, nature and moves and nothing more. Don't add an EV
+field, and don't reintroduce the retired "MunchStats nature coverage is
+~17%" claim — that number was the Champions share of a format-mixed corpus,
+not a coverage gap (nature is 100% within Champions).
+
 ## Development workflow
 
 Python, managed with `uv`. Setup and the standard dev loop:
@@ -149,9 +173,9 @@ Individual targets: `make lint` (ruff), `make test` (pytest), `make dbt-build`
 all`), `make refresh` (extract-all → dbt-build → validate), `make release
 VERSION=X.Y.Z` (refresh → release).
 
-- `pipelines/extract/` — one module per v1 source (PokéAPI, OP.GG,
-  MunchStats, PokéBase, Bulbagarden) that writes provenance-tagged rows into
-  `data/staging/`. PokéAPI fetches every entry in its `/pokemon` list (base
+- `pipelines/extract/` — one module per source (PokéAPI, OP.GG,
+  MunchStats, PokéBase, Bulbagarden, RK9, Limitless) that writes
+  provenance-tagged rows into `data/staging/`. PokéAPI fetches every entry in its `/pokemon` list (base
   species plus Mega/regional/alternate forms); OP.GG and PokéBase each do a
   plain GET against their respective Champions pages (both server-rendered,
   no browser automation needed despite appearing JS-driven — see

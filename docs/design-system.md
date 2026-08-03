@@ -676,9 +676,12 @@ paste, not a URL.
   unchanged for every other view). Each exported Pokémon uses that slot's
   actual chosen item/ability/moves (whatever its selects currently hold,
   defaulting to but not fixed at the top-recorded pick — see "Team
-  Builder" above), not an EV spread or nature — MunchStats' nature
-  coverage is only ~17% (see `docs/dashboard.md`'s "Pro Team Gallery"
-  section), so it's omitted rather than guessed.
+  Builder" above), not an EV spread. EVs are omitted because **no source
+  publishes them**: official team sheets carry ability, item, nature and
+  moves and nothing more (see `docs/data-sources.md`'s Victory Road entry).
+  Nature is available — it is reported for 100% of Champions roster slots —
+  but is left out of the export for the same reason the builder has no
+  nature selector: it is a per-slot choice this UI doesn't model.
 
 Neither direction is guaranteed to produce syntax that round-trips through
 Pokémon Showdown itself byte-for-byte — this is a "pokepaste-style"
@@ -726,9 +729,11 @@ Documented simplifications, not silent approximations:
 - Stats are computed at **level 50, IV 31, EV 252** on whichever
   offensive/defensive stat the chosen move uses (`statAtLevel50()`/
   `hpAtLevel50()` in `matchup.js`) — a "maximally invested" baseline on
-  both sides, not each Pokémon's actual real-tournament EV spread/nature
-  (MunchStats' nature coverage is only ~17%, and EVs aren't reported at
-  all).
+  both sides, not each Pokémon's actual real-tournament EV spread. EVs are
+  not modeled because no source publishes them at all (see
+  `docs/data-sources.md`'s Victory Road entry); nature is published, and
+  reported for 100% of Champions roster slots, but is not modeled here
+  either.
 - Only the curated `TOGGLES` list (Choice Band/Specs, Life Orb, Expert
   Belt, Huge Power/Pure Power, Adaptability, Technician, Intimidate) is
   modeled; no other item or ability affects the calculation.

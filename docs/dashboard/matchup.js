@@ -1,4 +1,5 @@
-/* Matchup tab: type effectiveness, teammate co-usage, and a stats/setup/
+/* Matchup tab: real head-to-head records, type effectiveness, teammate
+ * co-usage, and a stats/setup/
  * weather-aware damage calculator (docs/design-system.md's "Matchup tab
  * components"). Loaded after app.js and reuses window.DashboardApp for
  * data/helpers rather than duplicating them.
@@ -14,9 +15,10 @@
  *
  * Scope, documented rather than silently approximated: this calculator
  * assumes a level-50, IV 31 / EV 252 "maximally invested" stat on
- * whichever offensive/defensive stat the chosen move uses (real
- * nature/EV/IV data isn't reliably reported by MunchStats — nature
- * coverage is only ~17%, see docs/dashboard.md), models STAB, type
+ * whichever offensive/defensive stat the chosen move uses (no source
+ * publishes real EV/IV data at all, so an "actual spread" calculation is
+ * not available to build; see docs/data-sources.md's Victory Road entry),
+ * models STAB, type
  * effectiveness, stat stages, rain/sun weather boosts, sand/snow's
  * Rock-SpDef/Ice-Def boosts, and a curated set of common competitive
  * items/abilities as flat multipliers. It does NOT model status
@@ -171,6 +173,7 @@
     var profileRows = marts.pokemon_champions_profile || [];
     var moveRows = marts.pokemon_move_usage || [];
     var coreRows = marts.pokemon_team_core_usage || [];
+    var h2hRows = marts.pokemon_head_to_head || [];
     var byName = {};
     profileRows.forEach(function (r) {
       byName[r.pokemon_name] = r;
@@ -191,6 +194,8 @@
     var resultEl = document.getElementById("matchup-damage-result");
     var typeGridEl = document.getElementById("matchup-type-grid");
     var coUsageGridEl = document.getElementById("matchup-co-usage-grid");
+    var h2hGridEl = document.getElementById("matchup-h2h-grid");
+    var h2hHeadlineEl = document.getElementById("matchup-h2h-headline");
     if (!attackerSelect || !defenderSelect) return;
 
     var sortedProfiles = profileRows.slice().sort(function (a, b) {
@@ -305,6 +310,76 @@
       });
     }
 
+    // Minimum recorded matches before a head-to-head pair is shown. Below
+    // this, win rate is noise: a single match reads as 100% or 0%. Matches
+    // pokemon_matchup_summary's own threshold so the mart and the UI agree.
+    var H2H_MIN_MATCHES = 10;
+
+    function h2hRow(attacker, defender) {
+      if (!attacker || !defender) return null;
+      for (var i = 0; i < h2hRows.length; i++) {
+        if (
+          h2hRows[i].pokemon_key === attacker.pokemon_key &&
+          h2hRows[i].opponent_pokemon_key === defender.pokemon_key
+        ) {
+          return h2hRows[i];
+        }
+      }
+      return null;
+    }
+
+    function drawHeadToHead(attacker, defender) {
+      if (h2hHeadlineEl) {
+        var row = h2hRow(attacker, defender);
+        if (!attacker || !defender) {
+          h2hHeadlineEl.innerHTML =
+            '<div class="damage-sub">Pick an attacker and a defender to see their recorded head-to-head.</div>';
+        } else if (!row) {
+          h2hHeadlineEl.innerHTML =
+            '<div class="damage-sub">No recorded matches between teams fielding ' +
+            App.escapeHtml(attacker.pokemon_name) + " and " +
+            App.escapeHtml(defender.pokemon_name) + ".</div>";
+        } else {
+          h2hHeadlineEl.innerHTML =
+            '<div class="damage-headline">' + App.formatPercent(row.win_rate) + "</div>" +
+            '<div class="damage-sub">Teams with ' + App.escapeHtml(attacker.pokemon_name) +
+            " beat teams with " + App.escapeHtml(defender.pokemon_name) + " in " +
+            row.wins + " of " + row.matches_played + " recorded matches." +
+            (row.matches_played < H2H_MIN_MATCHES
+              ? " Small sample — treat with caution."
+              : "") +
+            "</div>";
+        }
+      }
+      if (!h2hGridEl) return;
+      // The defender's toughest opponents: rows where the DEFENDER is the
+      // opponent, ranked by how reliably the other side wins.
+      var rows = defender
+        ? h2hRows
+            .filter(function (r) {
+              return (
+                r.opponent_pokemon_key === defender.pokemon_key &&
+                r.matches_played >= H2H_MIN_MATCHES
+              );
+            })
+            .sort(function (a, b) {
+              return b.wilson_lower_bound - a.wilson_lower_bound;
+            })
+            .slice(0, 12)
+        : [];
+      App.renderGrid6xn(h2hGridEl, rows, {
+        keyFn: function (r) {
+          return r.pokemon_key;
+        },
+        labelFn: function (r) {
+          return r.pokemon_name;
+        },
+        displayFn: function (r) {
+          return App.formatPercent(r.win_rate) + " (n=" + r.matches_played + ")";
+        },
+      });
+    }
+
     function drawCoUsage(defender) {
       if (!coUsageGridEl) return;
       var rows = defender
@@ -338,6 +413,7 @@
       if (attackerStatsEl) attackerStatsEl.textContent = statLine(attacker);
       if (defenderStatsEl) defenderStatsEl.textContent = statLine(defender);
       drawTypeGrid(defender);
+      drawHeadToHead(attacker, defender);
       drawCoUsage(defender);
 
       var moveName = moveSelect.value;

@@ -21,7 +21,7 @@ with member_rosters as (
   select
     team_id,
     string_agg(pokemon_key, '|' order by slot_number) as pokemon_keys
-  from {{ ref('tournament_team_member') }}
+  from {{ ref('int_champions_roster') }}
   group by team_id
 )
 select

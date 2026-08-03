@@ -23,7 +23,7 @@ with agg as (
       4
     ) as win_rate,
     count(*) as record_count
-  from {{ ref('tournament_team_member') }} member
+  from {{ ref('int_champions_roster') }} member
   inner join {{ ref('tournament_team') }} team
     on team.team_id = member.team_id
   inner join {{ ref('pokemon_stat_champions') }} champions

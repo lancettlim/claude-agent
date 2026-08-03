@@ -10,21 +10,18 @@ from pathlib import Path
 
 import pytest
 
-from pipelines.extract import bulbagarden, munchstats, opgg, pokeapi, pokebase
+from pipelines.cli import _EXTRACTORS
+from pipelines.extract import pokeapi
 from pipelines.schema_contracts import schema_field_names
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STAGING_SCHEMA_DIR = REPO_ROOT / "data" / "staging"
 
-# (extractor module, staging schema filename stem) -- mirrors
-# pipelines/cli.py's _EXTRACTORS mapping (source -> staging subdirectory).
-_EXTRACTOR_SCHEMAS = [
-    (munchstats, "munchstats"),
-    (opgg, "opgg_champions"),
-    (pokebase, "pokebase"),
-    (bulbagarden, "bulbagarden"),
-    (pokeapi, "pokeapi"),
-]
+# Derived from pipelines/cli.py's _EXTRACTORS (source -> staging
+# subdirectory) rather than restated here: a hand-maintained copy silently
+# stops covering any extractor added after it was last edited, which is the
+# same failure mode backlog #37 removed from the validation report.
+_EXTRACTOR_SCHEMAS = [(module, subdir) for module, subdir in _EXTRACTORS.values()]
 
 
 @pytest.mark.parametrize(

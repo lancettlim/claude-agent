@@ -16,7 +16,7 @@ with counted as (
     member.pokemon_key,
     event.event_date,
     count(*) as usage_count
-  from {{ ref('tournament_team_member') }} member
+  from {{ ref('int_champions_roster') }} member
   inner join {{ ref('pokemon_stat_champions') }} champions
     on champions.pokemon_key = member.pokemon_key
     and champions.is_legal = true

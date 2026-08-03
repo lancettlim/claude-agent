@@ -152,6 +152,24 @@ def test_run_extract_munchstats_passes_previous_snapshot_path(tmp_path, monkeypa
     assert fake.calls == [(tmp_path / "munchstats" / "2026-07-30.csv", "1.2.3", previous_path)]
 
 
+def test_run_extract_rk9_passes_previous_snapshot_path(tmp_path, monkeypatch):
+    # rk9 shares munchstats' incremental path: a concluded event's pairings
+    # never change, so the previous snapshot is reused rather than re-fetched.
+    monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
+    _stub_extraction_summary(monkeypatch)
+    previous_path = tmp_path / "rk9_pairings" / "2026-07-29.csv"
+    _write_csv(previous_path, [], ["a"])
+    fake = _RecordingMunchstatsExtractor()
+    monkeypatch.setattr(cli, "_EXTRACTORS", {"rk9": (fake, "rk9_pairings")})
+    monkeypatch.setattr(cli, "_RETENTION_COUNTS", {"rk9_pairings": 7})
+    monkeypatch.setattr(cli, "_snapshot_date", lambda: "2026-07-30")
+
+    exit_code = cli._run_extract("rk9", "1.2.3")
+
+    assert exit_code == 0
+    assert fake.calls == [(tmp_path / "rk9_pairings" / "2026-07-30.csv", "1.2.3", previous_path)]
+
+
 def test_run_extract_other_sources_do_not_receive_previous_snapshot_path(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "STAGING_DIR", tmp_path)
     _stub_extraction_summary(monkeypatch)

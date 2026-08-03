@@ -1,0 +1,89 @@
+{
+  "table_name": "team_list",
+  "purpose": "canonical team-composition identity, reused across the players and events that fielded it",
+  "primary_key": "team_list_id",
+  "join_keys": [
+    "team_list_id",
+    "first_seen_event_id"
+  ],
+  "fields": [
+    {
+      "name": "team_list_id",
+      "type": "string",
+      "required": true,
+      "description": "Primary key; Limitless' own canonical team-list id"
+    },
+    {
+      "name": "tournament_count",
+      "type": "integer",
+      "required": true,
+      "description": "Distinct tournaments at which this exact composition was fielded"
+    },
+    {
+      "name": "player_count",
+      "type": "integer",
+      "required": true,
+      "description": "Distinct players who fielded this exact composition"
+    },
+    {
+      "name": "best_placement",
+      "type": "integer",
+      "required": true,
+      "description": "Best (lowest) final standing achieved with this composition"
+    },
+    {
+      "name": "first_seen_date",
+      "type": "string",
+      "required": true,
+      "description": "Earliest tournament date this composition appears at (YYYY-MM-DD)"
+    },
+    {
+      "name": "first_seen_tournament_id",
+      "type": "string",
+      "required": true,
+      "description": "Limitless tournament id for that earliest appearance"
+    },
+    {
+      "name": "first_seen_event_id",
+      "type": "string",
+      "required": false,
+      "description": "RK9/MunchStats event_id for that appearance; the join key to tournament_event"
+    },
+    {
+      "name": "regulation_set",
+      "type": "string",
+      "required": true,
+      "description": "Regulation set the composition was played under, e.g. \"m-a\""
+    },
+    {
+      "name": "source_name",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: originating source name"
+    },
+    {
+      "name": "source_url",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: source URL for this record"
+    },
+    {
+      "name": "source_record_id",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: upstream record identifier"
+    },
+    {
+      "name": "extracted_at_utc",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: UTC ISO-8601 timestamp of the extraction run"
+    },
+    {
+      "name": "dataset_version",
+      "type": "string",
+      "required": true,
+      "description": "Provenance: dataset version this record was published under"
+    }
+  ]
+}

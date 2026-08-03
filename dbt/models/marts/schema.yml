@@ -269,31 +269,6 @@ models:
           - not_null:
               config:
                 meta: {category: mart_quality, table_name: pokemon_champions_profile}
-  - name: pokemon_tera_type_usage
-    description: >
-      Tera type drill-down (backlog.md #10): usage count and tera_share
-      (that count's fraction of the Pokémon's own total tera-type rows)
-      per Pokémon x tera_type, restricted to the current legal pool,
-      ranked within each Pokémon. Coverage is partial -- MunchStats
-      doesn't report tera_type for every roster slot. Written to
-      data/marts/pokemon_tera_type_usage.csv.
-    data_tests:
-      - unique_combination_of_columns:
-          arguments:
-            combination_of_columns: ['pokemon_key', 'tera_type']
-          config:
-            meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
-    columns:
-      - name: pokemon_key
-        data_tests:
-          - not_null:
-              config:
-                meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
-      - name: tera_type
-        data_tests:
-          - not_null:
-              config:
-                meta: {category: mart_quality, table_name: pokemon_tera_type_usage}
   - name: pokemon_usage_by_regulation
     description: >
       Usage x regulation cross-tab (backlog.md #12): pokemon_usage_summary's
@@ -487,6 +462,75 @@ models:
           - not_null:
               config:
                 meta: {category: mart_quality, table_name: player_signature_pokemon}
+  - name: roster_source_agreement
+    description: >
+      Cross-source validation, one row per event covered by both MunchStats
+      and Limitless: how often the two independently agree on a player's six
+      Pokémon. exact_agreement_rate is whole-roster agreement,
+      slot_agreement_rate is per-slot. The event join is real rather than
+      heuristic — Limitless links out to the same event on RK9, and
+      MunchStats reuses RK9's event ids. covered_players is stated because
+      the comparison spans Limitless' day-2 cut, not the full field.
+      This mart earned its keep immediately: it reported 0% exact agreement
+      on first run, which is what surfaced the Mega representation
+      difference now handled by limitless_mega_item_to_pokeapi_form (see
+      int_limitless_mapped.sql). Written to
+      data/marts/roster_source_agreement.csv.
+    columns:
+      - name: event_id
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: roster_source_agreement}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: roster_source_agreement}
+  - name: pokemon_head_to_head
+    description: >
+      Real head-to-head records per (pokemon_key, opponent_pokemon_key),
+      built on tournament_match (RK9 pairings, backlog.md #27): how often
+      teams fielding the first Pokémon beat teams fielding the second,
+      with a 95% Wilson lower bound since head-to-head samples are small.
+      CAVEAT, and it must be surfaced wherever this is displayed: the grain
+      is team vs team, NOT Pokémon vs Pokémon. RK9 publishes no per-battle
+      log naming which Pokémon were brought (VGC brings 4 of 6) or which
+      defeated which, so a row reads "teams with A beat teams with B this
+      often", never "A beats B". Pairs are mirrored, and scoped to Masters,
+      to decided matches, and to the current legal pool. Written to
+      data/marts/pokemon_head_to_head.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key', 'opponent_pokemon_key']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_head_to_head}
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_head_to_head}
+      - name: opponent_pokemon_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_head_to_head}
+  - name: pokemon_matchup_summary
+    description: >
+      One row per Pokémon: overall head-to-head win rate plus its best and
+      worst matchups, chosen by Wilson lower bound over a minimum of 10
+      matches (a raw win-rate extreme is always a 1-0 record). Inherits
+      pokemon_head_to_head's team-vs-team caveat exactly. Written to
+      data/marts/pokemon_matchup_summary.csv.
+    columns:
+      - name: pokemon_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_matchup_summary}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_matchup_summary}
 
 # Filter-dimension coverage for docs/todo.md's "Document KPI views and
 # filter dimensions (regulation/date/tournament tier)" item, and how it
@@ -529,12 +573,25 @@ models:
 # and weather-boost multipliers are universal game-mechanics constants, not
 # per-record data, and live in the dashboard's JS layer rather than a dbt
 # model — the same treatment already given to app.js's SPEED_TIERS
-# bucketing constant). Still a real gap: true head-to-head battle-outcome
-# matchups ("what beats Pokémon X X% of the time in practice"), since
-# MunchStats reports team-level win/loss records, not individual battle
-# outcomes against a named opponent — the Matchup tab's co-usage panel
-# (pokemon_team_core_usage) is an approximate teammate-based proxy, not a
-# real matchup-outcome signal. Tracked in docs/todo.md's backlog.
+# bucketing constant).
+#
+# The head-to-head half is now largely closed too, and the note that used
+# to sit here ("MunchStats reports team-level win/loss records, not
+# individual battle outcomes against a named opponent") was only ever true
+# of MunchStats: RK9 — the tournament software MunchStats itself scrapes —
+# publishes round-by-round pairings with a winner per match. Those land as
+# tournament_match and feed pokemon_head_to_head /
+# pokemon_matchup_summary, so "what beats Pokémon X in practice" now has a
+# real, sourced answer (backlog.md #27). The Matchup tab's co-usage panel
+# (pokemon_team_core_usage) remains a teammate-pairing view, and is no
+# longer standing in for a matchup signal that doesn't exist.
+#
+# What is still genuinely missing is narrower: per-battle, per-Pokémon
+# outcomes. No source names which 4 of a team's 6 Pokémon were actually
+# brought to a given match, or which Pokémon knocked out which, so every
+# head-to-head number here is attributed to the whole roster. Closing that
+# would need a battle-log/replay source, which no in-scope or deferred
+# source provides.
 #
 # All fields these depend on (event_tier, record_wins/record_losses,
 # item_name/ability/tera_type/moves) are optional in the source data — see

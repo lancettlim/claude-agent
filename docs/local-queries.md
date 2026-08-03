@@ -10,9 +10,15 @@ on every `dbt build`).
 
 This is backlog item #28: for a single user, a short recipe plus a few
 starter queries beats building a notebook server or a new dashboard tab —
-several marts below (tera type usage, team synergy, placement-weighted
-usage, build concentration) aren't wired into the dashboard UI yet at all,
-so this is currently the *only* way to see their output.
+several marts below (team synergy, placement-weighted usage, build
+concentration, cross-source roster agreement) aren't wired into the
+dashboard UI yet at all, so this is currently the *only* way to see their
+output.
+
+Note on scope: every usage/win-rate mart is now restricted to Pokémon
+Champions events. MunchStats indexes standard VGC events alongside
+Champions ones, and until `event_format` was captured these tables mixed
+the two — see `dbt/models/intermediate/int_champions_roster.sql`.
 
 ## Prerequisites
 
@@ -107,14 +113,25 @@ order by lift desc
 limit 10;
 ```
 
-**Tera type spread for one Pokémon** (swap the `pokemon_key`; see
-`pokemon.csv` or `pokemon_usage_summary` for valid keys):
+**Head-to-head matchups for one Pokémon** (swap the `pokemon_key`; see
+`pokemon.csv` or `pokemon_usage_summary` for valid keys). Read this as
+*team vs team* — see `pokemon_head_to_head`'s schema.yml entry:
 
 ```sql
-select tera_type, usage_count, round(tera_share * 100, 1) as share_pct
-from pokemon_tera_type_usage
-where pokemon_key = 'incineroar'
-order by usage_count desc;
+select opponent_pokemon_key, matches_played, round(win_rate * 100, 1) as win_pct
+from pokemon_head_to_head
+where pokemon_key = 'incineroar' and matches_played >= 30
+order by wilson_lower_bound desc
+limit 10;
+```
+
+**Do the two roster sources agree?** — MunchStats and Limitless read
+independently, compared per event:
+
+```sql
+select event_name, covered_players, exact_agreement_rate, slot_agreement_rate
+from roster_source_agreement
+order by covered_players desc;
 ```
 
 **"Popular" vs. "actually good"** — top-cut usage share and a continuous

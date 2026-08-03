@@ -62,6 +62,10 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("win_rate",),
     ),
     "pokemon_usage_by_event_date": (("usage_count", "usage_rank"), ("usage_share",)),
+    "pokemon_head_to_head": (
+        ("matches_played", "wins", "losses", "matchup_rank"),
+        ("win_rate", "wilson_lower_bound"),
+    ),
 }
 
 
@@ -140,6 +144,13 @@ def _join_pokemon_names(
                     **row,
                     "partner_pokemon_name": pokemon_names.get(
                         row["partner_pokemon_key"], row["partner_pokemon_key"]
+                    ),
+                }
+            if "opponent_pokemon_key" in row:
+                row = {
+                    **row,
+                    "opponent_pokemon_name": pokemon_names.get(
+                        row["opponent_pokemon_key"], row["opponent_pokemon_key"]
                     ),
                 }
             joined_rows.append(row)

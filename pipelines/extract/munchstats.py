@@ -83,6 +83,7 @@ FIELDNAMES = [
     "event_name",
     "event_date",
     "event_tier",
+    "event_format",
     "team_id",
     "player_id",
     "player_name",
@@ -140,15 +141,30 @@ def _load_cached_rows_by_tournament(previous_snapshot_path: Path | None) -> dict
     return cached
 
 
-def _metadata_signature(metadata: dict) -> tuple[str, str, str]:
-    return (metadata["name"], metadata["date"], metadata.get("type", ""))
+def _metadata_signature(metadata: dict) -> tuple[str, str, str, str]:
+    return (
+        metadata["name"],
+        metadata["date"],
+        metadata.get("type", ""),
+        metadata.get("format", ""),
+    )
 
 
-def _cached_metadata_signature(cached_rows: list[dict]) -> tuple[str, str, str] | None:
+def _cached_metadata_signature(cached_rows: list[dict]) -> tuple[str, str, str, str] | None:
+    """The cached counterpart of _metadata_signature. `event_format` is read
+    with a default because a snapshot written before that column existed
+    simply has no such key: such a row yields "" here, which cannot match a
+    real format, so the tournament is re-fetched and backfilled rather than
+    being reused with a silently blank format."""
     if not cached_rows:
         return None
     first = cached_rows[0]
-    return (first.get("event_name", ""), first.get("event_date", ""), first.get("event_tier", ""))
+    return (
+        first.get("event_name", ""),
+        first.get("event_date", ""),
+        first.get("event_tier", ""),
+        first.get("event_format", ""),
+    )
 
 
 def _rows_for_tournament(
@@ -194,6 +210,7 @@ def _rows_for_tournament(
                     "event_name": metadata["name"],
                     "event_date": metadata["date"],
                     "event_tier": metadata.get("type", ""),
+                    "event_format": metadata.get("format", ""),
                     "team_id": team_id,
                     "player_id": player_id,
                     "player_name": player.get("name", ""),

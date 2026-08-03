@@ -244,6 +244,7 @@ def _cached_row(**overrides):
             "event_name": METADATA["name"],
             "event_date": METADATA["date"],
             "event_tier": METADATA["type"],
+            "event_format": METADATA["format"],
             "team_id": "cached-team",
             "player_id": "cached-player",
             "player_name": "Cached Player",
@@ -291,6 +292,45 @@ def test_extract_reuses_cached_rows_when_metadata_signature_unchanged(tmp_path):
     # Reused rows are still re-stamped with this run's provenance fields.
     assert rows[0]["dataset_version"] == "0.2.0"
     assert rows[0]["extracted_at_utc"] != "2026-01-01T00:00:00+00:00"
+
+
+def test_extract_refetches_a_snapshot_cached_before_event_format_existed(tmp_path):
+    """A snapshot written before event_format was captured has no such
+    column. Those rows must NOT be reused as-is -- that would silently
+    carry a blank format forward, and every Champions-scoped mart keys off
+    it. The signature comparison treats the missing column as "" so it
+    can't match the real format, forcing a re-fetch that backfills it."""
+    session = _FakeSession(
+        {
+            munchstats.TOURNAMENTS_INDEX_URL: [{"id": TOURNAMENT_ID}],
+            f"{DIR_URL}/metadata.json": METADATA,
+            f"{DIR_URL}/players.json": PLAYERS,
+        }
+    )
+    previous_path = tmp_path / "previous.csv"
+    stale_row = _cached_row()
+    stale_row.pop("event_format")
+    with previous_path.open("w", newline="", encoding="utf-8") as fh:
+        fieldnames = [n for n in munchstats.FIELDNAMES if n != "event_format"]
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerow(stale_row)
+    output_path = tmp_path / "munchstats.csv"
+
+    munchstats.extract(
+        output_path,
+        [TOURNAMENT_ID],
+        dataset_version="0.3.0",
+        session=session,
+        previous_snapshot_path=previous_path,
+    )
+
+    assert f"{DIR_URL}/players.json" in session.requested_urls
+    with output_path.open(newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    assert rows, "re-fetch must produce real rows, not an empty file"
+    assert {row["event_format"] for row in rows} == {METADATA["format"]}
+    assert "Cached Mon" not in {row["pokemon_name"] for row in rows}
 
 
 def test_extract_refetches_when_metadata_signature_changed(tmp_path):

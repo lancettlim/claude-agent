@@ -16,17 +16,17 @@ stable and never reused** — a completed or dropped item keeps its number.
 
 ## Progress overview
 
-*Last updated 2026-08-02.* 49 numbered items exist (#1-#49, none dropped).
+*Last updated 2026-08-03.* 49 numbered items exist (#1-#49, none dropped).
 This table is maintained by hand alongside each grooming/implementation
 pass — if it drifts from the per-item statuses below, the per-item entries
 are the source of truth.
 
 | Status | Count | Meaning |
 |---|---|---|
-| **Done** | 39 | Shipped and verified against real data: #1-#16, #22-#24, #28-#30, #32, #33, #35-#49 (every item in this range except #17 and #34, see below) |
-| **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
+| **Done** | 41 | Shipped and verified against real data: #1-#16, #22-#24, #26-#30, #32, #33, #35-#49 (every item in this range except #17, #25 and #34, see below) |
+| **Resolved, no build needed** | 3 | #17 — deliberately left unwired, not an oversight; #25 — the EV data does not exist at any source, so there is nothing to build; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
 | **Open, buildable now** | 0 | Every previously-open, unblocked item has shipped |
-| **Blocked** | 3 | Waiting on a source that's deferred/out-of-scope/nonexistent (#25-#27) |
+| **Blocked** | 0 | The last three (#25-#27) were resolved on 2026-08-03; two of the three blockers turned out to be stale |
 | **Archived** | 5 | Excluded from active scope by user decision (2026-08-02): meta-shift/legal-pool/stat-change trend items (#18-#21) and the Streamlit dashboard (#31). Not resolved — deprioritized; each stays blocked underneath (Blocker A/B or snapshot-dependent hosting) and can be un-archived if reprioritized |
 
 By section:
@@ -37,10 +37,10 @@ By section:
 | 1 — Buildable today (#6-#17) | 11 | 1 | 0 | 0 | 0 | 12 |
 | 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 0 | 3 | 3 |
 | 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 0 | 1 | 1 |
-| 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 0 | 6 |
+| 1 — Needs new provenance (#22-#27) | 5 | 1 | 0 | 0 | 0 | 6 |
 | 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 0 | 1 | 7 |
 | 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 0 | 15 |
-| **Total** | **39** | **2** | **0** | **3** | **5** | **49** |
+| **Total** | **41** | **3** | **0** | **0** | **5** | **49** |
 
 Takeaways: **every unblocked item in the backlog is now done.** Sections 0,
 1's "buildable today" subsection (except #17, a deliberate non-build), 2,
@@ -69,10 +69,29 @@ B, or #31's snapshot-dependent hosting justification), just no longer
 counted among the items this file is actively tracking toward. See each
 entry's "Archived" note, and #18's note for the shared rationale.
 
-The 3 remaining blocked items aren't neglect — each needs a source this
-repo doesn't have, and in #26/#27's case, one that may not exist in
-scriptable form at all. What's left to do in this file now is exactly what's
-left: bring a new source into scope, or wait for one to become scriptable.
+**2026-08-03: the last three blocked items (#25-#27) are now resolved, and
+two of the three blockers were stale rather than real.** Checking them
+against the live sources instead of against this file's own description
+changed the answer in every case:
+
+- **#27 was not blocked at all.** Its own text named the missing piece
+  ("round-by-round pairing data from tournament software") without following
+  it up. That software is RK9 — already this dataset's upstream, via
+  MunchStats — and it serves pairings over plain HTTP. Shipped as
+  `tournament_match` plus two head-to-head marts.
+- **#26's blockers were both false**: Limitless needs no browser automation,
+  and it does not extend Champions history (only three Champions events
+  exist anywhere). Built anyway, for the real value its entry had missed —
+  canonical shared team identity, and cross-source validation.
+- **#25 is genuinely, permanently unbuildable**, but for a different reason
+  than recorded: EVs are not published by *any* source, including the
+  official team sheets every source here derives from. Victory Road's
+  unreachability turned out to be beside the point.
+
+Two of these passes surfaced real bugs while verifying against live data:
+#26's cross-validation caught a Mega-form modelling error, and #25's
+investigation caught the format-mixing bug that had every usage mart
+blending Champions with standard VGC events. Neither was hypothetical.
 
 ## Entry format
 
@@ -319,7 +338,7 @@ set, as intended. Still open: extending past pairs to triples for real
 "core" detection, as this entry originally suggested — a bigger
 combinatorial problem than the pairwise case, left for a follow-up.
 
-#### 10. Tera type usage mart — DONE
+#### 10. Tera type usage mart — REMOVED; the Champions format has no Tera
 
 - **Size**: S
 - **Value**: Tera type is a defining format mechanic and is entirely absent
@@ -328,10 +347,22 @@ combinatorial problem than the pairwise case, left for a follow-up.
   `dbt/models/marts/schema.yml:123-127` — coverage is partial)
 - **Touches**: new mart, `tournament_team_member.tera_type`
 
-Shipped as `dbt/models/marts/pokemon_tera_type_usage.sql`, mirroring
-`pokemon_item_usage`/`pokemon_ability_usage`'s share-of-own-total pattern.
-Not yet wired into the dashboard UI (real, queryable mart output; a Tera
-Types drill-down section is separate, undone follow-up work).
+Shipped as `dbt/models/marts/pokemon_tera_type_usage.sql`, then
+**removed on 2026-08-03** — reopened as unbuildable, with the reason
+established by measurement.
+
+This entry's premise ("Tera type is a defining format mechanic") is true of
+standard VGC and false of Champions: **the Champions format has no Tera
+mechanic at all**, and `tera_type` is reported for 0.0% of its 18,284 roster
+slots (100% of standard VGC's). The mart looked populated only because
+`tournament_event` did not yet capture `event_format`, so it was silently
+counting standard VGC events this dataset is not scoped to (see #25). Once
+`int_champions_roster` scoped the marts correctly, it returned zero rows
+permanently.
+
+Removed rather than shipped as a guaranteed-empty view, following the same
+precedent that removed the stat-change leaderboard and legal-pool trend
+dashboard sections. Re-add only if the Champions format ever gains Tera.
 
 #### 11. Move-type coverage analysis — SUPERSEDED, mostly resolved
 
@@ -607,10 +638,12 @@ Blocker B underneath; un-archive if this is reprioritized.
 
 ### Needs new provenance — with a sourcing path
 
-Everything here is currently unbuildable from in-scope data. Each entry
-names the real path to provenance rather than proposing a hardcoded,
-unsourced table — that would violate the mandatory-provenance convention in
-`CLAUDE.md`, which is the reason these gaps still exist.
+**All six items in this subsection are now closed** (#22-#24 shipped
+earlier; #25-#27 on 2026-08-03). Each entry named a real path to provenance
+rather than proposing a hardcoded, unsourced table — and in #26/#27's case
+the path turned out to be considerably shorter than the entry assumed, once
+the live source was checked rather than the entry's own description of it.
+#25 is the one genuine dead end: the data it wanted is published by nobody.
 
 #### 22. `pokemon_type` entity via PokéAPI `/type` — DONE, via a lighter path
 
@@ -674,54 +707,157 @@ entity dictionary and joined into `pokemon_move_usage`/
 question this entry flagged is still unresolved, but unverifiable from any
 in-scope source, not a gap in this item's own scope.
 
-#### 25. EV spreads and verified movesets via Victory Road
+#### 25. EV spreads via Victory Road — RESOLVED, will not build; the data does not exist
 
 - **Size**: L
-- **Value**: EVs are the missing half of "how is this Pokémon actually
-  built." Also fixes MunchStats' ~17% nature coverage
-  (`docs/dashboard.md`), and makes #16's speed tiers exact instead of
-  assumed.
-- **Blocked by**: bringing a deferred source into scope
-- **Touches**: new `pipelines/extract/victoryroad.py`, new mapping seed,
-  `tournament_team_member`, `docs/data-sources.md`, `docs/dataset-spec.md`
+- **Value**: EVs were framed as "the missing half of how this Pokémon is
+  actually built," plus a fix for MunchStats' ~17% nature coverage and a way
+  to make #16's speed tiers exact instead of assumed.
+- **Blocked by**: nothing that can be unblocked — see below
+- **Touches**: `docs/data-sources.md`, `docs/dashboard.md`,
+  `docs/design-system.md`, `pipelines/extract/munchstats.py`,
+  `dbt/models/intermediate/int_champions_roster.sql`
 
-Victory Road's stated deferral reason in `dataset-spec.md` is precisely
-this: "defer until detailed moveset/EV enrichment is prioritized." Needs a
-Showdown Paste format parser. Un-deferring has precedent — PokéBase was
-pulled into v1 the same way once its need became concrete.
+Closed by measurement rather than by building an extractor, and **both
+halves of this entry's premise turned out to be false**.
 
-#### 26. Historical event coverage via Limitless VGC
+**The EV half: structurally unavailable, not deferred.** Three findings, in
+increasing order of importance:
 
-- **Size**: XL
-- **Value**: Deep historical brackets and player win rates, extending the
-  meta history further back than MunchStats reaches.
-- **Blocked by**: bringing a deferred source into scope; **no API exists**
-- **Touches**: new extractor, `docs/data-sources.md`,
-  `docs/dataset-spec.md`
+1. `docs/data-sources.md` pointed at `victory-road.com`, which **has no DNS
+   record at all** — the URL was simply wrong. The real site is
+   `victoryroadvgc.com`.
+2. `victoryroadvgc.com` is unreachable from this project's egress. It is
+   *permitted* by network policy (CONNECT tunnel established, HTTP 200) but
+   the origin resets the TLS handshake right after ClientHello — reproduced
+   across TLS 1.2/1.3, with and without ALPN, via both curl and
+   `openssl s_client`, while control hosts handshake normally. Not a
+   pipeline-side problem and not routable around.
+3. **Decisively: nobody publishes EVs.** Official tournament team sheets —
+   RK9's own, which both MunchStats and Limitless derive from — carry
+   Ability, Held Item, "Stat Alignment" (nature) and moves, and nothing
+   else. Verified directly against `rk9.gg/teamlist/public/{event}/{team}`
+   and `limitlessvgc.com/teams/{id}`: zero EV/IV data on either. Any EV
+   spread published anywhere is community-reconstructed, not sourced, so
+   ingesting it would violate this repo's mandatory-provenance rule.
 
-Sized honestly: `docs/data-sources.md` records the extraction method as
-manual browser table capture, or contacting Limitless for bulk exports.
-There is no scriptable path today, which is the real reason this is XL and
-not L. Its deferral reason — "defer until historical event coverage
-expansion" — is still accurate.
+So #16's speed tiers stay on their documented max-investment convention.
+That is now a permanent answer, not a placeholder.
 
-#### 27. Head-to-head and battle-level matchups
+**The nature-coverage half: a measurement artifact, and fixing it exposed a
+real bug.** "MunchStats' nature coverage is only ~17%" was repeated in five
+files. It is not a coverage gap: **17.2% is the Champions share of the
+corpus.** MunchStats indexes standard VGC events (regulations F/H/I)
+alongside Champions ones, and `tournament_event` never captured `format`, so
+every usage and win-rate mart in this repo had been silently blending two
+different games with different legal pools and mechanics.
 
-- **Size**: XL
-- **Value**: "What beats Pokémon X" is the most-asked competitive question
-  the dataset cannot answer, and the other half of the matchup gap #23
-  partially closes.
-- **Blocked by**: a source that is **neither in scope nor currently
-  deferred**
-- **Touches**: would require a new source and likely a new entity family
+Measured, per format:
 
-MunchStats reports team-level win/loss records, not per-battle outcomes
-against a named opponent, so there is no signal to derive this from. Neither
-deferred source supplies it either. Candidate source *types* rather than
-named sources: battle-log/replay archives, ladder databases, or
-round-by-round pairing data from tournament software. Worth periodically
-re-checking whether any has become scriptable — this stays blocked until one
-does, and no amount of frontend work substitutes for the missing data.
+| Event format | roster slots | nature | tera_type |
+|---|---|---|---|
+| `gen9championsvgc2026regma` | 18,284 | **100%** | 0% |
+| standard VGC (`regf`/`regh`/`regi`) | 87,850 | 0% | **100%** |
+
+Champions team sheets report nature and the format has no Tera mechanic;
+standard VGC is the exact reverse. Fixed by capturing `event_format` through
+extraction into `tournament_event`, and adding
+`dbt/models/intermediate/int_champions_roster.sql`, which every
+roster-derived mart now reads instead of `tournament_team_member`.
+
+The correction is large and visible: Incineroar was the #1 most-used Pokémon
+at 7,641 appearances and is really #5 at 1,029; Gholdengo, Dragonite,
+Whimsicott and Farigiraf leave the Champions top 8 entirely, replaced by
+Basculegion-Male, Kingambit, Garchomp and Charizard-Mega-Y. Consequently
+`pokemon_tera_type_usage` (backlog #10) is now **permanently empty** for
+Champions and was removed, following the same precedent that removed the
+stat-change leaderboard and legal-pool trend sections — see #10's note.
+
+#### 26. Limitless VGC — DONE, built for a different reason than this entry gave
+
+- **Size**: XL as written; actually M once the premise was checked
+- **Value**: as delivered — canonical shared team identity, and an
+  independent second source to cross-validate MunchStats rosters against.
+  NOT, as originally written, deeper historical coverage.
+- **Blocked by**: nothing; both stated blockers were false
+- **Touches**: `pipelines/extract/limitless.py`, `data/staging/limitless*`,
+  `dbt/models/{staging,intermediate,normalized}/`, two new seeds,
+  `dbt/models/marts/roster_source_agreement.sql`
+
+Both of this entry's blockers were wrong, and so was its value statement.
+
+- **"No API exists / manual browser table capture"** — false.
+  limitlessvgc.com is server-rendered; every page needed is a plain GET with
+  the data on `data-` attributes. No browser automation, no screenshotting.
+- **"Extends the meta history further back than MunchStats reaches"** —
+  false. Only **three** Champions-format events exist anywhere, and
+  MunchStats already had all three. Limitless' other 22 tournaments are
+  standard VGC, out of scope per `docs/prd.md`. Per event it is in fact
+  *narrower*: team lists cover the day-2 cut only (156 of 1,096 at NAIC).
+
+What it does have, and what it was built for, is **identity**: a
+`/teams/<id>` is a canonical team *composition* reused across every player
+and event that fielded it, where MunchStats mints a fresh team id per player
+per event. Shipped as `team_list` (359 compositions; 44 fielded by more than
+one player, 8 across more than one tournament) and `team_list_member`.
+
+The cross-validation paid for itself immediately. New
+`roster_source_agreement` reported **0% exact agreement** on first run,
+which surfaced a real modelling error: Limitless publishes the *base*
+species holding its Mega Stone ("Charizard" + "Charizardite Y") where
+MunchStats publishes the evolved form ("Charizard-Mega-Y"). Taken literally
+the Limitless row joined to base-species stats — not the stats that Pokémon
+actually played with. Fixed with a `limitless_mega_item_to_pokeapi_form`
+seed keyed on (slug, item), after which agreement is **97.9-100% exact and
+99.2-100% per slot**, with Turin at a clean 100%. Two cases the mechanical
+rule could not derive and that are recorded explicitly: `Eviolite` is a
+generic item that ends in `-ite`, and Floette's Mega evolves from the
+Eternal Flower form onto `floette-mega`.
+
+The residual ~1-2% disagreement is real and left visible: Limitless
+publishes a bare `maushold` slug with no family-size distinction, so three
+Maushold-Family-of-Three teams map to family-of-four.
+
+#### 27. Head-to-head matchups — DONE via RK9; the "no signal" premise was stale
+
+- **Size**: XL as written; actually M
+- **Value**: delivered — "what beats Pokémon X" is answerable from real
+  match outcomes for the first time.
+- **Blocked by**: nothing
+- **Touches**: `pipelines/extract/rk9.py`, `data/staging/rk9_pairings*`,
+  `dbt/models/normalized/tournament_match.sql`,
+  `dbt/models/marts/pokemon_head_to_head.sql`,
+  `pokemon_matchup_summary.sql`, the dashboard's Matchup tab
+
+This entry said "MunchStats reports team-level win/loss records, not
+per-battle outcomes against a named opponent, so there is no signal to
+derive this from." True of MunchStats — but it named the answer itself
+without following it up: "round-by-round pairing data from tournament
+software." That software is **RK9**, the same source MunchStats scrapes for
+rosters, and it publishes pairings over plain HTTP.
+
+`GET rk9.gg/pairings/{event_id}?pod={p}&rnd={n}` returns each round's
+matches with winner/loser, table number and both players' running records.
+No new ID mapping was needed at the event level: MunchStats reuses RK9's own
+event ids verbatim, so `tournament_event.event_id` *is* the pairings key.
+Players resolve to `team_id` on (name, country) at **99.8%** across 24,139
+Masters pairing slots.
+
+Shipped as `tournament_match` (13,201 real matches across the three
+Champions events: 13,127 decided, 69 byes, 5 ties) plus
+`pokemon_head_to_head` (16,763 pairs, Wilson-ranked) and
+`pokemon_matchup_summary`, surfaced in the Matchup tab beside the co-usage
+panel that had been standing in for this. Results are non-degenerate and
+competitively sensible — Incineroar's worst matchup is Lycanroc-Dusk at
+39.1% over 289 matches, its best Torkoal at 61.0% over 290.
+
+**One honest limit remains, and it is narrower than this entry's original
+scope.** An outcome is *team vs team*. No source names which four of a
+team's six Pokémon were brought to a given match, or which knocked out
+which, so every head-to-head figure is attributed to the whole roster.
+Closing that needs a battle-log or replay source; none is in scope or
+deferred. Every consumer of these marts states this — see
+`dbt/models/marts/schema.yml`.
 
 ---
 

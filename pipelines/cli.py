@@ -1,7 +1,7 @@
 """CLI entry point for the pipelines package.
 
 Subcommands:
-    extract <source>   Run one source extractor (pokeapi | opgg | munchstats | pokebase | bulbagarden | all)
+    extract <source>   Run one source extractor (pokeapi | opgg | munchstats | rk9 | limitless | pokebase | bulbagarden | all)
     validate           Reshape dbt's test results into a validation report
     release            Publish a versioned release package (gated on validate)
     render-card        Render a team card PNG, from a team_id or an ad-hoc build spec
@@ -30,7 +30,15 @@ from pathlib import Path
 
 from pipelines import versioning
 from pipelines.dashboard import build as dashboard_build
-from pipelines.extract import bulbagarden, munchstats, opgg, pokeapi, pokebase
+from pipelines.extract import (
+    bulbagarden,
+    limitless,
+    munchstats,
+    opgg,
+    pokeapi,
+    pokebase,
+    rk9,
+)
 from pipelines.extract import http as extract_http
 from pipelines.extract import summary as extraction_summary
 from pipelines.release import build as release_build
@@ -47,6 +55,8 @@ STAGING_DIR = REPO_ROOT / "data" / "staging"
 # (see _referenced_move_ability_item_names).
 _EXTRACTORS = {
     "munchstats": (munchstats, "munchstats"),
+    "rk9": (rk9, "rk9_pairings"),
+    "limitless": (limitless, "limitless"),
     "opgg": (opgg, "opgg_champions"),
     "pokebase": (pokebase, "pokebase"),
     "bulbagarden": (bulbagarden, "bulbagarden"),
@@ -65,6 +75,8 @@ _RETENTION_COUNTS = {
     "pokeapi_item": 12,
     "opgg_champions": 14,
     "munchstats": 7,
+    "rk9_pairings": 7,
+    "limitless": 14,
     "pokebase": 14,
     "bulbagarden": 10,
 }
@@ -85,6 +97,8 @@ _ENDPOINTS = {
     "opgg_champions": "https://op.gg/pokemon-champions/pokedex",
     "munchstats": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/"
     "stats/tournaments/",
+    "rk9_pairings": "https://rk9.gg/pairings/{event_id}?pod={pod}&rnd={round}",
+    "limitless": "https://limitlessvgc.com/tournaments, /tournaments/{id}, /teams/{id}",
     "pokebase": "https://pokebase.app/pokemon-champions/pokemon",
     "bulbagarden": "https://archives.bulbagarden.net/w/api.php (Category:Champions_menu_sprites)",
 }
@@ -203,10 +217,12 @@ def _run_extract(source: str, dataset_version: str) -> int:
     date_str = _snapshot_date()
     output_path = _dated_snapshot_path(staging_subdir, date_str)
     extract_kwargs = {}
-    if source == "munchstats":
-        # backlog.md #44: reuse cached roster rows for a tournament whose
-        # metadata hasn't changed since the previous snapshot, instead of
-        # re-fetching all ~106k rows on every scheduled run.
+    if source in ("munchstats", "rk9"):
+        # backlog.md #44: reuse cached rows for an event that hasn't changed
+        # since the previous snapshot, instead of re-fetching everything on
+        # every scheduled run. For munchstats that's ~106k roster rows
+        # behind a metadata signature check; for rk9 it's every round of a
+        # concluded event, whose pairings are immutable once uploaded.
         extract_kwargs["previous_snapshot_path"] = _latest_snapshot_path(staging_subdir)
     ok = _run_tracked_extract(
         source_name=_source_display_name(module, staging_subdir),

@@ -1,0 +1,191 @@
+{
+  "dataset_version": "0.3.0",
+  "published_at_utc": "2026-08-03T09:02:19Z",
+  "sources": [
+    {
+      "source_name": "Pok\u00e9API",
+      "source_url": "https://github.com/PokeAPI/pokeapi",
+      "extracted_at_utc": "2026-08-03T08:26:36.523413+00:00",
+      "record_count": 1351
+    },
+    {
+      "source_name": "OP.GG Pok\u00e9mon Champions",
+      "source_url": "https://op.gg/pokemon-champions/pokedex",
+      "extracted_at_utc": "2026-08-03T08:26:02.917650+00:00",
+      "record_count": 317
+    },
+    {
+      "source_name": "MunchStats",
+      "source_url": "https://github.com/PizzaTimeJoshua/munchstats",
+      "extracted_at_utc": "2026-08-03T08:46:08.010721+00:00",
+      "record_count": 106134
+    },
+    {
+      "source_name": "Pok\u00e9Base",
+      "source_url": "https://pokebase.app/pokemon-champions/pokemon",
+      "extracted_at_utc": "2026-08-03T08:26:06.404790+00:00",
+      "record_count": 311
+    },
+    {
+      "source_name": "Bulbagarden Archives",
+      "source_url": "https://archives.bulbagarden.net/w/api.php",
+      "extracted_at_utc": "2026-08-03T08:26:08.595486+00:00",
+      "record_count": 359
+    },
+    {
+      "source_name": "RK9.gg",
+      "source_url": "https://rk9.gg",
+      "extracted_at_utc": "2026-08-03T08:25:59.896593+00:00",
+      "record_count": 13201
+    },
+    {
+      "source_name": "Limitless VGC",
+      "source_url": "https://limitlessvgc.com",
+      "extracted_at_utc": "2026-08-03T08:41:23.658111+00:00",
+      "record_count": 2616
+    }
+  ],
+  "tables": [
+    {
+      "table_name": "pokemon",
+      "file_name": "pokemon.csv",
+      "primary_key": "pokemon_key",
+      "row_count": 1351
+    },
+    {
+      "table_name": "pokemon_stat_canonical",
+      "file_name": "pokemon_stat_canonical.csv",
+      "primary_key": "pokemon_stat_canonical_key",
+      "row_count": 1351
+    },
+    {
+      "table_name": "pokemon_stat_champions",
+      "file_name": "pokemon_stat_champions.csv",
+      "primary_key": "pokemon_stat_champions_key",
+      "row_count": 312
+    },
+    {
+      "table_name": "pokemon_stat_delta",
+      "file_name": "pokemon_stat_delta.csv",
+      "primary_key": "pokemon_stat_delta_key",
+      "row_count": 312
+    },
+    {
+      "table_name": "legality_snapshot",
+      "file_name": "legality_snapshot.csv",
+      "primary_key": "legality_snapshot_key",
+      "row_count": 307
+    },
+    {
+      "table_name": "tournament_event",
+      "file_name": "tournament_event.csv",
+      "primary_key": "event_id",
+      "row_count": 31
+    },
+    {
+      "table_name": "tournament_team",
+      "file_name": "tournament_team.csv",
+      "primary_key": "team_id",
+      "row_count": 17685
+    },
+    {
+      "table_name": "tournament_team_member",
+      "file_name": "tournament_team_member.csv",
+      "primary_key": "team_member_id",
+      "row_count": 106080
+    },
+    {
+      "table_name": "tournament_match",
+      "file_name": "tournament_match.csv",
+      "primary_key": "match_id",
+      "row_count": 13201
+    },
+    {
+      "table_name": "team_list",
+      "file_name": "team_list.csv",
+      "primary_key": "team_list_id",
+      "row_count": 359
+    },
+    {
+      "table_name": "team_list_member",
+      "file_name": "team_list_member.csv",
+      "primary_key": "team_list_member_id",
+      "row_count": 2154
+    },
+    {
+      "table_name": "pokemon_asset",
+      "file_name": "pokemon_asset.csv",
+      "primary_key": "pokemon_asset_key",
+      "row_count": 317
+    }
+  ],
+  "images": {
+    "count": 317,
+    "missing": 0,
+    "directory": "images/"
+  },
+  "quality_checks": [
+    {
+      "check_name": "bulbagarden_sprite_coverage",
+      "status": "pass",
+      "metric_value": 0.883,
+      "threshold": ">=0.85"
+    },
+    {
+      "check_name": "limitless_slug_mapping_coverage",
+      "status": "pass",
+      "metric_value": 1.0,
+      "threshold": ">=0.85"
+    },
+    {
+      "check_name": "opgg_legal_pool_coverage",
+      "status": "pass",
+      "metric_value": 0.9842,
+      "threshold": ">=0.95"
+    },
+    {
+      "check_name": "pokebase_legal_pool_coverage",
+      "status": "pass",
+      "metric_value": 0.9871,
+      "threshold": ">=0.95"
+    },
+    {
+      "check_name": "rk9_pairing_mapping_coverage",
+      "status": "pass",
+      "metric_value": 0.998,
+      "threshold": ">=0.90"
+    },
+    {
+      "check_name": "tournament_team_member_mapping_coverage",
+      "status": "pass",
+      "metric_value": 0.9995,
+      "threshold": ">=0.90"
+    },
+    {
+      "check_name": "required_field_null_rate",
+      "status": "pass",
+      "metric_value": 0.0,
+      "threshold": "<=0.01"
+    },
+    {
+      "check_name": "duplicate_primary_key_violations",
+      "status": "pass",
+      "metric_value": 0,
+      "threshold": "=0"
+    },
+    {
+      "check_name": "referential_integrity",
+      "status": "pass",
+      "metric_value": 0,
+      "threshold": "all resolve"
+    }
+  ],
+  "known_limitations": [
+    "Pok\u00e9Base publishes only positive legality signals, so legality_snapshot cannot distinguish a Pok\u00e9mon that was banned in a later regulation from one not yet observed; legality_summary_by_regulation's cumulative count can only grow.",
+    "Every mapped Pok\u00e9mon has a stat_total_delta of exactly 0: no Champions rebalance has occurred yet. This is real data, not a defect.",
+    "A small number of ambiguous source-to-form mappings are deliberately excluded rather than guessed, including OP.GG's and Bulbagarden's 'Mega Meowstic' entries.",
+    "tournament_match records team-vs-team outcomes, not Pokemon-vs-Pokemon. No source publishes a per-battle log naming which four of a team's six Pokemon were brought, so pokemon_head_to_head attributes each result to the whole roster.",
+    "No EV or IV spreads are published by any source in scope: official tournament team sheets carry ability, held item, nature and moves only. team_list_member therefore has no EV fields.",
+    "Limitless VGC publishes team lists for the day-2 cut only (156 of 1096 players at NAIC 2026), so team_list/team_list_member are a top-cut view rather than full-field coverage."
+  ]
+}
