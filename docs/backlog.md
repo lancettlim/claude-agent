@@ -1057,6 +1057,31 @@ no-op rather than failing the job. This was caught firsthand: PR #40 (the
 one that shipped backlog items #8/#10/#12/#13/#14) had zero CI checks run
 against it before this item existed.
 
+### 35b. CI skips dbt when the restored cache predates the commit — DONE
+
+Follow-up to #35, found the hard way: the PR that added the RK9 and
+Limitless sources red-failed CI with three opaque dbt errors ("No files
+found that match the pattern `../data/staging/limitless/*.csv`",
+"Referenced column `event_format` not found in FROM clause") even though
+`make check` passed locally against real data.
+
+Nothing was wrong with the code. CI deliberately never extracts: it
+restores the `actions/cache` entry `scheduled-extraction.yml` populates and
+runs dbt against that, so the data it sees is always as old as the last
+scheduled run. Any PR that adds a source or a staging column is therefore
+*guaranteed* to build against snapshots that predate it — a structural
+false failure that would have hit every future source addition, and one
+that resolves on its own once the nightly cron repopulates the cache.
+
+`ci.yml` already intended to skip rather than fail here; it just only
+recognised the total-miss case (a fresh fork with no cache at all). New
+`pipelines/schema_contracts.staging_contract_mismatches()` compares the
+restored snapshots against the tracked `data/staging/*.schema.json`
+contracts — reusing #41's existing contract loader rather than adding a
+second notion of what a staging source looks like — and CI now skips with
+an explanation when they disagree. Covered by seven unit tests, including
+the exact missing-source and missing-column shapes that failed.
+
 ### 36. Fix vacuously-passing coverage tests — DONE
 
 - **Size**: S

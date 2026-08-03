@@ -12,6 +12,18 @@ name: CI
 # instead of re-extracting on every push. On a fresh repo/fork with no
 # scheduled-extraction run yet, the cache restore is a no-op and the
 # dbt-build/validate step is skipped rather than failing the whole job.
+#
+# The same skip applies when the restored cache is *stale relative to this
+# commit* rather than absent. The cache is only ever as new as the last
+# scheduled extraction, so a PR that adds a source or a staging column is
+# necessarily building against snapshots that predate it: the new source
+# has no directory, and existing snapshots lack the new column. dbt reports
+# that as "No files found that match the pattern ..." / "Referenced column
+# ... not found in FROM clause", which looks like a code defect but is
+# purely a cache-age artifact that resolves once the nightly cron re-runs.
+# pipelines/schema_contracts.py checks the restored snapshots against the
+# tracked data/staging/*.schema.json contracts so that case is skipped with
+# an explanation instead of red-failing the PR.
 on:
   pull_request:
   push:
@@ -48,12 +60,20 @@ jobs:
           restore-keys: |
             staging-snapshots-
 
-      - name: dbt build + validate (if cached staging snapshots exist)
+      - name: dbt build + validate (if cached staging snapshots are usable)
         run: |
           set -euo pipefail
-          if find data/staging -mindepth 2 -name '*.csv' -print -quit | grep -q .; then
-            make dbt-build
-            make validate
-          else
+          if ! find data/staging -mindepth 2 -name '*.csv' -print -quit | grep -q .; then
             echo "No cached staging snapshots restored (fresh repo/fork, or scheduled-extraction hasn't run yet) -- skipping dbt-build/validate."
+            exit 0
           fi
+          if ! mismatches=$(uv run python -m pipelines.schema_contracts); then
+            echo "::notice::Cached staging snapshots are older than this commit's staging contracts -- skipping dbt-build/validate."
+            echo "$mismatches"
+            echo "This is expected on a PR that adds a source or a staging column: CI never extracts, it"
+            echo "reuses the cache scheduled-extraction.yml populates, so the data catches up on the next"
+            echo "scheduled run. Verify dbt locally with 'make refresh' until then."
+            exit 0
+          fi
+          make dbt-build
+          make validate
