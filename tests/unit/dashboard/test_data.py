@@ -436,3 +436,217 @@ def test_join_pokemon_names_resolves_partner_pokemon_key(tmp_path):
             "partner_pokemon_name": "Raichu",
         }
     ]
+
+
+def test_load_mart_coerces_speed_tier_bracket_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_speed_tiers.csv",
+        [
+            {
+                "pokemon_key": "dragapult",
+                "type_1": "dragon",
+                "type_2": "ghost",
+                "base_speed": "142",
+                "max_investment_speed": "213",
+                "plus_one_speed": "319",
+                "scarf_speed": "319",
+                "plus_two_speed": "426",
+                "tailwind_speed": "426",
+                "scarf_tailwind_speed": "639",
+                "usage_count": "40",
+                "usage_share": "0.021",
+                "win_rate": "0.51",
+                "record_count": "80",
+            }
+        ],
+    )
+    rows = data.load_mart(tmp_path, "pokemon_speed_tiers")
+    assert rows[0]["base_speed"] == 142
+    assert rows[0]["max_investment_speed"] == 213
+    assert rows[0]["scarf_tailwind_speed"] == 639
+    assert rows[0]["usage_share"] == 0.021
+    assert rows[0]["type_2"] == "ghost"
+
+
+def test_load_mart_coerces_placement_weighted_usage_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_placement_weighted_usage.csv",
+        [
+            {
+                "pokemon_key": "incineroar",
+                "usage_count": "1029",
+                "top_cut_usage_count": "18",
+                "top_cut_usage_share": "0.0721",
+                "placement_weighted_score": "12.5",
+                "weighted_usage_share": "0.0654",
+                "weighted_usage_rank": "1",
+            }
+        ],
+    )
+    assert data.load_mart(tmp_path, "pokemon_placement_weighted_usage") == [
+        {
+            "pokemon_key": "incineroar",
+            "usage_count": 1029,
+            "top_cut_usage_count": 18,
+            "top_cut_usage_share": 0.0721,
+            "placement_weighted_score": 12.5,
+            "weighted_usage_share": 0.0654,
+            "weighted_usage_rank": 1,
+        }
+    ]
+
+
+def test_load_mart_slices_team_synergy_to_the_dashboard_cut(tmp_path):
+    # Pairs below MIN_SYNERGY_PAIR_TEAMS are dropped (lift is noise at that
+    # sample size), and each anchor keeps at most
+    # MAX_SYNERGY_PARTNERS_PER_POKEMON of its highest-lift partners.
+    rows = [
+        {
+            "pokemon_key": "pikachu",
+            "partner_pokemon_key": "partner-%02d" % i,
+            "pair_team_count": "20",
+            "lift": str(20 - i),
+            "lift_rank": str(i + 1),
+        }
+        for i in range(15)
+    ]
+    rows.append(
+        {
+            "pokemon_key": "pikachu",
+            "partner_pokemon_key": "rare-partner",
+            "pair_team_count": "2",
+            "lift": "99.0",
+            "lift_rank": "16",
+        }
+    )
+    _write_csv(tmp_path / "pokemon_team_synergy.csv", rows)
+
+    sliced = data.load_mart(tmp_path, "pokemon_team_synergy")
+
+    assert len(sliced) == data.MAX_SYNERGY_PARTNERS_PER_POKEMON
+    partner_keys = [row["partner_pokemon_key"] for row in sliced]
+    # The extreme-lift pair is excluded by the pair_team_count floor, not
+    # kept because its lift is the highest in the file.
+    assert "rare-partner" not in partner_keys
+    assert partner_keys[0] == "partner-00"
+    assert sliced[0]["lift"] == 20.0
+
+
+def test_load_mart_slices_player_signature_to_established_players(tmp_path):
+    _write_csv(
+        tmp_path / "player_signature_pokemon.csv",
+        [
+            {
+                "player_id": "established",
+                "player_name": "Ash",
+                "player_country": "JP",
+                "player_team_count": "2",
+                "pokemon_key": "pikachu",
+                "usage_count": "11",
+                "player_usage_share": "0.297",
+                "player_pokemon_rank": "1",
+            },
+            {
+                "player_id": "established",
+                "player_name": "Ash",
+                "player_country": "JP",
+                "player_team_count": "2",
+                "pokemon_key": "raichu",
+                "usage_count": "1",
+                "player_usage_share": "0.027",
+                "player_pokemon_rank": "7",
+            },
+            {
+                "player_id": "one-off",
+                "player_name": "Gary",
+                "player_country": "JP",
+                "player_team_count": "1",
+                "pokemon_key": "eevee",
+                "usage_count": "1",
+                "player_usage_share": "1.0",
+                "player_pokemon_rank": "1",
+            },
+        ],
+    )
+
+    sliced = data.load_mart(tmp_path, "player_signature_pokemon")
+
+    # A one-team player's 100% "signature" share is exactly the weak
+    # evidence the floor exists to exclude; so is a rank-7 pick nothing
+    # displays.
+    assert [(row["player_id"], row["player_pokemon_rank"]) for row in sliced] == [
+        ("established", 1)
+    ]
+
+
+def test_join_pokemon_names_resolves_matchup_summary_best_and_worst(tmp_path):
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    _write_csv(
+        normalized_dir / "pokemon.csv",
+        [
+            {"pokemon_key": "incineroar", "pokemon_name": "Incineroar"},
+            {"pokemon_key": "torkoal", "pokemon_name": "Torkoal"},
+            {"pokemon_key": "lycanroc-dusk", "pokemon_name": "Lycanroc"},
+        ],
+    )
+    _write_csv(
+        marts_dir / "pokemon_matchup_summary.csv",
+        [
+            {
+                "pokemon_key": "incineroar",
+                "overall_win_rate": "0.51",
+                "distinct_opponents": "180",
+                "total_matchup_appearances": "9000",
+                "best_matchup_pokemon_key": "torkoal",
+                "best_matchup_win_rate": "0.61",
+                "best_matchup_matches": "290",
+                "worst_matchup_pokemon_key": "lycanroc-dusk",
+                "worst_matchup_win_rate": "0.391",
+                "worst_matchup_matches": "289",
+                "min_matches_threshold": "10",
+            }
+        ],
+    )
+    row = data.build_payload(marts_dir, normalized_dir)["marts"]["pokemon_matchup_summary"][0]
+
+    assert row["pokemon_name"] == "Incineroar"
+    assert row["best_matchup_pokemon_name"] == "Torkoal"
+    # Display names come from pokemon_key via to_pascal_case, so the form
+    # suffix survives — "LycanrocDusk", not the species-only "Lycanroc".
+    assert row["worst_matchup_pokemon_name"] == "LycanrocDusk"
+
+
+def test_join_pokemon_names_leaves_a_null_best_matchup_alone(tmp_path):
+    # pokemon_matchup_summary left-joins best/worst, so a Pokémon with no
+    # qualifying opponent has null keys — those must not resolve to a
+    # display name at all rather than to an empty-string one.
+    marts_dir = tmp_path / "marts"
+    normalized_dir = tmp_path / "normalized"
+    _write_csv(
+        normalized_dir / "pokemon.csv",
+        [{"pokemon_key": "pikachu", "pokemon_name": "Pikachu"}],
+    )
+    _write_csv(
+        marts_dir / "pokemon_matchup_summary.csv",
+        [
+            {
+                "pokemon_key": "pikachu",
+                "overall_win_rate": "0.5",
+                "distinct_opponents": "1",
+                "total_matchup_appearances": "2",
+                "best_matchup_pokemon_key": "",
+                "best_matchup_win_rate": "",
+                "best_matchup_matches": "",
+                "worst_matchup_pokemon_key": "",
+                "worst_matchup_win_rate": "",
+                "worst_matchup_matches": "",
+                "min_matches_threshold": "10",
+            }
+        ],
+    )
+    row = data.build_payload(marts_dir, normalized_dir)["marts"]["pokemon_matchup_summary"][0]
+
+    assert "best_matchup_pokemon_name" not in row
+    assert "worst_matchup_pokemon_name" not in row
+    assert row["best_matchup_win_rate"] is None

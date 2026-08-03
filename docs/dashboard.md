@@ -43,7 +43,8 @@ pipelines/dashboard/build.py      calls data.py + sprites.py, resolves
 pipelines/dashboard/templates/    the tabbed HTML/CSS template
 pipelines/dashboard/static/       app.js (tab framework, .grid-6xn,
                                    Overview/Usage/Pokémon Profile/Speed
-                                   Tiers, shared helpers exported on
+                                   Tiers/Players & Regions, shared helpers
+                                   exported on
                                    window.DashboardApp), matchup.js
                                    (Matchup tab), teams.js (Team Builder +
                                    Top Teams tabs) — see
@@ -97,42 +98,75 @@ The dashboard degrades gracefully in several ways:
 
 ## Tabs
 
-The page is a single scrolling KPI row plus seven tabs (client-side,
+The page is a single scrolling KPI row plus eight tabs (client-side,
 vanilla JS — no routing library, no page reload). The competitive-UX
 redesign pass removed Archetypes and Regulations, added Matchup and Top
 Teams, and restructured every remaining tab around
 `docs/design-system.md`'s "3-tier tab layout convention"
-(filters → `.grid-6xn` → optional detail table):
+(filters → `.grid-6xn` → optional detail table); a later
+**mart-wiring pass** (see "Marts wired in the mart-wiring pass" below)
+added Players & Regions and extended four of the existing tabs:
 
 - **Overview** — the KPI cards plus a "Top 12" `.grid-6xn`, ranked by
   `usage_share`. (The old "Top 30" ranked list was removed — the Usage tab
   is the full leaderboard now.)
-- **Usage** — tier/type/role/usage-%/speed filters, a `.grid-6xn` of
-  usage-share leaders, a full Usage leaders table, then the same
-  grid+table pattern again for Win rate leaders (with a minimum-recorded-
-  matches filter), plus a **Trends** subtab (backlog #29/#30): a
-  tournament-date filter over `pokemon_usage_by_event_date` and a
-  `.grid-6xn`/table showing each Pokémon's usage share *change* versus the
-  previous tournament date (▲/▼ badge, or a `NEW` badge for a Pokémon
-  absent from that previous date) — this dashboard's dependency-free stand
-  -in for a usage-over-time line chart, since it has no charting library.
+- **Usage** — tier/regulation/type/role/usage-%/speed filters, a
+  `.grid-6xn` of usage-share leaders, a full Usage leaders table, then the
+  same grid+table pattern again for Win rate leaders (with a
+  minimum-recorded-matches filter), plus two more subtabs. The
+  **regulation** filter (backlog #12) swaps the leaderboard's source from
+  `pokemon_usage_summary` to `pokemon_usage_by_regulation`, whose share and
+  rank are recomputed inside that regulation's own legal pool; picking one
+  *disables* the tier select rather than silently ignoring it, because no
+  source reports which regulation an event was played under, so the two
+  dimensions can't be combined (see that mart's header). The **Success**
+  subtab (backlog #8, `pokemon_placement_weighted_usage`) is the
+  popular-vs-successful split: rank by top-cut (placement 1–8) share or by
+  a continuous 1/placement weighting, each row carrying a Movement badge
+  for how many places the Pokémon gains or loses versus its raw usage
+  rank. The **Trends** subtab (backlog #29/#30) has a tournament-date
+  filter over `pokemon_usage_by_event_date` and a `.grid-6xn`/table showing
+  each Pokémon's usage share *change* versus the previous tournament date
+  (▲/▼ badge, or a `NEW` badge for a Pokémon absent from that previous
+  date) — this dashboard's dependency-free stand-in for a usage-over-time
+  line chart, since it has no charting library.
 - **Pokémon Profile** — a single Pokémon picker (sorted by usage
   relevance, not alphabetically) driving: a profile header (base stats,
   speed-tier badge, and now a type badge), then three separate `.grid-6xn`
   sections — **Items** (top 5), **Ability** (top 5), **Moves** (top 15) —
   each tile showing a PokéAPI `short_effect` description, replacing the
-  old single combined item×ability build table. **Team Cores** (most-
-  frequent partners) keeps its own `.grid-6xn` section below those.
-- **Speed Tiers** — every currently-legal Pokémon's Champions-format base
-  Speed stat, fastest first, with type/speed-range filters, a `.grid-6xn`,
-  and a full sortable table bucketed into Blazing/Fast/Average/Slow badges
-  (see `docs/design-system.md`'s "Speed-tier badge")
+  old single combined item×ability build table. The Items and Ability
+  sections each carry a **build-concentration** badge (backlog #14,
+  `pokemon_build_concentration`) — Locked in / Semi-contested / Contested,
+  from that mart's Herfindahl-Hirschman index over the same shares the
+  grid below shows. **Team Cores** (most-frequent partners) keeps its own
+  `.grid-6xn` section below those, now rankable two ways: raw
+  co-occurrence share (`pokemon_team_core_usage`) or **synergy lift**
+  (backlog #9, `pokemon_team_synergy`) — how much more often a pair
+  appears together than their individual popularity predicts, ×1.0 being
+  exactly chance.
+- **Speed Tiers** — who actually moves first, under a selectable
+  **scenario** (backlog #16, `pokemon_speed_tiers`): base stat, max
+  investment (Level 50 / 252 EVs / beneficial nature / 31 IV — the
+  documented convention, since no source publishes real EV spreads),
+  +1-stage-or-Choice-Scarf (×1.5), +2-stages-or-Tailwind (×2), or
+  scarf-under-Tailwind (×3). The grid, the Speed range filter and the
+  new **Outruns** benchmark ("N of M shown Pokémon outrun 180 in this
+  scenario") all follow the selected scenario's column, and the table
+  shows every bracket side by side. The Blazing/Fast/Average/Slow badge
+  (`docs/design-system.md`'s "Speed-tier badge") stays pinned to *base*
+  speed on purpose: its thresholds are calibrated to the base-stat scale,
+  so scoring a ×3 number against them would read "Blazing" for every row.
 - **Matchup** *(new)* — pick an attacker and defender Pokémon: a type-
   effectiveness grid, a stats/setup/weather damage calculator with a
-  curated item/ability toggle list, and a co-usage `.grid-6xn` (a
-  teammate-pairing proxy, explicitly not a real matchup-outcome signal).
-  See `docs/design-system.md`'s "Matchup" section for the full scope note
-  and what mechanics are/aren't modeled.
+  curated item/ability toggle list, the pair's real head-to-head record,
+  a **Matchup profile** panel per side (`pokemon_matchup_summary`: overall
+  record plus best and worst opponent, both Wilson-chosen over a
+  10-match minimum — this answers something even when the two picked
+  Pokémon have never met), and a co-usage `.grid-6xn` (a teammate-pairing
+  proxy, explicitly not a real matchup-outcome signal). See
+  `docs/design-system.md`'s "Matchup" section for the full scope note and
+  what mechanics are/aren't modeled.
 - **Team Builder** — a fully client-side roster builder: search/sort/
   type-filter the legal pool, add up to 6 Pokémon, see each slot's stats/
   top ability/top-4-move picker, their speed order, usage/win-rate/speed
@@ -144,6 +178,15 @@ Teams, and restructured every remaining tab around
   new `top_tournament_teams` mart (real MunchStats team data, ranked by
   win_rate), and the **Pro Team Gallery** (see below), moved here from
   Team Builder.
+- **Players & Regions** *(new, mart-wiring pass)* — backlog #7's two marts,
+  as two subtabs. **By region** (`pokemon_usage_by_country`): a country
+  picker ordered by how much recorded data each country has, driving a
+  `.grid-6xn`/table of that country's own most-played Pokémon by share of
+  its picks. **By player** (`player_signature_pokemon`): a player picker
+  and a "Most committed specialists" table. Both views cover a player's or
+  country's *entire* recorded Champions history, not one event. Two
+  data-shape constraints are handled explicitly rather than papered over —
+  see "Marts wired in the mart-wiring pass" below.
 
 Usage leaders, Speed Tiers, Pokémon Profile, Matchup, and Team Builder's
 picker all pull from `data/marts/pokemon_champions_profile.csv` — a mart
@@ -157,6 +200,61 @@ Each tab's setup function still runs lazily on that tab's first activation
 rather than eagerly on page load — see `docs/design-system.md`'s note on
 how Team Builder and Top Teams coordinate shared team state despite that
 laziness (`ensureTeamBuilder()`).
+
+## Marts wired in the mart-wiring pass
+
+`pipelines/dashboard/data.py`'s `MART_FIELDS` had drifted well behind the
+mart layer: eight marts that `dbt build` produces on every run were read by
+nothing, so `docs/local-queries.md` was the only way to see their output.
+This pass wired them all into views — `pokemon_placement_weighted_usage`,
+`pokemon_usage_by_regulation`, `pokemon_build_concentration`,
+`pokemon_team_synergy`, `pokemon_speed_tiers`, `pokemon_matchup_summary`,
+`pokemon_usage_by_country`, and `player_signature_pokemon` (see "Tabs"
+above for where each one landed).
+
+Three marts stay deliberately unwired, and none of them is an oversight:
+`stat_change_leaderboard` (backlog #17 — permanently all-zero until a
+Champions rebalance happens, and a section that always renders empty is
+worse than no section), `pokemon_archetype_usage`/`archetype_summary` (the
+Archetypes tab was removed by explicit request — see "Removed tabs" below),
+and `roster_source_agreement` (a MunchStats-vs-Limitless data-quality
+check, which belongs in `reports/validation/`, not in a competitive
+analytics view).
+
+### Payload slicing
+
+The whole payload is inlined into the committed `docs/dashboard/index.html`
+(see "Architecture" above), so two of the new marts are cut down to their
+dashboard-relevant slice in `data.py` (`MART_SLICERS`) before they get
+there: `pokemon_team_synergy` keeps pairs seen on at least 5 teams, at most
+12 partners per anchor; `player_signature_pokemon` keeps players with at
+least 2 recorded teams and each player's top 6 picks. Both floors are the
+same ones each mart's own header calls for — lift is unstable at low
+`pair_team_count`, and a signature claim from a single recorded team is
+weak evidence — so this is the analytically honest cut, not only a size
+cut. The marts themselves stay complete for `docs/local-queries.md`'s
+ad-hoc querying. Net effect on the committed HTML: 6.97MB → 8.18MB
+(+17%) for eight new marts. Unsliced, `player_signature_pokemon` alone
+would have added several MB more.
+
+### Two data-shape constraints worth knowing
+
+Both were found by checking the built page against real data, and both
+would have shipped a misleading view if taken at face value:
+
+- **A "signature" share is structurally capped at 16.7%.**
+  `player_signature_pokemon.player_usage_share` is a Pokémon's share of the
+  player's roster *slots*, and a Pokémon can appear at most once on a
+  six-slot team — so a player who brought the same Pokémon to every team
+  they ever fielded still reads as 16.7%, tied with everyone else who did.
+  The Most-committed-specialists table therefore ranks and displays on
+  share of the player's *teams* (`usage_count / player_team_count`, "3 of
+  3 teams", reaching a real 100%), not on that capped share.
+- **Two recorded teams is the meaningful bar, not three.** Only three
+  Champions events exist anywhere, so three teams is the ceiling: measured
+  against the real mart, 2,329 players have one recorded team, 358 have
+  two, and exactly one has three. A `>= 3` floor left the entire By-player
+  view showing a single player.
 
 ## Cumulative legal pool
 

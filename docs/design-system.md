@@ -572,6 +572,54 @@ support the two-line label/value/sub structure); the leaderboard table's
 record) shows neither — `usage_share_delta` and `is_new` are both
 unset/false, which renders as `—`.
 
+### Rank-movement badge (Usage tab's Success subtab)
+
+The same two-token pattern as the trend delta badge, applied to a
+different comparison: how many places a Pokémon moves between its raw
+`pokemon_usage_summary.usage_rank` and its rank under
+`pokemon_placement_weighted_usage`'s chosen weighting (`▲ +3` /
+`▼ -2` / a neutral `.badge-rank` `±0`). Positive means results-weighting
+*promotes* it — a quiet top-cut staple; negative means a crowd favourite
+that underperforms. Computed client-side rather than in the mart, since it
+compares two marts' ranks and the second one depends on which weighting
+the user picked. As with the trend badge, `.grid-6xn`'s `subFn` shows the
+plain-text version and the table column renders the colored pill.
+
+### Build-concentration badge (Pokémon Profile)
+
+Backlog #14's Herfindahl-Hirschman index (`pokemon_build_concentration`)
+as a one-line label above the Items and Ability grids: **Locked in**
+(HHI ≥ 0.5, `.badge-new`), **Semi-contested** (≥ 0.25, `.badge-rank`), or
+**Contested** (`.badge-positive`), followed by the raw index and how many
+distinct options were observed. The cut points are a UX bucketing
+convention like `SPEED_TIERS`, not a sourced threshold. A Pokémon with
+exactly one recorded option gets its own **Only one recorded** label
+instead: an HHI of 1.0 across a single choice isn't a locked-in *finding*,
+there was never a choice to make.
+
+### Multiplier values, the one non-percentage headline
+
+"Percentages, not raw counts" above has exactly one exception in a
+`.grid-6xn` headline slot: Team Cores' synergy ranking shows lift as
+`×1.9`, because lift is a ratio against chance with no whole to be a share
+of — a percentage there would assert something false. The tile's `subFn`
+carries the sample size (`74 shared teams`) for the same reason win rate
+keeps its `(n=X)`: lift is noisy at low pair counts, which is also why the
+dashboard only ever sees pairs at or above the floor documented in
+`docs/dashboard.md`'s "Payload slicing".
+
+### Scenario select (Speed Tiers)
+
+A `<select>` that changes *which column* a whole tab reads, rather than
+filtering rows: Speed Tiers' scenario picker swaps between
+`pokemon_speed_tiers`' base/max-investment/×1.5/×2/×3 columns, and the
+grid, the range filter and the Outruns benchmark all follow it so the tab
+is never showing two units at once. Distinct from the range and chip
+filters above, which narrow a fixed column. When adding one: keep any
+derived badge pinned to the column it was calibrated for (the speed-tier
+badge stays on base speed — see `docs/dashboard.md`'s Speed Tiers entry),
+and say in the tab's `.sub` copy which unit is on screen.
+
 ## Team Builder
 
 A fully client-side (no backend, nothing uploaded) roster-assembly tool
