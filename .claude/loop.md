@@ -11,11 +11,13 @@ is supposed to finish.
 ## Why a loop
 
 This repo now has a build/test scaffold (`make check` — see CLAUDE.md's
-"Development workflow"), but Phase 1+ ingestion/normalization logic is still
-unwritten, so the safest unit of agentic progress is one change per
-iteration: do it, verify it, record it, commit. Running that as a `/loop`
-lets unattended iterations make steady, reviewable progress instead of one
-large uncontrolled batch of changes.
+"Development workflow") and Phases 1-4 plus M6 are all implemented and
+published (see CLAUDE.md's "Repository purpose"), so the work has shifted
+from initial build-out to backlog items, hardening, and upkeep. The safest
+unit of agentic progress is still one change per iteration: do it, verify
+it, record it, commit. Running that as a `/loop` lets unattended iterations
+make steady, reviewable progress instead of one large uncontrolled batch of
+changes.
 
 ## Implementation loop
 

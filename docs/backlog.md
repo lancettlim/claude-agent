@@ -26,20 +26,21 @@ are the source of truth.
 | **Done** | 39 | Shipped and verified against real data: #1-#16, #22-#24, #28-#30, #32, #33, #35-#49 (every item in this range except #17 and #34, see below) |
 | **Resolved, no build needed** | 2 | #17 — deliberately left unwired, not an oversight; #34 — current default-to-highest-usage behavior decided to be correct as-is; see each entry |
 | **Open, buildable now** | 0 | Every previously-open, unblocked item has shipped |
-| **Blocked** | 8 | Waiting on Blocker A (#18-#20), Blocker B (#21), a source that's deferred/out-of-scope/nonexistent (#25-#27), or snapshot history accumulating (#31) |
+| **Blocked** | 3 | Waiting on a source that's deferred/out-of-scope/nonexistent (#25-#27) |
+| **Archived** | 5 | Excluded from active scope by user decision (2026-08-02): meta-shift/legal-pool/stat-change trend items (#18-#21) and the Streamlit dashboard (#31). Not resolved — deprioritized; each stays blocked underneath (Blocker A/B or snapshot-dependent hosting) and can be un-archived if reprioritized |
 
 By section:
 
-| Section | Done | Resolved | Open | Blocked | Total |
-|---|---|---|---|---|---|
-| 0 — Foundational enablers | 5 | 0 | 0 | 0 | 5 |
-| 1 — Buildable today (#6-#17) | 11 | 1 | 0 | 0 | 12 |
-| 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 3 | 3 |
-| 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 1 | 1 |
-| 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 6 |
-| 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 1 | 7 |
-| 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 15 |
-| **Total** | **39** | **2** | **0** | **8** | **49** |
+| Section | Done | Resolved | Open | Blocked | Archived | Total |
+|---|---|---|---|---|---|---|
+| 0 — Foundational enablers | 5 | 0 | 0 | 0 | 0 | 5 |
+| 1 — Buildable today (#6-#17) | 11 | 1 | 0 | 0 | 0 | 12 |
+| 1 — Blocked on Blocker A (#18-#20) | 0 | 0 | 0 | 0 | 3 | 3 |
+| 1 — Blocked on Blocker B (#21) | 0 | 0 | 0 | 0 | 1 | 1 |
+| 1 — Needs new provenance (#22-#27) | 3 | 0 | 0 | 3 | 0 | 6 |
+| 2 — Consumption surfaces (#28-#34) | 5 | 1 | 0 | 0 | 1 | 7 |
+| 3 — Platform, quality, and ops (#35-#49) | 15 | 0 | 0 | 0 | 0 | 15 |
+| **Total** | **39** | **2** | **0** | **3** | **5** | **49** |
 
 Takeaways: **every unblocked item in the backlog is now done.** Sections 0,
 1's "buildable today" subsection (except #17, a deliberate non-build), 2,
@@ -60,12 +61,18 @@ and #15) each surfaced a real, previously-unknown issue while verifying
 against live data rather than synthetic fixtures — not hypothetical risk,
 actual bugs and actual data-vs-editorial mismatches caught in the act.
 
-The 8 remaining blocked items aren't neglect — 4 are waiting on real-world
-time/events (Blocker A's snapshot history, Blocker B's rebalance, #31's
-snapshot-dependent hosting justification) and 4 need a source this repo
-doesn't have and, in #26/#27's case, may not exist in scriptable form at
-all. What's left to do in this file now is exactly what's left: wait for
-those, or bring a new source into scope.
+A 2026-08-02 pass then archived five items — #18-#21 (meta-shift/
+legal-pool/stat-change trend work) and #31 (the Streamlit dashboard) — by
+explicit user decision to exclude them from active planning. Archiving is
+not resolution: each stays exactly as blocked as before (Blocker A, Blocker
+B, or #31's snapshot-dependent hosting justification), just no longer
+counted among the items this file is actively tracking toward. See each
+entry's "Archived" note, and #18's note for the shared rationale.
+
+The 3 remaining blocked items aren't neglect — each needs a source this
+repo doesn't have, and in #26/#27's case, one that may not exist in
+scriptable form at all. What's left to do in this file now is exactly what's
+left: bring a new source into scope, or wait for one to become scriptable.
 
 ## Entry format
 
@@ -527,9 +534,11 @@ Items #1-#3 shipped (see Section 0), so the mechanism for this history now
 exists — `data/staging/` accumulates real dated snapshots on a schedule. The
 items below stay "blocked" in practice, not in mechanism: each needs actual
 elapsed time in production for multiple real snapshots to accumulate before
-it has non-degenerate data to work with.
+it has non-degenerate data to work with. All three (#18-#20) are also now
+**archived** — excluded from active scope by user decision (see #18's note)
+— on top of remaining genuinely blocked.
 
-#### 18. Meta-shift and movers view
+#### 18. Meta-shift and movers view — ARCHIVED (excluded from active scope)
 
 - **Size**: M
 - **Value**: "What's rising, what's falling, what's new this week" — the
@@ -539,7 +548,12 @@ it has non-degenerate data to work with.
 
 Partially approximable today via #6's event-date axis.
 
-#### 19. Legal-pool change tracking
+**Archived 2026-08-02**: excluded from active scope by user decision, along
+with #19-#21 and #31 (meta-shift/legal-pool/stat-change trend items and the
+Streamlit dashboard). Not resolved — deprioritized. Still genuinely blocked
+on Blocker A underneath; un-archive if this is reprioritized.
+
+#### 19. Legal-pool change tracking — ARCHIVED (excluded from active scope)
 
 - **Size**: S once unblocked
 - **Value**: Revives an analysis that already exists and has never returned
@@ -553,7 +567,10 @@ legality signals, so absence can't distinguish "banned" from "not yet
 observed" (`legality_summary_by_regulation.sql:14-21`). A second source with
 explicit ban signals would be the real fix.
 
-#### 20. Restore the legal-pool trend dashboard section
+**Archived 2026-08-02**: excluded from active scope by user decision (see
+#18's note). Not resolved — deprioritized.
+
+#### 20. Restore the legal-pool trend dashboard section — ARCHIVED (excluded from active scope)
 
 - **Size**: S
 - **Value**: The code already existed and was cut for permanently rendering
@@ -563,9 +580,16 @@ explicit ban signals would be the real fix.
 - **Blocked by**: #19
 - **Touches**: `pipelines/dashboard/`, `docs/dashboard/`
 
+**Archived 2026-08-02**: excluded from active scope by user decision (see
+#18's note). Not resolved — deprioritized.
+
 ### Blocked on a Champions rebalance (Blocker B)
 
-#### 21. Stat-change leaderboard surface
+The one item in this subsection (#21) is also now **archived** — excluded
+from active scope by user decision (see #18's note) — on top of remaining
+genuinely blocked on Blocker B.
+
+#### 21. Stat-change leaderboard surface — ARCHIVED (excluded from active scope)
 
 - **Size**: S
 - **Value**: The whole `pokemon_stat_delta` entity — a core part of the
@@ -576,6 +600,10 @@ explicit ban signals would be the real fix.
 
 The `--positive`/`--positive-bg` design tokens are already reserved for
 exactly this. Nothing to do but be ready.
+
+**Archived 2026-08-02**: excluded from active scope by user decision (see
+#18's note). Not resolved — deprioritized. Still genuinely blocked on
+Blocker B underneath; un-archive if this is reprioritized.
 
 ### Needs new provenance — with a sourcing path
 
@@ -774,7 +802,7 @@ routed through the shared `fillSelect()` helper (which always prepends an
 "All" option) — an unfiltered/all-dates view doesn't mean anything for a
 per-date usage snapshot, so the select only ever offers real dates.
 
-### 31. Dynamic Streamlit dashboard
+### 31. Dynamic Streamlit dashboard — ARCHIVED (excluded from active scope)
 
 - **Size**: L
 - **Value**: Mirrors the existing `docs/todo.md` M6 backlog item. Would
@@ -788,6 +816,9 @@ per-date usage snapshot, so the select only ever offers real dates.
 
 Worth weighing against #28: for a single user, a notebook may deliver most
 of the same value with none of the hosting cost.
+
+**Archived 2026-08-02**: excluded from active scope by user decision (see
+#18's note). Not resolved — deprioritized.
 
 ### 32. JSON feed alongside the baked-in dashboard data — DONE
 
@@ -1405,25 +1436,39 @@ imports it directly) rather than an implicit transitive one via
 Not full backlog entries — these are drift and belong to `.claude/loop.md`'s
 tech-debt loop, listed here only so they're written down somewhere.
 
-- `docs/prd.md` still names Chart.js as the resolved dashboard stack; the
-  broadcast redesign removed the charting library entirely
-  (`docs/dashboard.md`).
-- `docs/todo.md`'s release-readiness header says `0.1.0` is the published
-  version; `CLAUDE.md` and `README.md` say `0.2.0`.
-- `docs/todo.md`'s null-rate item says "all eight" core tables pass; there
-  are nine since `pokemon_asset` was added in Phase 4.
-- `docs/dataset-spec.md`'s trailing "Next implementation task" section
-  describes repository scaffolding completed long ago.
-- `dbt/analyses/README.md` still attributes the degenerate legal-pool query
-  to OP.GG's null `regulation_code`; PokéBase resolved that, and the real
-  reason is now Blocker A.
-- `.claude/loop.md`'s "Why a loop" section claims "Phase 1+ ingestion/
-  normalization logic is still unwritten."
-- `docs/design-system.md:415-416` has a sentence mangled mid-edit ("...a
-  battle-log source neither currently in scope nor deferred source... is
-  confirmed to provide").
-- `docs/dataset-spec.md`'s phased roadmap names only three phases; Phase 4
-  and M6 exist only in `docs/todo.md`.
+**All eight items below are now fixed** (2026-08-02 pass):
+
+- ~~`docs/prd.md` still names Chart.js as the resolved dashboard stack~~ —
+  checked and this was already stale itself: `docs/prd.md`'s "Open
+  questions" section already documents Chart.js's removal in the broadcast
+  redesign (`docs/design-system.md`'s "6-wide grid" section). No edit
+  needed; this entry no longer describes real drift.
+- ~~`docs/todo.md`'s release-readiness header says `0.1.0` is the published
+  version~~ — now says `0.2.0` (the current latest), noting `0.1.0` was the
+  first release.
+- ~~`docs/todo.md`'s null-rate item says "all eight" core tables pass~~ — now
+  says "all nine," with a note that `pokemon_asset` joined the core entity
+  list in Phase 4.
+- ~~`docs/dataset-spec.md`'s trailing "Next implementation task" section
+  describes repository scaffolding completed long ago~~ — replaced with a
+  "Current status" section pointing at `todo.md`/`backlog.md` for what's
+  actually still open.
+- ~~`dbt/analyses/README.md` still attributes the degenerate legal-pool query
+  to OP.GG's null `regulation_code`~~ — now correctly attributes it to
+  Blocker A (only one `snapshot_date` so far), with a note that
+  `regulation_code` itself is real now.
+- ~~`.claude/loop.md`'s "Why a loop" section claims "Phase 1+ ingestion/
+  normalization logic is still unwritten"~~ — now states that Phases 1-4
+  and M6 are implemented and published, and that the loop's role has
+  shifted from initial build-out to backlog/hardening/upkeep work.
+- ~~`docs/design-system.md:415-416` has a sentence mangled mid-edit~~ — fixed
+  to read "...needs a battle-log source — neither an in-scope nor a
+  deferred source (Limitless VGC, Victory Road) is confirmed to provide
+  one." (the debt note's own line numbers had already drifted from the
+  original edit; found by searching for the mangled text instead).
+- ~~`docs/dataset-spec.md`'s phased roadmap names only three phases~~ — now
+  names Phase 4 and M6 too, with a pointer to `CLAUDE.md`'s "Repository
+  purpose" for how each layers on the last.
 
 One item on this list was **not** prose drift and got separate attention —
 now fixed: `releases/manifests/manifest-0.2.0.json` had

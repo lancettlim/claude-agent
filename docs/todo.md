@@ -166,10 +166,15 @@ Outstanding work for the v1 Pokémon Champions dataset artifact, derived from
 
 ## M6 — Dashboard analytics release
 
-The three unchecked `Backlog:` items below are mirrored in `docs/backlog.md`
-(items #30, #34, and #31 respectively), alongside the wider post-v1 wish
-list. They stay here as the committed record; `backlog.md` holds everything
-not yet committed to.
+The two unchecked `Backlog:` items below (originally three; #30 and #34
+have since shipped, see their entries above) mirror `docs/backlog.md`'s
+#18-#20/#29-#30 trend-chart work and #31's Streamlit dashboard. Both were
+**archived** on 2026-08-02 — excluded from active scope by explicit user
+decision, alongside `backlog.md`'s meta-shift/legal-pool/stat-change trend
+items — so they stay unchecked but are no longer active work; see
+`backlog.md`'s "Archived" notes on those numbered entries for the shared
+rationale. They stay here as the committed record either way; `backlog.md`
+holds everything not yet committed to.
 
 - [x] Stand up a first-party analytics dashboard (KPI overview cards;
   trend views by regulation window and tournament period; drill-down by
@@ -294,15 +299,22 @@ not yet committed to.
   out importer/exporter); Team Builder slots now show stats/top-ability/
   top-4-moves per pick, plus an "Export as pokepaste text" button. See
   `docs/design-system.md` for the full component/token reference.
-- [ ] Backlog: further dashboard capability items not covered by the above
-  redesigns: a tournament-event/date filter once multiple snapshots exist
-  (still blocked — only one `snapshot_date` in the data), and trend/line
-  charts once that same multi-snapshot data exists
-- [ ] Backlog: build a dynamic Python/Streamlit dashboard on top of
-  `pipelines/dashboard/data.py`'s existing mart-loading/KPI logic, once the
-  dataset has enough snapshots/trend data (multiple `snapshot_date`s, a
-  real Champions rebalance) to justify the added hosting complexity beyond
-  today's free static GitHub Pages site — not part of this pass's scope
+- [ ] ARCHIVED (excluded from active scope, 2026-08-02): further dashboard
+  capability items not covered by the above redesigns: a tournament-event/
+  date filter once multiple snapshots exist (still blocked — only one
+  `snapshot_date` in the data; the event-date variant shipped separately,
+  see the Usage-tab Trends subtab item above), and trend/line charts once
+  that same multi-snapshot data exists. Note the event-date-filter part of
+  this specific bullet is now stale on top of being archived — #30 already
+  shipped a tournament-*date* filter over `pokemon_usage_by_event_date`;
+  what's left here is only the snapshot-date variant, i.e. `backlog.md`'s
+  #18-#20.
+- [ ] ARCHIVED (excluded from active scope, 2026-08-02): build a dynamic
+  Python/Streamlit dashboard on top of `pipelines/dashboard/data.py`'s
+  existing mart-loading/KPI logic, once the dataset has enough snapshots/
+  trend data (multiple `snapshot_date`s, a real Champions rebalance) to
+  justify the added hosting complexity beyond today's free static GitHub
+  Pages site — not part of this pass's scope (`backlog.md` #31)
 
 ## Foundational enablers (backlog Section 0)
 
@@ -687,9 +699,10 @@ item's `docs/backlog.md` entry.
 
 All release gates pass as of this writing (see
 `reports/validation/validation_report.json`: `release_blocking_findings: []`)
-and **`dataset_version 0.1.0` has been published** —
-`releases/data/0.1.0/*.csv`, `releases/manifests/manifest-0.1.0.json`,
-`releases/changelogs/CHANGELOG-0.1.0.md`.
+and **`dataset_version 0.2.0` has been published** (the current latest;
+`0.1.0` was the first release) —
+`releases/data/0.2.0/*.csv`, `releases/manifests/manifest-0.2.0.json`,
+`releases/changelogs/CHANGELOG-0.2.0.md`.
 
 - [x] Coverage: >=95% of OP.GG legal pool mapped to canonical `pokemon_id`
   (currently 98.4%, 312/317 legal-pool rows)
@@ -697,8 +710,9 @@ and **`dataset_version 0.1.0` has been published** —
   tables (currently ~99.9%)
 - [x] Coverage: >=95% of PokéBase legal-pool rows mapped to canonical
   `pokemon_id` (currently ~98.7%, 306/310 rows)
-- [x] Data quality: required-field null rate <=1% for core tables (all eight
-  pass, including `legality_snapshot` now that `regulation_code` is real)
+- [x] Data quality: required-field null rate <=1% for core tables (all nine
+  pass, including `legality_snapshot` now that `regulation_code` is real —
+  nine since `pokemon_asset` joined the core entity list in Phase 4)
 - [x] Data quality: zero duplicate primary-key violations
 - [x] Data quality: referential integrity checks pass for Pokémon/team/event
   joins

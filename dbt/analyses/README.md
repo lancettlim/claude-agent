@@ -18,11 +18,11 @@ analysis queries" release-readiness item calls for.
   usage ranking (e.g. Incineroar/Gholdengo/Sneasler lead the current
   snapshot).
 - `largest_legal_pool_changes_by_regulation.sql` — validated but currently
-  degenerate for two reasons, both already tracked in `docs/todo.md`: OP.GG
-  doesn't publish `regulation_code` (always null), and this dataset has
-  only been extracted once so far, so there's no second `snapshot_date` to
-  diff against. The query is structurally correct and ready for both gaps
-  to close.
+  degenerate: `regulation_code` is now real (sourced from PokéBase, see
+  `docs/dataset-spec.md`), but this dataset has only been extracted once so
+  far, so there's no second `snapshot_date` yet to diff against (`docs/
+  backlog.md`'s "Blocker A"). The query is structurally correct and ready
+  once multiple snapshots accumulate in production.
 
 Run with, e.g.:
 
