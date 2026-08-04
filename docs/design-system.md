@@ -36,6 +36,25 @@ color, spacing, or radius value that already has a token — add one instead.
 | `--panel-dark` | `#12131a` | Broadcast color-block section/page header background (see "Broadcast color-block header" below) |
 | `--accent-red` / `--accent-red-bg` | `#e3323c` / `#fce7e8` | Broadcast accent: active tab, `.grid-6xn` leader tile |
 | `--accent-gold` | `#f4b942` | Broadcast accent: reserved for #1-rank/MVP highlighting |
+| `--type-<name>` (18) | see below | Per-type accent color, one per Pokémon type |
+| `--type-unknown` | `#6B7280` | Fallback when a type is absent or unrecognized |
+
+### Type color accents
+
+The 18 `--type-*` tokens are **not** authored in the stylesheet. They are
+emitted into `:root` at build time from `pipelines/render/template.py`'s
+`TYPE_COLORS` map — the same palette the team-card renderer already used —
+via `build.py`'s `_type_colors()`, so the dashboard and the card renderer
+are one palette rather than two that drift. To change a type's color, edit
+`TYPE_COLORS`; do not add a literal hex here.
+
+Use them as **accents, not fills**: a 6px left-edge bar via the
+`.has-type-accent` class plus a `--tile-accent` custom property set per
+element (`typeAccentGradient()` in `app.js`, which splits the bar 50/50 for
+a dual-type Pokémon so it reads as both). The broadcast palette above stays
+the page's identity. Applied today to `.grid-6xn-tile` (via
+`renderGrid6xn`'s `typeFn` option), the Pokémon Profile header, and Team
+Builder's filled slots.
 
 Speed-tier colors (`--speed-blazing`, `--speed-fast`, `--speed-average`,
 `--speed-slow`, each with a `-bg` pair) are documented under "Speed-tier
@@ -52,24 +71,55 @@ sprite, 32px roster picker, 24px table cell, 22px chart axis):
 |---|---|---|
 | `--icon-sm` | 40px | Table/list cells, `.grid-6xn` tiles, speed-order rows (`ICON_SIZES.sm` in `app.js`) |
 | `--icon-md` | 64px | Roster picker rows, `.grid-6xn` tiles (`ICON_SIZES.md`) |
-| `--icon-lg` | 96px | KPI hero sprite, team slot, Pokémon Profile hero (`ICON_SIZES.lg`) |
-| `--icon-xl` | 128px | Pokémon Profile's dual-type badge only (`ICON_SIZES.xl`) — see "Type badge" below |
+| `--icon-lg` | 96px | KPI hero sprite, team slot (`ICON_SIZES.lg`) |
+| `--icon-xl` | 128px | Pokémon Profile's hero art only (`ICON_SIZES.xl`) |
 
 **Every sprite/item/type image must use one of these tokens** (or the
 matching `ICON_SIZES` constant in JS) — no other pixel value. `--icon-xl`
 is a deliberate single-purpose exception, not a general-use size: it
-exists because the Profile header's type display is new, hero-level
-information (docs' "add descriptions and larger type" ask), not because
-the sm/md/lg floor moved. Everywhere else still uses sm/md/lg.
+belongs to the Pokémon Profile header's hero art, the one view whose whole
+subject is a single Pokémon. Everywhere else still uses sm/md/lg.
+
+It previously belonged to that header's *dual-type badge* instead. That was
+wrong once real hero art existed: two 128px type emblems came out larger
+than the Pokémon they described, so the subject of the page lost to its own
+metadata. The badge dropped to `--icon-md` with a type-colored ring (see
+"Type badge" below) and the token moved to the art.
 
 **Sprites render at native resolution, smoothed, not pixelated.** Every
 sprite-bearing element (`.kpi-sprite`, `.cell-icon`, `.grid-6xn-tile img`,
 `.team-slot img`) used to force `image-rendering: pixelated` (a deliberate
 "retro pixel art" look) — this was dropped, along with the tier bump
-above, so upscaling the source art looks smooth rather than blocky. This
-enlarges and de-pixelates at the *existing* Bulbagarden source
-resolution; it isn't a switch to a higher-resolution image source (no
-such source is wired up in this repo today).
+above, so the source art looks smooth rather than blocky.
+
+### Hero art vs menu sprite
+
+There are now **two** Pokémon image assets, and which one a slot gets is
+decided by its size token, not by preference:
+
+| Token | Asset | Helper |
+|---|---|---|
+| `--icon-sm` (40px), `--icon-md` (64px) | **Menu sprite** — Bulbagarden, 128×128, copied verbatim to `images/<pokemon_key>.png` | `spriteImg()` |
+| `--icon-lg` (96px), `--icon-xl` (128px) | **Hero art** — PokéAPI HOME render, 512×512 downscaled to a 256px WebP at `images/hero/<pokemon_key>.webp` | `heroImg()` |
+
+Both come from `pokemon_asset`, which carries one row per `pokemon_key`
+**per `image_kind`** (`menu_sprite` / `home_render`) — see
+`docs/dataset-spec.md`. This replaces the previous note here that no
+higher-resolution source was wired up; one is now, as a gated dataset
+entity with its own `>=95%` coverage gate, not a scraped extra.
+
+The split is deliberate in both directions. Hero art exists because a
+128px menu sprite upscaled into a 96px/128px box visibly blurs, and worse
+on a HiDPI display where that box is 192–256 device px. Menu sprites stay
+in the small slots because at 40px the 128px sprite is already
+oversampled — swapping in a 256px render there would cost bytes for no
+visible gain. **`heroImg()` falls back to `spriteImg()`** when a Pokémon
+has no render, and to nothing when it has neither, so the
+never-a-broken-image rule under "Representing Pokémon" still holds.
+
+Every sprite/hero `<img>` carries intrinsic `width`/`height` plus
+`loading="lazy"` and `decoding="async"` — with 300+ images on a page,
+omitting the intrinsic size causes visible layout shift as they load.
 
 ### Spacing
 
@@ -102,8 +152,8 @@ webfont, keeping the page dependency-free.
   M6 redesign decision (see `docs/todo.md`'s "Dashboard full redesign"
   entry) to keep the page scannable as views are added. Current tabs:
   Overview, Usage, Pokémon Profile, Speed Tiers, Matchup, Team Builder, Top
-  Teams. Archetypes and Regulations were removed in the competitive-UX
-  redesign pass (see "Removed tabs" below); Matchup and Top Teams are new.
+  Teams, Players & Regions, Data & Sources. Archetypes and Regulations were
+  removed in the competitive-UX redesign pass (see "Removed tabs" below).
   Each tab's setup function is registered via `App.registerTab(tabId, fn)`
   and still runs lazily, on first activation — `app.js` owns the
   Overview/Usage/Pokémon Profile/Speed Tiers tabs directly, while
@@ -120,7 +170,7 @@ webfont, keeping the page dependency-free.
   within one section. Deliberately lighter-weight than `.tabs` (a rounded
   pill row, not an underlined bar) so it reads as a sub-navigation, not
   another top-level tab strip — `.tabs` stays reserved for the page's
-  seven main tabs. Two uses today: the **Usage** tab's Usage-leaders/
+  nine main tabs. Three uses today: the **Usage** tab's Usage-leaders/
   Win-rate-leaders tables (previously two stacked `h2` sections), and the
   **Pokémon Profile** tab's Items/Ability/Moves/Team Cores (previously
   four stacked `.grid-6xn`s under separate `h3`s). Wired the same way as
@@ -231,6 +281,27 @@ anymore rather than kept "just in case." (`.ranked-value`, a small muted
 inline-annotation style, survives on its own — the Win rate leaders
 table's `(n=X)` sample-size note still uses it — but it's unrelated to the
 deleted ranked-list row component now.)
+
+### Team composition (`.team-comp`)
+
+`teamCompositionHtml(pokemonKeys, sizePx)` in `app.js` renders a team as
+the **six Pokémon it actually is** — a wrapping row of `--icon-sm` sprites
+in `slot_number` order, each with the Pokémon's display name on a `title`
+attribute. Fed the pipe-delimited, slot-ordered `pokemon_keys` string the
+team marts publish (`top_tournament_teams`, `team_list_convergence`).
+
+Reached through `renderGrid6xn`'s **`iconHtmlFn`** option, which supplies
+arbitrary markup in place of the single `<img>` that `iconFn`/`keyFn`
+produce. That option exists for this component.
+
+This replaced rendering a team as its first slot's sprite alone, which was
+a correctness problem rather than a cosmetic one — two teams sharing a lead
+Pokémon were visually identical. A slot whose sprite doesn't resolve keeps
+its place as a `.team-comp-blank` circle, so the composition still reads as
+six. **Any new view that shows a team must use this** rather than picking
+one representative Pokémon. The Pokémon *names* stay on the tile's
+`subFn` line: sprites are scannable but don't name anything, and `title`
+isn't reachable on touch.
 
 ### Broadcast color-block header
 
@@ -380,10 +451,11 @@ alongside the now-icon-only symbol instead of the old doubled-up
 icon-with-baked-in-text-plus-a-second-text-label.
 - **Compact** (`large=false`): `.type-pill`, an 18px cropped type icon.
   Used in the Matchup tab's attacker/defender panels.
-- **Large** (`large=true`): `.type-badge-lg .type-pill-lg`, a `--icon-xl`
-  (128px) cropped icon. Used once, in the Pokémon Profile header — the
-  one place in the dashboard that uses `--icon-xl` (see "Icon size scale"
-  above).
+- **Large** (`large=true`): `.type-badge-lg .type-pill-lg`, an `--icon-md`
+  (64px) cropped icon in a 3px ring of that type's own `--type-*` color.
+  Used once, in the Pokémon Profile header, beside the hero art. It was
+  `--icon-xl` until hero art landed; see "Icon size scale" above for why it
+  shrank and the token moved to the Pokémon.
 
 Not icon-only: the type-filter chip row (`renderTypeFilterChips`, Usage/
 Speed Tiers/Team Builder) and the Matchup tab's type-effectiveness grid

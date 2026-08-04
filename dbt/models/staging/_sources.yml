@@ -120,5 +120,12 @@ sources:
           - row_count_anomaly:
               config:
                 meta: {category: row_count_anomaly, source_name: pokebase}
+      # Exempt from freshness/row_count_anomaly for the same reason
+      # Bulbagarden is: artwork extraction is on-demand-only, scoped to the
+      # forms Bulbagarden already covers, so there is no cadence a staleness
+      # threshold could measure against and no expected per-run volume
+      # drift to alarm on.
+      - name: pokeapi_artwork
+        description: "Raw PokéAPI high-resolution HOME render manifest, scoped to forms with a Champions menu sprite. See data/staging/pokeapi_artwork.schema.json."
       - name: bulbagarden
         description: "Raw Bulbagarden Champions-menu-sprite image manifest. See data/staging/bulbagarden.schema.json."

@@ -213,17 +213,35 @@ from PokéAPI's community sprites GitHub repo instead — see
   - **No EV/IV fields, permanently**: official team sheets do not publish
     them — see "Formerly deferred sources" above
 - `pokemon_asset`
-  - **Purpose**: sprite/menu-icon image manifest for Pokémon/form
-    references, sourced from Bulbagarden Archives
-  - **Primary key**: `pokemon_asset_key` (equal to `pokemon_key`; v1 scope
-    is one menu sprite per form)
+  - **Purpose**: image manifest for Pokémon/form references, in two kinds
+    (see `image_kind` below)
+  - **Primary key**: `pokemon_asset_key`, the composite
+    `<pokemon_key>::<image_kind>`. `pokemon_key` alone is deliberately
+    **not** unique here — each Pokémon carries one row per image kind. (v1
+    scoped this entity to one menu sprite per form, which made the two
+    equivalent; the hero-art addition below is what separated them.)
   - **Join keys**: `pokemon_key`, `pokemon_id`
+  - **`image_kind`** — one of:
+    - `menu_sprite`: 128x128, Bulbagarden Archives. The dense-UI asset,
+      correct at table-cell size, cached under `data/assets/bulbagarden/`.
+    - `home_render`: 512x512, PokéAPI's sprite repository
+      (`sprites/pokemon/other/home/<resource_id>.png`). The hero asset,
+      cached under `data/assets/pokeapi_artwork/`. Added because upscaling
+      a 128px menu sprite into the dashboard's 96px/128px hero slots
+      visibly blurs, worse again on HiDPI displays.
   - **Required fields**: `pokemon_asset_key`, `pokemon_key`, `image_kind`,
     `local_cache_path`, `sha1`, `width`, `height`, `source_name`,
     `source_url`, `source_record_id`, `extracted_at_utc`, `dataset_version`
   - **Optional fields**: `pokemon_id` (nullable only if a future source
-    can't supply it directly; Bulbagarden rows always resolve it via the
-    mapping seed)
+    can't supply it directly; both kinds always resolve it — Bulbagarden
+    via the mapping seed, PokéAPI artwork by joining its own form slug
+    straight to `pokemon.form_name`)
+  - **Release layout**: images ship under
+    `releases/data/<version>/images/<image_kind>/`, one subdirectory per
+    kind, because the two kinds use unrelated file-naming conventions
+    (Bulbagarden's `0006-Mega X.png` against PokéAPI's
+    `charizard-mega-x.png`) and a flat directory would mix them with no way
+    to tell which asset a consumer is looking at.
 
 Three more entities were added in the dashboard competitive-UX pass, all
 sourced from PokéAPI, scoped to move/ability/item names actually reported
@@ -286,7 +304,9 @@ value there (vs. as dashboard-only support data) is clearer.
 
 ### Refresh policy
 
-- **PokéAPI**: weekly scheduled refresh
+- **PokéAPI**: weekly scheduled refresh (identity/stat rows and the
+  move/ability/item detail tables; high-resolution artwork is on-demand —
+  see "PokéAPI high-resolution artwork" below)
 - **OP.GG Pokémon Champions**: daily change check, publish on change detection
 - **MunchStats**: daily check with publish after new tournament/event detection
 - **Versioning rule**: publish `dataset_version` on every successful refresh
@@ -460,6 +480,40 @@ Every release entry must summarize:
   - Sustained/scheduled automated access rate-limiting or ToS posture not
     independently verified beyond a one-off extract
 
+### PokéAPI high-resolution artwork
+
+A second PokéAPI extraction path, distinct from the identity/stat one above
+because it reads the project's sprite *repository* on GitHub rather than its
+JSON API.
+
+- **Records to capture**
+  - One 512x512 Pokémon HOME render per form, with its local cache path,
+    locally-computed sha1 and PNG-header dimensions
+- **Scope**
+  - Restricted to the forms that already have a Bulbagarden Champions menu
+    sprite, read from the `bulbagarden_title_to_pokeapi_form` seed — that
+    category *is* the Champions pool, so the two image kinds cover exactly
+    the same Pokémon rather than drifting apart. Roughly 317 forms against
+    PokéAPI's full ~1,350.
+- **Refresh cadence**
+  - Infrequent / on-demand, same as Bulbagarden: a published render never
+    changes
+- **Mapping rules**
+  - No mapping seed is needed or used. The sprite repository is keyed by
+    each form's *own* PokéAPI resource id (`10034` for `charizard-mega-x`,
+    not the species Dex number `6`), which the identity extractor already
+    records as `source_record_id`; the artwork manifest's `form_name` is
+    PokéAPI's own form slug, which joins straight to `pokemon.form_name`.
+- **Known risks**
+  - Not every form has a published HOME render; a missing one is skipped
+    rather than fabricated, so the gap surfaces as the `home_render`
+    coverage gate rather than as a failed run
+  - The repository publishes no checksum, so unlike Bulbagarden there is no
+    upstream sha1 to re-verify a cached file against
+  - Artwork is Nintendo/Game Freak-owned and is redistributed under the same
+    known-limitation disclaimer as the Bulbagarden sprites, not a cleared
+    right
+
 ### Confidence requirements
 
 - OP.GG legal-pool mapping coverage must reach at least 95% before release.
@@ -492,7 +546,16 @@ of every phase.
   - `>=95%` of OP.GG legal pool mapped to canonical `pokemon_id`
   - `>=90%` of targeted tournament records mapped to normalized team tables
   - `>=95%` of PokéBase legal-pool rows mapped to canonical `pokemon_id`
-  - `>=85%` of Bulbagarden sprite titles mapped to `pokemon_asset` rows
+  - `>=85%` of Bulbagarden sprite titles mapped to `pokemon_asset`
+    `menu_sprite` rows
+  - `>=95%` of `pokemon_asset` `menu_sprite` rows also having a
+    `home_render` row. The threshold is higher than Bulbagarden's 85%
+    because none of what justifies that lower floor applies: that gate's
+    denominator is raw file titles, several of which collapse onto one
+    `pokemon_key` by design (Vivillon patterns, Florges colors, Furfrou
+    trims, Alcremie flavors). Both sides of this ratio are already
+    per-`pokemon_key`, so a shortfall here is a real missing render rather
+    than a dedup artifact.
 - **Null-rate gate**
   - Required-field null rate must be `<=1%` for every core table
 - **Duplicate-key gate**

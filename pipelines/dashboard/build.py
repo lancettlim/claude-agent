@@ -1,14 +1,23 @@
 """Builds the static analytics dashboard site (docs/dashboard/) from
 data/marts/*.csv, per docs/prd.md's M6 milestone.
 
-The dashboard is a self-contained static HTML/CSS/vanilla-JS page (Chart.js
-via CDN, no backend, no build tooling) so it can be hosted for free on
-GitHub Pages — see docs/dashboard.md. Data is baked into the page as an
-inline `window.DASHBOARD_DATA = {...}` assignment rather than fetched from
-a separate JSON file, so the page also works opened directly via file://
-(fetch() of a local file is blocked by CORS there).
+The dashboard is a self-contained static HTML/CSS/vanilla-JS page (no
+charting library, no backend, no build tooling) so it can be hosted for
+free on GitHub Pages — see docs/dashboard.md.
 
-Pokémon sprites, move-type icons, and item icons are copied/resolved
+The payload is split in two. The critical keys (KPIs, sprite/hero/icon
+maps, display names — see _CRITICAL_PAYLOAD_KEYS) are baked into the page
+as an inline `window.DASHBOARD_DATA = {...}` assignment, so the header, the
+KPI row and the Overview tab render with no network round-trip at all. The
+marts, which are ~8MB, go only into the sibling data.json that static/app.js
+fetches on the first activation of a tab that needs them. Inlining
+everything used to make index.html an 8MB file whose first paint blocked on
+parsing all of it. The cost of the split is that fetch() is blocked over
+file://, so opening index.html by double-clicking now shows the header and
+Overview but reports a load error on the deeper tabs; app.js names the fix
+(serve the directory) in that message.
+
+Pokémon sprites, hero art, move-type icons, and item icons are copied/resolved
 alongside the HTML into output_dir/images/ (see pipelines/dashboard/
 sprites.py and pipelines/render/assets.py) rather than inlined as base64,
 to keep the committed HTML file small and its diffs readable. Species
@@ -37,6 +46,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from pipelines.dashboard import data, sprites
 from pipelines.render import assets as render_assets
 from pipelines.render import bulbagarden_items
+from pipelines.render import template as render_template
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -60,6 +70,69 @@ def _safe_json(payload: dict[str, Any]) -> str:
     return json.dumps(payload, default=str).replace("<", "\\u003c")
 
 
+# Everything except "marts". These are the keys the page header, the KPI
+# row and the Overview tab render from, plus the sprite/hero/icon/display-
+# name lookups every other tab needs the moment its rows arrive — a few
+# hundred KB in total, against ~8MB for the marts. Inlining this much and
+# fetching the rest is what lets the page paint immediately instead of
+# blocking on an 8MB JSON parse (see static/app.js's ensureData).
+_CRITICAL_PAYLOAD_KEYS = (
+    "generated_at_utc",
+    "kpis",
+    "provenance",
+    "sprites",
+    "hero_art",
+    "type_icons",
+    "type_colors",
+    "item_icons",
+    "pokemon_names",
+    "reference_teams",
+)
+
+
+def _asset_coverage(payload: dict[str, Any], referenced_keys: set[str]) -> list[dict[str, Any]]:
+    """How much of the imagery the marts reference actually resolved.
+
+    Reported per asset kind as resolved/referenced, so a partial sprite
+    cache or a run of unresolvable item names is visible on the page rather
+    than only as silently text-only cells.
+    """
+    distinct_items = {
+        row["item_name"]
+        for row in payload["marts"].get("pokemon_item_usage", [])
+        if row.get("item_name")
+    }
+    return [
+        {
+            "asset": "Menu sprites",
+            "resolved": len(payload.get("sprites", {})),
+            "referenced": len(referenced_keys),
+        },
+        {
+            "asset": "Hero art",
+            "resolved": len(payload.get("hero_art", {})),
+            "referenced": len(referenced_keys),
+        },
+        {
+            "asset": "Item icons",
+            "resolved": len(payload.get("item_icons", {})),
+            "referenced": len(distinct_items),
+        },
+        {
+            "asset": "Type icons",
+            "resolved": len(payload.get("type_icons", {})),
+            "referenced": 18,
+        },
+    ]
+
+
+def _critical_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """The subset of the payload inlined into index.html. Missing keys are
+    skipped rather than defaulted, so this stays correct if build() ever
+    stops producing one."""
+    return {key: payload[key] for key in _CRITICAL_PAYLOAD_KEYS if key in payload}
+
+
 def _referenced_pokemon_keys(marts: dict[str, list[dict[str, Any]]]) -> set[str]:
     keys: set[str] = set()
     for rows in marts.values():
@@ -71,6 +144,19 @@ def _referenced_pokemon_keys(marts: dict[str, list[dict[str, Any]]]) -> set[str]
             if row.get("pokemon_keys"):
                 keys.update(row["pokemon_keys"].split("|"))
     return keys
+
+
+def _type_colors() -> dict[str, str]:
+    """The 18 per-type accent colors, as {type_name: hex}.
+
+    Imported from pipelines/render/template.py rather than restated here so
+    the dashboard and the team-card renderer stay one palette, not two that
+    drift. The None key that module uses for its own "unknown type"
+    fallback is dropped: the dashboard's fallback is a CSS var default at
+    the point of use, and a null JSON key would be meaningless to the
+    template anyway.
+    """
+    return {name: value for name, value in render_template.TYPE_COLORS.items() if name}
 
 
 def _copy_type_icons(output_dir: Path) -> dict[str, str]:
@@ -115,6 +201,14 @@ def _resolve_item_icons(
 
     dest_dir = output_dir / "images" / "icons" / "items"
     dest_dir.mkdir(parents=True, exist_ok=True)
+    # Prune by name before repopulating, the same discipline sprites.py
+    # applies to images/ (backlog.md #47) — without it, icons for items
+    # that have dropped out of the usage mart accumulate in git build after
+    # build. Not an rmtree: this directory is a sibling of others that
+    # build.py populates independently.
+    for stale_icon in dest_dir.glob("*"):
+        if stale_icon.is_file():
+            stale_icon.unlink()
 
     resolved: dict[str, str] = {}
     session = requests.Session()
@@ -173,6 +267,7 @@ def build(
     normalized_dir: Path = data.DEFAULT_NORMALIZED_DIR,
     output_dir: Path = DEFAULT_OUTPUT_DIR,
     asset_cache_dir: Path = sprites.DEFAULT_ASSET_CACHE_DIR,
+    artwork_cache_dir: Path = sprites.DEFAULT_ARTWORK_CACHE_DIR,
     item_icon_cache_dir: Path = DEFAULT_ITEM_ICON_CACHE_DIR,
     reference_teams_dir: Path = DEFAULT_REFERENCE_TEAMS_DIR,
     fetch_icons: bool = True,
@@ -194,7 +289,14 @@ def build(
         normalized_dir=normalized_dir,
         asset_cache_dir=asset_cache_dir,
     )
+    payload["hero_art"] = sprites.copy_hero_art(
+        referenced_keys,
+        output_dir=output_dir,
+        normalized_dir=normalized_dir,
+        artwork_cache_dir=artwork_cache_dir,
+    )
     payload["type_icons"] = _copy_type_icons(output_dir)
+    payload["type_colors"] = _type_colors()
     payload["item_icons"] = _resolve_item_icons(
         payload["marts"],
         output_dir=output_dir,
@@ -202,21 +304,27 @@ def build(
         fetch_icons=fetch_icons,
     )
     payload["reference_teams"] = _load_reference_teams(output_dir, reference_teams_dir)
+    # Asset coverage is only knowable here, after the copies have run: it's
+    # the ratio of what actually resolved to what the marts reference. The
+    # Data & Sources tab reports it alongside the dbt release gates so the
+    # imagery has the same visible accounting as the numbers do.
+    payload["provenance"]["asset_coverage"] = _asset_coverage(payload, referenced_keys)
 
     env = _make_environment()
     template = env.get_template("index.html.jinja")
-    html = template.render(payload=payload, data_json=_safe_json(payload))
+    html = template.render(payload=payload, data_json=_safe_json(_critical_payload(payload)))
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "index.html").write_text(html, encoding="utf-8")
     for script_name in ("app.js", "matchup.js", "teams.js"):
         shutil.copyfile(STATIC_DIR / script_name, output_dir / script_name)
-    # backlog.md #32: a sibling JSON feed of the same payload baked into
-    # index.html's window.DASHBOARD_DATA, so the data is scriptable (e.g.
-    # `curl | jq`, a notebook) without re-running dbt or scraping the HTML.
-    # index.html stays the inline-data version (not a fetch() of this file)
-    # so it keeps working opened directly via file://, per this module's
-    # docstring.
+    # backlog.md #32: a sibling JSON feed carrying the *complete* payload —
+    # both the critical keys index.html already inlines and the marts it
+    # doesn't. Keeping it complete preserves #32's contract (the data is
+    # scriptable via `curl | jq` or a notebook without re-running dbt or
+    # scraping the HTML) and doubles as the file app.js fetches for the
+    # marts; the few hundred KB of critical keys duplicated between the two
+    # is a rounding error against the ~8MB of marts.
     (output_dir / "data.json").write_text(json.dumps(payload, default=str), encoding="utf-8")
 
     return payload

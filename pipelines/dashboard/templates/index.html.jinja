@@ -49,6 +49,17 @@
     --icon-lg: 96px;
     --icon-xl: 128px;
 
+    /* Per-type accent colors (docs/design-system.md's "Type color
+       accents"). Emitted from pipelines/render/template.py's TYPE_COLORS
+       via build.py's _type_colors() rather than hardcoded here, so the
+       dashboard and the team-card renderer share one palette. Used as
+       accents (borders, gradients) rather than fills — the broadcast
+       palette above stays the page's identity. */
+    {%- for type_name, hex in payload.type_colors.items() | sort %}
+    --type-{{ type_name }}: {{ hex }};
+    {%- endfor %}
+    --type-unknown: #6B7280;
+
     /* Speed-tier badge scale (docs/design-system.md's "Speed-tier badge"
        component) — bucketed off pokemon_champions_profile.speed. */
     --speed-blazing: #b23434;
@@ -160,7 +171,7 @@
      Moves/Team Cores), so several equally-important views can share one
      section instead of stacking. Deliberately visually lighter than the
      top-level `.tabs` row above, which stays reserved for the page's
-     seven main tabs. --- */
+     nine main tabs. --- */
   .subtabs {
     display: flex;
     gap: var(--space-2);
@@ -263,6 +274,51 @@
     position: relative;
   }
   .grid-6xn-tile.is-leader { border-color: var(--accent-red); background: var(--accent-red-bg); }
+
+  /* Type color accent (docs/design-system.md's "Type color accents"): a
+     left-edge bar in the Pokémon's own type colors, painted from the
+     --tile-accent custom property app.js sets per element. An accent, not
+     a fill — the broadcast palette stays the page's identity, and the
+     .is-leader treatment above still reads over the top of it. */
+  .has-type-accent { position: relative; overflow: hidden; }
+  .has-type-accent::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    background: var(--tile-accent, var(--type-unknown));
+  }
+
+  /* A team drawn as its six Pokémon (app.js's teamCompositionHtml). Wraps
+     to two rows at narrow widths rather than overflowing its tile. */
+  .team-comp {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-1);
+  }
+  .team-comp-slot { display: inline-flex; align-items: center; }
+  .team-comp-slot img { display: block; }
+  /* Placeholder for a roster slot whose sprite didn't resolve, so a
+     six-Pokémon team still reads as six. */
+  .team-comp-blank {
+    display: inline-block;
+    width: var(--icon-sm);
+    height: var(--icon-sm);
+    border-radius: 50%;
+    background: var(--light-blue);
+  }
+
+  /* Hero art (pokemon_asset's home_render kind) is a transparent-background
+     render, drawn at --icon-lg/--icon-xl. Unlike the menu sprites it is
+     downscaled rather than upscaled, so it needs no rendering hint. */
+  .hero-art { object-fit: contain; }
+
+  /* Country flag glyph. Sized up slightly against the code beside it,
+     which always stays visible — see countryCell() in app.js. */
+  .country-flag { font-size: 1.15em; line-height: 1; }
   /* Normal flow, left-aligned within the centered column — not absolutely
      positioned, so it reserves its own row instead of overlapping the
      label when a tile has no icon (e.g. an item/ability/move/team with no
@@ -306,6 +362,38 @@
   .badge-speed-slow { background: var(--speed-slow-bg); color: var(--speed-slow); }
   .badge-positive { background: var(--positive-bg); color: var(--positive); }
   .badge-negative { background: var(--danger-bg); color: var(--danger); }
+
+  /* Data & Sources tab. Table cells there hold prose and endpoint URLs
+     rather than the short numeric values every other table has, so they
+     opt into wrapping instead of forcing the row wider. */
+  .wrap-cell { white-space: normal; min-width: 220px; max-width: 420px; }
+  .wrap-cell code { font-size: var(--font-xs); word-break: break-all; }
+  .caveat-list {
+    margin: 0;
+    padding-left: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    color: var(--muted);
+  }
+  .caveat-list strong { color: var(--navy); }
+  /* Freshness chip in the page header: dataset version + snapshot date,
+     visible without opening the Data & Sources tab. */
+  .header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .header-chip {
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--radius-pill);
+    padding: 2px var(--space-3);
+    font-size: var(--font-xs);
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
   .badge-new { background: var(--accent-gold-bg); color: var(--warning); }
 
   /* --- Type badge (Pokémon Profile header, Matchup tab pickers) — the
@@ -320,8 +408,19 @@
 
   /* Profile header's dual-type display — the one place a type icon uses
      --icon-xl instead of the sm/md/lg scale (see "Icon size scale" above). */
-  .type-badge-row.type-badge-lg { gap: var(--space-3); }
-  .type-badge-lg .type-pill-lg { display: inline-flex; align-items: center; justify-content: center; }
+  .type-badge-row.type-badge-lg { gap: var(--space-3); margin: var(--space-2) 0; }
+  /* A --icon-md emblem in a ring of its own type color: enough presence to
+     read as hero-level information without competing with the Pokémon's
+     hero art beside it (see renderTypeBadgeRow in app.js). */
+  .type-badge-lg .type-pill-lg {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    padding: var(--space-1);
+    border: 3px solid var(--pill-type-color, var(--type-unknown));
+    background: var(--surface);
+  }
 
   /* Crops static/icons/types/*.png (wide 200x40 "icon + type name" badges,
      not bare square icons) down to just the icon's fixed-width left
@@ -539,6 +638,20 @@
 <header>
   <h1>Pokémon Champions — Analytics Dashboard</h1>
   <p>Generated {{ payload.kpis.latest_snapshot_date or "—" }} · built {{ payload.generated_at_utc }}</p>
+  {# Freshness/provenance chips: which dataset version and snapshot this
+     page was built from, and whether its release gates passed — visible
+     without opening the Data & Sources tab. #}
+  <div class="header-meta">
+    {% if payload.provenance.dataset_version %}
+      <span class="header-chip">dataset {{ payload.provenance.dataset_version }}</span>
+    {% endif %}
+    {% if payload.kpis.latest_snapshot_date %}
+      <span class="header-chip">snapshot {{ payload.kpis.latest_snapshot_date }}</span>
+    {% endif %}
+    {% if payload.provenance.validation_available %}
+      <span class="header-chip">{% if payload.provenance.release_blocking_findings %}{{ payload.provenance.release_blocking_findings | length }} gate failure(s){% else %}all gates passing{% endif %}</span>
+    {% endif %}
+  </div>
 </header>
 <main>
   <div class="kpi-row">
@@ -550,8 +663,9 @@
     </div>
     <div class="kpi-card">
       {% set top_used = payload.kpis.top_used_pokemon %}
-      {% if top_used and payload.sprites.get(top_used.pokemon_key) %}
-        <img class="kpi-sprite" src="{{ payload.sprites[top_used.pokemon_key] }}" alt="">
+      {% set top_used_art = payload.hero_art.get(top_used.pokemon_key) or payload.sprites.get(top_used.pokemon_key) if top_used %}
+      {% if top_used_art %}
+        <img class="kpi-sprite" src="{{ top_used_art }}" alt="" width="96" height="96" decoding="async">
       {% endif %}
       <div class="kpi-body">
         <div class="label">Most Used</div>
@@ -561,8 +675,9 @@
     </div>
     <div class="kpi-card">
       {% set top_win = payload.kpis.top_win_rate_pokemon %}
-      {% if top_win and payload.sprites.get(top_win.pokemon_key) %}
-        <img class="kpi-sprite" src="{{ payload.sprites[top_win.pokemon_key] }}" alt="">
+      {% set top_win_art = payload.hero_art.get(top_win.pokemon_key) or payload.sprites.get(top_win.pokemon_key) if top_win %}
+      {% if top_win_art %}
+        <img class="kpi-sprite" src="{{ top_win_art }}" alt="" width="96" height="96" decoding="async">
       {% endif %}
       <div class="kpi-body">
         <div class="label">Top Win Rate</div>
@@ -591,6 +706,7 @@
     <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
     <button class="tab-btn" role="tab" data-tab="top-teams" aria-selected="false">Top Teams</button>
     <button class="tab-btn" role="tab" data-tab="players" aria-selected="false">Players &amp; Regions</button>
+    <button class="tab-btn" role="tab" data-tab="data-sources" aria-selected="false">Data &amp; Sources</button>
   </nav>
 
   <section class="tab-panel" data-panel="overview">
@@ -978,8 +1094,27 @@
     </div>
 
     <h2>Top Teams</h2>
-    <p class="sub">Real Pokémon Champions tournament teams (MunchStats), ranked by reported win rate — distinct from the curated Pro Team Gallery below.</p>
-    <div class="grid-6xn" id="top-teams-grid"></div>
+    <div class="subtabs" role="tablist">
+      <button class="subtab-btn" role="tab" data-subtab="tt-leaderboard" aria-selected="true">By win rate</button>
+      <button class="subtab-btn" role="tab" data-subtab="tt-converged" aria-selected="false">Converged lists</button>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="tt-leaderboard">
+      <p class="sub">Real Pokémon Champions tournament teams (MunchStats), ranked by reported win rate — distinct from the curated Pro Team Gallery below.</p>
+      <div class="grid-6xn" id="top-teams-grid"></div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="tt-converged" hidden>
+      <p class="sub">
+        Whole team compositions the field independently converged on
+        (Limitless VGC), ranked by how many distinct players fielded the
+        same six Pokémon. <strong>Day-2 cut only</strong> — Limitless
+        publishes the teams that made the cut, about 93 distinct Pokémon
+        against 203 across the full Champions roster, so this shows what
+        converged at the top of the field rather than the meta as a whole.
+      </p>
+      <div class="grid-6xn" id="converged-lists-grid"></div>
+    </div>
 
     <h3>Pro Team Gallery</h3>
     <p class="sub">
@@ -1049,6 +1184,125 @@
           <tbody></tbody>
         </table>
       </div>
+    </div>
+  </section>
+
+  <section class="tab-panel" data-panel="data-sources" hidden>
+    <h2>Data &amp; Sources</h2>
+    <p class="sub">
+      Where every number on this dashboard comes from, and whether it passed
+      the release gates in <code>docs/dataset-spec.md</code>. Provenance is
+      mandatory in this dataset — every record carries its source, URL,
+      upstream record id and extraction timestamp — so it is reported here
+      rather than left implicit.
+    </p>
+
+    <div class="subtabs" role="tablist">
+      <button class="subtab-btn" role="tab" data-subtab="ds-sources" aria-selected="true">Sources</button>
+      <button class="subtab-btn" role="tab" data-subtab="ds-gates" aria-selected="false">Release gates</button>
+      <button class="subtab-btn" role="tab" data-subtab="ds-assets" aria-selected="false">Image coverage</button>
+      <button class="subtab-btn" role="tab" data-subtab="ds-agreement" aria-selected="false">Source agreement</button>
+      <button class="subtab-btn" role="tab" data-subtab="ds-caveats" aria-selected="false">Caveats</button>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-sources">
+      <div class="table-scroll">
+        <table id="ds-sources-table">
+          <thead><tr><th>Source</th><th>Endpoint</th><th>Availability</th><th class="sortable" data-sort-key="request_success_rate">Request success</th><th class="sortable" data-sort-key="rows_written">Rows</th><th class="sortable" data-sort-key="required_field_null_rate">Null rate</th><th>Checked</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-gates" hidden>
+      <p class="sub" id="ds-gates-status"></p>
+      <div class="table-scroll">
+        <table id="ds-gates-table">
+          <thead><tr><th>Gate</th><th>Check</th><th>What it measures</th><th>Threshold</th><th>Value</th><th>Status</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-assets" hidden>
+      <p class="sub">
+        How much of the imagery this dashboard references actually resolved.
+        A Pokémon with no resolvable image degrades to its name in text —
+        never a broken image — so a shortfall here is otherwise invisible.
+      </p>
+      <div class="grid-6xn" id="ds-assets-grid"></div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-agreement" hidden>
+      <p class="sub">
+        Two independent sources publish Champions rosters — MunchStats and
+        Limitless VGC. This is how often they agree, per event: what share of
+        the players covered by both have an identical six-Pokémon roster, and
+        what share of individual slots match. Disagreement is not
+        necessarily either source being wrong (rosters get corrected, and
+        coverage differs), but a sharp drop is worth knowing about before
+        trusting a number downstream.
+      </p>
+      <div class="table-scroll">
+        <table id="ds-agreement-table">
+          <thead><tr><th>Event</th><th class="sortable" data-sort-key="covered_players">Players covered by both</th><th class="sortable" data-sort-key="exact_agreement_rate">Exact roster agreement</th><th class="sortable" data-sort-key="slot_agreement_rate">Slot agreement</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-caveats" hidden>
+      <p class="sub">
+        Standing limitations that apply to figures elsewhere on this
+        dashboard. Each is a property of what the sources publish, not a bug
+        to be fixed here.
+      </p>
+      <ul class="caveat-list">
+        <li>
+          <strong>Head-to-head is team vs team, never Pokémon vs Pokémon.</strong>
+          No source publishes a per-battle log naming which four of six were
+          actually brought, so a "matchup" figure means teams containing A
+          beat teams containing B — it is attributed to the whole roster.
+        </li>
+        <li>
+          <strong>Matchup appearance counts overstate sample roughly 6×</strong>
+          for the same reason: every pairing is counted against all six
+          Pokémon on each side.
+        </li>
+        <li>
+          <strong>The legal pool is an upper bound.</strong> PokéBase
+          publishes no removal signal, so the cumulative legal-Pokémon count
+          can only grow — a later-banned Pokémon is never subtracted.
+        </li>
+        <li>
+          <strong>Signature share is structurally capped at 16.7%</strong> —
+          a Pokémon can appear only once on a six-slot team — which is why
+          players are ranked by share of their <em>teams</em> instead.
+        </li>
+        <li>
+          <strong>Everything here is Champions-format only.</strong> The
+          tournament corpus also covers standard VGC events; every usage and
+          win-rate figure is filtered to Champions events first. Blending the
+          two would be comparing different games.
+        </li>
+        <li>
+          <strong>No EV or IV spreads exist anywhere in this dataset.</strong>
+          Official team sheets publish ability, held item, nature and moves
+          and nothing more. The damage calculator therefore assumes a
+          maximally-invested level-50 baseline on both sides rather than any
+          real spread.
+        </li>
+        <li>
+          <strong>Legality has a single snapshot date</strong>, so nothing on
+          this dashboard trends legality over time; usage trends are measured
+          across tournament dates instead.
+        </li>
+        <li>
+          <strong>Champions stat deltas are all zero.</strong> No rebalance
+          has been published yet, so every Pokémon's Champions stats still
+          equal its canonical stats.
+        </li>
+      </ul>
     </div>
   </section>
 

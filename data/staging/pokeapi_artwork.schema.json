@@ -1,0 +1,29 @@
+{
+  "source_name": "PokéAPI",
+  "source_url": "https://github.com/PokeAPI/sprites",
+  "refresh_cadence": "infrequent/on-demand",
+  "records_captured": [
+    "one high-resolution Pokémon HOME render per form that has a Champions menu sprite"
+  ],
+  "fields": [
+    {"name": "form_name", "type": "string", "required": true, "description": "The form's own PokéAPI slug, matching data/staging/pokeapi.schema.json's form_name and resolving directly to pokemon_key"},
+    {"name": "pokeapi_resource_id", "type": "string", "required": true, "description": "The form's own PokéAPI resource id (e.g. 10034 for charizard-mega-x), not the species National Dex number; this is what the sprite repository's file names are keyed by"},
+    {"name": "image_kind", "type": "string", "required": true, "description": "Constant: home_render. Distinguishes these rows from Bulbagarden's menu_sprite rows in the shared pokemon_asset entity"},
+    {"name": "local_cache_path", "type": "string", "required": true, "description": "File name under data/assets/pokeapi_artwork/ where the downloaded bytes were cached"},
+    {"name": "sha1", "type": "string", "required": true, "description": "SHA-1 of the downloaded image bytes, computed locally (the sprite repository publishes no checksum to compare against)"},
+    {"name": "width", "type": "integer", "required": true, "description": "Image width in pixels, read from the PNG IHDR chunk (512 for HOME renders)"},
+    {"name": "height", "type": "integer", "required": true, "description": "Image height in pixels, read from the PNG IHDR chunk (512 for HOME renders)"},
+    {"name": "mime_type", "type": "string", "required": true, "description": "Constant: image/png. Recorded rather than assumed so a non-PNG response is visible as a contract violation"},
+    {"name": "file_size_bytes", "type": "integer", "required": true, "description": "Size of the downloaded image in bytes"},
+    {"name": "source_name", "type": "string", "required": true, "description": "Constant: PokéAPI"},
+    {"name": "source_url", "type": "string", "required": true, "description": "Full raw.githubusercontent.com URL the image was downloaded from"},
+    {"name": "source_record_id", "type": "string", "required": true, "description": "Upstream PokéAPI resource id, equal to pokeapi_resource_id"},
+    {"name": "extracted_at_utc", "type": "string", "required": true, "description": "ISO-8601 UTC extraction timestamp"},
+    {"name": "dataset_version", "type": "string", "required": true, "description": "Dataset version this staging snapshot feeds"}
+  ],
+  "known_risks": [
+    "Not every PokéAPI form has a published HOME render: alternate forms added late, and cosmetic-only forms, can 404. A missing render is skipped rather than fabricated, so the gap shows up as a coverage-gate number (docs/dataset-spec.md's home_render coverage gate) rather than as a failed run.",
+    "The sprite repository publishes no checksum, so unlike the Bulbagarden extractor there is no upstream sha1 to re-verify a cached file against; a cached file is trusted on presence and its digest recorded from the local bytes.",
+    "Artwork is Nintendo/Game Freak-owned. It is redistributed in release packages under the same known-limitation disclaimer as the Bulbagarden sprites (see releases/data/README.md), not under a cleared right."
+  ]
+}

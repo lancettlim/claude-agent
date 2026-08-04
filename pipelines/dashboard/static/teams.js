@@ -340,8 +340,13 @@
       var key = slot.key;
       var r = byKey[key];
       el.className = "team-slot";
+      // A filled slot is an --icon-lg hero box, so it takes the HOME
+      // render rather than the upscaled menu sprite, and carries its
+      // Pokémon's type accent on the slot border.
+      el.style.setProperty("--tile-accent", App.typeAccentGradient(r.type_1, r.type_2));
+      el.classList.add("has-type-accent");
       el.innerHTML =
-        (sprites[key] ? '<img src="' + sprites[key] + '" alt="">' : "") +
+        App.heroImg(key, App.ICON_SIZES.lg) +
         '<div class="slot-name">' + App.escapeHtml(r.pokemon_name) + "</div>" +
         '<div class="slot-detail">HP ' + r.hp + " Atk " + r.attack + " Def " + r.defense +
         " SpA " + r.sp_attack + " SpD " + r.sp_defense + " Spe " + r.speed + "</div>";
@@ -596,9 +601,10 @@
         return a.team_rank - b.team_rank;
       });
       App.renderGrid6xn(grid, ranked.slice(0, 18), {
-        iconFn: function (r) {
-          var firstKey = (r.pokemon_keys || "").split("|")[0];
-          return sprites[firstKey];
+        // The whole roster, not just slot 1: a team is six Pokémon, and
+        // drawing it as one sprite misrepresented which team a tile is.
+        iconHtmlFn: function (r) {
+          return App.teamCompositionHtml(r.pokemon_keys);
         },
         labelFn: function (r) {
           return (r.player_name || "Unknown") + (r.event_name ? " · " + r.event_name : "");
@@ -607,6 +613,9 @@
           return App.formatPercent(r.win_rate);
         },
         subFn: function (r) {
+          // The names stay as the sub-line: the sprite row above is
+          // scannable, but a sprite alone doesn't name a Pokémon, and the
+          // per-slot title attribute isn't reachable on touch.
           var names = (r.pokemon_keys || "")
             .split("|")
             .map(function (key) {
@@ -617,6 +626,48 @@
         },
       });
     }
+
+    // Converged lists: whole compositions multiple players independently
+    // brought (Limitless team_list layer). Ranked by player_count, which
+    // is the point of the view -- convergence, not placement.
+    var convergedGrid = document.getElementById("converged-lists-grid");
+    if (convergedGrid) {
+      var converged = (marts.team_list_convergence || []).slice().sort(function (a, b) {
+        return a.convergence_rank - b.convergence_rank;
+      });
+      App.renderGrid6xn(convergedGrid, converged.slice(0, 18), {
+        iconHtmlFn: function (r) {
+          return App.teamCompositionHtml(r.pokemon_keys);
+        },
+        labelFn: function (r) {
+          return (r.pokemon_keys || "")
+            .split("|")
+            .map(function (key) {
+              return App.pokemonNames[key] || key;
+            })
+            .join(", ");
+        },
+        displayFn: function (r) {
+          var n = r.player_count || 0;
+          return n + (n === 1 ? " player" : " players");
+        },
+        subFn: function (r) {
+          var parts = [];
+          if (r.best_placement) parts.push("best finish #" + r.best_placement);
+          if (r.tournament_count) {
+            parts.push(
+              r.tournament_count + (r.tournament_count === 1 ? " event" : " events")
+            );
+          }
+          if (r.first_seen_date) parts.push("first seen " + String(r.first_seen_date).slice(0, 10));
+          return parts.join(" · ");
+        },
+      });
+    }
+
+    var ttSubtabs = document.querySelectorAll('[data-panel="top-teams"] .subtab-btn');
+    var ttSubpanels = document.querySelectorAll('[data-panel="top-teams"] .subtab-panel');
+    App.setupSubTabs(ttSubtabs, ttSubpanels);
 
     var input = document.getElementById("pokepaste-input");
     var loadBtn = document.getElementById("pokepaste-load");

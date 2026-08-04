@@ -30,6 +30,7 @@ RELEASES_DATA_DIR = REPO_ROOT / "releases" / "data"
 MANIFESTS_DIR = REPO_ROOT / "releases" / "manifests"
 CHANGELOGS_DIR = REPO_ROOT / "releases" / "changelogs"
 DEFAULT_ASSET_CACHE_DIR = REPO_ROOT / "data" / "assets" / "bulbagarden"
+DEFAULT_ARTWORK_CACHE_DIR = REPO_ROOT / "data" / "assets" / "pokeapi_artwork"
 IMAGES_SUBDIR = "images"
 
 # table_name -> primary_key for the nine core release entities
@@ -145,22 +146,51 @@ def _copy_tables(normalized_dir: Path, dest_dir: Path) -> list[dict[str, Any]]:
 
 
 def _copy_referenced_images(
-    dest_dir: Path, *, asset_cache_dir: Path = DEFAULT_ASSET_CACHE_DIR
+    dest_dir: Path,
+    *,
+    asset_cache_dir: Path = DEFAULT_ASSET_CACHE_DIR,
+    artwork_cache_dir: Path = DEFAULT_ARTWORK_CACHE_DIR,
 ) -> dict[str, Any]:
     """Copy every file pokemon_asset.csv's local_cache_path column
-    references from the local extractor cache into dest_dir/images/, so the
+    references from the local extractor caches into dest_dir/images/, so the
     release package is self-contained. dest_dir is the release's own
     per-version directory (releases_data_dir/<dataset_version>), and
     pokemon_asset.csv must already be present there (i.e. this runs after
-    _copy_tables). Returns the manifest's "images" block."""
+    _copy_tables). Returns the manifest's "images" block.
+
+    Files are laid out under one subdirectory per image_kind
+    (images/menu_sprite/, images/home_render/) rather than flat. The two
+    kinds come from different caches and have independent naming
+    conventions -- Bulbagarden's National-Dex-style "0006-Mega X.png"
+    against PokéAPI's form slug "charizard-mega-x.png" -- so a flat
+    directory would mix two schemes with no way to tell which asset a
+    consumer is looking at. Rows with no image_kind are treated as
+    menu_sprite, which is what every row was before high-resolution artwork
+    was added.
+    """
     pokemon_asset_rows = _read_csv_rows(dest_dir / "pokemon_asset.csv")
     images_dir = dest_dir / IMAGES_SUBDIR
     images_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir_by_kind = {
+        "menu_sprite": asset_cache_dir,
+        "home_render": artwork_cache_dir,
+    }
     copied = 0
     missing = 0
+    by_kind: dict[str, int] = {}
     for row in pokemon_asset_rows:
         local_cache_path = row["local_cache_path"]
-        src = asset_cache_dir / local_cache_path
+        image_kind = row.get("image_kind") or "menu_sprite"
+        cache_dir = cache_dir_by_kind.get(image_kind)
+        if cache_dir is None:
+            missing += 1
+            print(
+                f"warning: pokemon_asset row has unknown image_kind {image_kind!r}, skipping: "
+                f"{local_cache_path}",
+                file=sys.stderr,
+            )
+            continue
+        src = cache_dir / local_cache_path
         if not src.exists():
             missing += 1
             print(
@@ -168,11 +198,17 @@ def _copy_referenced_images(
                 file=sys.stderr,
             )
             continue
-        dest = images_dir / local_cache_path
+        dest = images_dir / image_kind / local_cache_path
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(src, dest)
         copied += 1
-    return {"count": copied, "missing": missing, "directory": f"{IMAGES_SUBDIR}/"}
+        by_kind[image_kind] = by_kind.get(image_kind, 0) + 1
+    return {
+        "count": copied,
+        "missing": missing,
+        "directory": f"{IMAGES_SUBDIR}/",
+        "by_image_kind": dict(sorted(by_kind.items())),
+    }
 
 
 def _build_quality_checks(validation_report: dict[str, Any]) -> list[dict[str, Any]]:
@@ -275,10 +311,11 @@ def build(
     manifests_dir: Path = MANIFESTS_DIR,
     changelogs_dir: Path = CHANGELOGS_DIR,
     asset_cache_dir: Path = DEFAULT_ASSET_CACHE_DIR,
+    artwork_cache_dir: Path = DEFAULT_ARTWORK_CACHE_DIR,
 ) -> dict[str, Any]:
     """Build a versioned release package: copies data/normalized/*.csv to
-    releases/data/<dataset_version>/, copies the sprite images
-    pokemon_asset.csv references into releases/data/<dataset_version>/images/,
+    releases/data/<dataset_version>/, copies the images pokemon_asset.csv
+    references into releases/data/<dataset_version>/images/<image_kind>/,
     and writes releases/manifests/manifest-<dataset_version>.json and
     releases/changelogs/CHANGELOG-<dataset_version>.md.
 
@@ -291,7 +328,9 @@ def build(
     sources = _build_sources(staging_dir)
     release_dir = releases_data_dir / dataset_version
     tables = _copy_tables(normalized_dir, release_dir)
-    images = _copy_referenced_images(release_dir, asset_cache_dir=asset_cache_dir)
+    images = _copy_referenced_images(
+        release_dir, asset_cache_dir=asset_cache_dir, artwork_cache_dir=artwork_cache_dir
+    )
     quality_checks = _build_quality_checks(validation_report)
 
     manifest = {

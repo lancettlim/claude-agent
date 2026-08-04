@@ -11,7 +11,10 @@ Intended contents:
   `pokemon_stat_delta.csv`, `legality_snapshot.csv`,
   `tournament_event.csv`, `tournament_team.csv`,
   `tournament_team_member.csv`, `pokemon_asset.csv`), plus an `images/`
-  directory holding the sprite files `pokemon_asset.csv` references
+  directory holding the image files `pokemon_asset.csv` references, laid
+  out one subdirectory per `image_kind` (`images/menu_sprite/`,
+  `images/home_render/`) — the two kinds use unrelated file-naming
+  conventions, so a flat directory would mix them ambiguously
 
 Populated by `python -m pipelines.cli release --version <dataset_version>`,
 which copies `data/normalized/*.csv` here — gated on
@@ -20,10 +23,11 @@ which copies `data/normalized/*.csv` here — gated on
 `releases/changelogs/` for the accompanying manifest and changelog each
 release also publishes.
 
-**Image redistribution note**: `images/` files are sourced from Bulbagarden
-Archives, a fan wiki hosting Pokémon sprite artwork that is ultimately
+**Image redistribution note**: `images/` files come from two origins —
+`menu_sprite/` from Bulbagarden Archives (a fan wiki) and `home_render/`
+from the PokéAPI sprite repository — and the artwork in both is ultimately
 Nintendo/Game Freak-owned. Bundling them into a versioned, redistributable
-release package is a different posture than a fan wiki hosting them for
+release package is a different posture than either project hosting them for
 reference use, and that posture hasn't had a formal legal review — treat
 this as a documented known limitation (see each release's `manifest.json`
 `known_limitations` and `CHANGELOG-<version>.md`), not a cleared

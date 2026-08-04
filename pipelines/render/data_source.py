@@ -76,6 +76,24 @@ def _resolve_moves(
     return raw_moves, types
 
 
+def _menu_sprite_assets_by_key(normalized_dir: Path) -> dict[str, dict]:
+    """pokemon_key -> pokemon_asset row, restricted to menu_sprite rows.
+
+    The filter is load-bearing, not defensive: pokemon_asset carries one row
+    per Pokémon per image_kind (menu sprites from Bulbagarden, HOME renders
+    from PokéAPI), so keying by pokemon_key alone would let whichever row
+    came last win and point this renderer's sprite lookups at artwork
+    filenames that don't exist under asset_cache_dir. The card wants the
+    menu sprite specifically — it draws at 104px with pixelated rendering,
+    which is what that asset is for.
+    """
+    return {
+        row["pokemon_key"]: row
+        for row in _read_csv(normalized_dir / "pokemon_asset.csv")
+        if row.get("image_kind") == "menu_sprite"
+    }
+
+
 def _sprite_and_icon_lookup(
     pokemon_key: str | None,
     *,
@@ -116,9 +134,7 @@ def load_from_team_id(
     members.sort(key=lambda row: int(row["slot_number"]))
 
     pokemon_by_key = {row["pokemon_key"]: row for row in _read_csv(normalized_dir / "pokemon.csv")}
-    assets_by_key = {
-        row["pokemon_key"]: row for row in _read_csv(normalized_dir / "pokemon_asset.csv")
-    }
+    assets_by_key = _menu_sprite_assets_by_key(normalized_dir)
     move_types = load_move_types()
 
     slots = []
@@ -182,9 +198,7 @@ def load_from_spec(
     spec = json.loads(spec_path.read_text(encoding="utf-8"))
 
     pokemon_by_form = {row["form_name"]: row for row in _read_csv(normalized_dir / "pokemon.csv")}
-    assets_by_key = {
-        row["pokemon_key"]: row for row in _read_csv(normalized_dir / "pokemon_asset.csv")
-    }
+    assets_by_key = _menu_sprite_assets_by_key(normalized_dir)
     move_types = load_move_types()
 
     slots = []

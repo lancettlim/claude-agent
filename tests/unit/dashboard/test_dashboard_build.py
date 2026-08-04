@@ -136,10 +136,12 @@ def test_build_writes_index_html_and_app_js(tmp_path):
     assert embedded["kpis"]["distinct_pokemon_used"] == payload["kpis"]["distinct_pokemon_used"]
 
 
-def test_build_writes_json_feed_matching_embedded_payload(tmp_path):
-    # backlog.md #32: data.json is a sibling of the same payload baked into
-    # index.html's window.DASHBOARD_DATA, so the data is scriptable without
-    # re-running dbt or scraping the HTML.
+def test_build_writes_complete_json_feed_and_critical_only_inline_payload(tmp_path):
+    # The payload split. data.json stays the *complete* payload, preserving
+    # backlog.md #32's contract (scriptable without re-running dbt or
+    # scraping HTML) and doubling as the file app.js fetches for the marts.
+    # index.html inlines only the critical keys, so first paint doesn't
+    # block on parsing ~8MB of mart rows.
     marts_dir = tmp_path / "marts"
     normalized_dir = tmp_path / "normalized"
     output_dir = tmp_path / "out"
@@ -149,9 +151,20 @@ def test_build_writes_json_feed_matching_embedded_payload(tmp_path):
 
     assert (output_dir / "data.json").exists()
     from_json = json.loads((output_dir / "data.json").read_text(encoding="utf-8"))
+    assert from_json == payload
+
     html = (output_dir / "index.html").read_text(encoding="utf-8")
     embedded = _embedded_payload(html)
-    assert from_json == embedded == payload
+
+    # "marts" is the one key held back, and it is the only one.
+    assert "marts" not in embedded
+    assert set(embedded) == set(payload) - {"marts"}
+    for key in embedded:
+        assert embedded[key] == payload[key], key
+
+    # The inline payload still carries everything the header/KPI row and
+    # Overview render from, so the landing view needs no fetch.
+    assert embedded["kpis"]["distinct_pokemon_used"] == payload["kpis"]["distinct_pokemon_used"]
     assert "Pikachu" in html
 
 
@@ -200,7 +213,7 @@ def test_build_populates_sprites_and_type_icons(tmp_path):
     _populate_marts(marts_dir, normalized_dir)
     _write_csv(
         normalized_dir / "pokemon_asset.csv",
-        [{"pokemon_key": "pikachu", "local_cache_path": "0025.png"}],
+        [{"pokemon_key": "pikachu", "image_kind": "menu_sprite", "local_cache_path": "0025.png"}],
     )
     sprite_path = asset_cache_dir / "0025.png"
     sprite_path.parent.mkdir(parents=True, exist_ok=True)
