@@ -24,7 +24,7 @@ models:
   - name: team_list_member
     description: "One row per Pokémon on a canonical team list, with held item, ability, nature and moves. No EV/IV spread: official team sheets do not publish one. See data/normalized/team_list_member.schema.json."
   - name: pokemon_asset
-    description: "Sprite/menu-icon image manifest for Pokémon/form references, sourced from Bulbagarden Archives. See data/normalized/pokemon_asset.schema.json."
+    description: "Image manifest for Pokémon/form references. One row per pokemon_key per image_kind: 128x128 menu_sprite from Bulbagarden Archives (the dense-UI asset) and 512x512 home_render from PokéAPI's sprite repository (the hero asset). Primary key is the composite pokemon_asset_key (<pokemon_key>::<image_kind>) — pokemon_key alone is deliberately non-unique. See data/normalized/pokemon_asset.schema.json."
   - name: move_detail
     description: "Move reference detail (type/power/accuracy/category/priority/pp/short_effect), scoped to moves seen in tournament rosters. Dashboard-support reference data, not a release-gated core entity. See data/normalized/move_detail.schema.json."
   - name: ability_detail

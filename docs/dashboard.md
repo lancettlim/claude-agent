@@ -75,7 +75,7 @@ over `https://` by GitHub Pages.
 Pokémon sprites, move-type icons, and item icons are copied/resolved into
 `docs/dashboard/images/` as separate committed files rather than inlined as
 base64 — the payload JSON is already large (hundreds of usage/build/move/
-team-core rows), and base64 would add ~33% overhead across ~250 sprites,
+team-core rows), and base64 would add ~33% overhead across ~310 sprites,
 bloating the one committed HTML file and making its diffs unreadable.
 Separate PNGs keep diffs scoped to changed images and are browser-cacheable
 across page loads, mirroring the `releases/data/<version>/images/` pattern
@@ -334,14 +334,25 @@ rendered as plain text — no flag-emoji/ISO-lookup table exists yet.
 
 ## Icon sources
 
-Three distinct assets, three distinct strategies:
+Four distinct assets, four distinct strategies:
 
-- **Species sprites** (~250 Pokémon): copied from the gitignored
-  `data/assets/bulbagarden/` cache (populated by
+- **Species menu sprites** (312 Pokémon, 128x128): copied from the
+  gitignored `data/assets/bulbagarden/` cache (populated by
   `python -m pipelines.cli extract bulbagarden`) via `pipelines/dashboard/
-  sprites.py`, keyed by `pokemon_key` so `app.js` can look them up the same
-  way it looks up every other Pokémon-keyed field. Purely a local file
-  copy — no network access at dashboard-build time.
+  sprites.py`'s `copy_sprites`, keyed by `pokemon_key` so `app.js` can look
+  them up the same way it looks up every other Pokémon-keyed field. Purely
+  a local file copy — no network access at dashboard-build time. These are
+  the asset for the small slots (`--icon-sm`/`--icon-md`).
+- **Hero art** (312 Pokémon, 512x512 source): PokéAPI HOME renders from the
+  gitignored `data/assets/pokeapi_artwork/` cache (populated by
+  `python -m pipelines.cli extract pokeapi`), downscaled to 256px WebP into
+  `images/hero/<pokemon_key>.webp` by `sprites.py`'s `copy_hero_art` — the
+  one build step that needs Pillow. These are the asset for the hero slots
+  (`--icon-lg`/`--icon-xl`), where a 128px menu sprite was being upscaled
+  and visibly blurred. Both kinds come from the same `pokemon_asset` entity
+  (one row per `pokemon_key` per `image_kind`); see
+  `docs/design-system.md`'s "Hero art vs menu sprite" for which slot gets
+  which.
 - **Move-type icons** (18, fixed): bundled as committed static assets under
   `pipelines/dashboard/static/icons/types/`, bootstrapped once via
   `pipelines/render/assets.py`'s `ensure_type_icon()` and copied verbatim
@@ -384,24 +395,53 @@ python -m pipelines.cli build-dashboard
 python -m pipelines.cli build-dashboard --no-fetch-icons
 ```
 
-View it either by opening the file directly:
-
-```
-open docs/dashboard/index.html     # works via file://, no server needed
-```
-
-or by serving it the way GitHub Pages will:
+**Serve it — don't open the file directly:**
 
 ```
 python -m http.server --directory docs/dashboard
 ```
 
+This used to work over `file://` too, because the entire payload was
+inlined into `index.html`. It no longer is: the marts are ~8MB and now live
+only in the sibling `data.json`, which `app.js` fetches on first use of a
+tab that needs it (see "Payload split" below). A browser refuses that fetch
+over `file://` as a cross-origin request, so a directly-opened page renders
+its header, KPI row and Overview tab — all of which read the inlined
+critical payload — and then shows an explanatory empty state on the deeper
+tabs naming this command. The published GitHub Pages site is unaffected.
+
+## Payload split
+
+`index.html` carries only the **critical payload** inline
+(`_CRITICAL_PAYLOAD_KEYS` in `build.py`): KPIs, provenance, the
+sprite/hero-art/type-icon/item-icon maps, type colors, display names and
+reference teams — a few hundred KB. The marts go into `data.json` alone.
+
+The reason is first paint. When everything was inlined, `index.html` was
+**8.18 MB** and the browser had to parse all of it before rendering
+anything; it is now **~140 KB**. `data.json` is still the *complete*
+payload, not the leftovers — that preserves backlog #32's contract (the
+data is scriptable via `curl | jq` or a notebook without re-running dbt or
+scraping HTML) and costs only the few hundred KB of critical keys appearing
+in both files, a rounding error against ~8MB of marts.
+
+Client side, `app.js`'s `ensureData()` fetches `data.json` once, memoizes
+the promise, and merges the loaded marts **into the existing `marts`
+object** rather than reassigning it — `matchup.js` and `teams.js` hold a
+reference to that same object through `window.DashboardApp.marts`. Tabs
+registered with `{ needsMarts: false }` (only Overview today) skip the gate
+entirely and render straight from the inline payload, so the landing view
+never waits on a network round-trip. A failed fetch un-memoizes itself so
+re-clicking the tab retries.
+
 ## Publishing (GitHub Pages)
 
 Unlike other pipeline output in this repo (`data/normalized/`,
 `data/marts/`, `data/staging/` are all gitignored regenerated build
-output), **`docs/dashboard/index.html`, `docs/dashboard/app.js`, and
-`docs/dashboard/images/` are committed to git.** There is still no CI/
+output), **`docs/dashboard/index.html`, `docs/dashboard/app.js`,
+`docs/dashboard/matchup.js`, `docs/dashboard/teams.js`,
+`docs/dashboard/data.json`, and `docs/dashboard/images/` are committed to
+git.** There is still no CI/
 Actions workflow that *rebuilds* the dashboard (that would require live
 network access to all five extractors' upstream sources, which isn't
 something CI should do unsupervised) — after running `make dashboard`,

@@ -1699,3 +1699,79 @@ check — a separate, pre-existing artifact of backlog #49's bug (fixed in
 `report.py` after 0.2.0 was published) — left as-is since recomputing the
 true historical ratios would need the exact 0.2.0 warehouse snapshot, which
 no longer exists.
+
+---
+
+## 2026-08-04, dashboard graphics & accuracy pass
+
+A design pass on the dashboard, focused on Pokémon graphics fidelity and
+on making the dataset's own accuracy visible. Not drawn from the numbered
+backlog above — every unblocked item there was already done — so this is
+recorded here rather than as item resolutions.
+
+**Shipped:**
+
+1. **High-resolution art as a second `pokemon_asset` image kind.** Every
+   sprite in this repo was a 128×128 Bulbagarden menu icon, displayed at up
+   to 128 CSS px (256 device px on HiDPI) with pixelation deliberately
+   disabled — so every hero slot was a visibly blurred upscale.
+   `pokemon_asset` now carries a `home_render` kind (PokéAPI HOME renders,
+   512×512) beside `menu_sprite`, with its own `>=95%` coverage gate;
+   measured coverage is **317/317 = 100%**. Its primary key became the
+   composite `<pokemon_key>::<image_kind>`.
+
+   The enabling detail: **no new mapping seed was needed.** PokéAPI's
+   sprite repository is keyed by each form's own resource id (`10034` for
+   `charizard-mega-x`, not species `6`), and `pipelines/extract/pokeapi.py`
+   already recorded exactly that as `source_record_id`.
+
+2. **Teams drawn as six Pokémon.** Top Teams rendered a six-Pokémon team as
+   its first slot's sprite alone — a correctness problem, not a cosmetic
+   one, since two teams sharing a lead were visually identical.
+   `teamCompositionHtml()` plus `renderGrid6xn`'s new `iconHtmlFn` option
+   now render the whole roster, in both Top Teams and Converged lists.
+
+3. **Type color accents**, reusing `pipelines/render/template.py`'s existing
+   18-entry `TYPE_COLORS` map — emitted into `:root` at build time rather
+   than copied, so the dashboard and the team-card renderer stay one
+   palette. Applied automatically to any Pokémon-keyed `.grid-6xn` tile.
+
+4. **A Data & Sources tab.** The dashboard surfaced no provenance at all,
+   in a repo whose first stated convention is that provenance is mandatory.
+   It now reports per-source extraction health, all 48 release gates, image
+   coverage, cross-source roster agreement (wiring
+   `roster_source_agreement`, which had been built and tested but unread),
+   and the standing caveats that apply to figures elsewhere on the page.
+
+5. **A Converged lists view** over `team_list`/`team_list_member` — the
+   Limitless layer, which had zero mart and zero dashboard reach. Ranked by
+   how many distinct players independently fielded the same six Pokémon
+   (top composition: 9 players), with the day-2-cut-only caveat displayed.
+
+6. **The payload split.** `index.html` inlined the entire payload, making it
+   an **8.18 MB** file whose first paint blocked on parsing all of it,
+   beside an identical 8.14 MB `data.json`. The marts now live only in
+   `data.json`, fetched on first use; `index.html` is **~140 KB**. Whole
+   site: 22 MB → 14 MB, *including* 4.9 MB of newly added hero art.
+
+7. **Country flags** from ISO 3166-1 alpha-2 codes as Unicode
+   regional-indicator pairs — no asset, no network. Deliberately strict: a
+   malformed code renders as text rather than a guessed flag.
+
+8. **Hygiene:** `images/icons/items/` is now pruned by name like `images/`
+   already was (151 committed files → 78 referenced); doc drift fixed
+   (`build.py`'s stale "Chart.js via CDN", "seven tabs" → nine, "~250
+   sprites" → 312, the signature floor comment's 3 → 2, and
+   `docs/dashboard.md`'s incomplete committed-files list).
+
+**Considered and deliberately not built:**
+
+- **Tera-type analytics.** `tournament_team_member.tera_type` is populated
+  on **82.8%** of roster rows (87,796), appears in zero marts and zero UI,
+  needs no new extraction, and maps 1:1 onto the 18 type icons already
+  committed. This is the strongest remaining candidate for a future pass —
+  scoped out of this one by explicit user decision, not by a blocker. Size
+  **M** (a `pokemon_tera_usage` mart plus a Profile sub-tab or its own
+  filter dimension). The one design question to settle first: the 82.8%
+  coverage must be shown rather than hidden, since an unlabeled Tera
+  distribution over a 17% gap would read as complete.

@@ -1,4 +1,5 @@
 import csv
+import json
 
 from pipelines.dashboard import data
 
@@ -650,3 +651,96 @@ def test_join_pokemon_names_leaves_a_null_best_matchup_alone(tmp_path):
     assert "best_matchup_pokemon_name" not in row
     assert "worst_matchup_pokemon_name" not in row
     assert row["best_matchup_win_rate"] is None
+
+
+# --- provenance (Data & Sources tab) ---
+
+
+def test_load_provenance_degrades_when_reports_are_absent(tmp_path):
+    # A clean checkout has neither report: extraction_summary.json is
+    # committed but may not exist in a test fixture, and
+    # validation_report.json is gitignored. Neither absence should fail a
+    # dashboard build.
+    prov = data.load_provenance(tmp_path)
+
+    assert prov["sources"] == []
+    assert prov["gates"] == []
+    assert prov["validation_available"] is False
+    assert prov["dataset_version"] is None
+
+
+def test_load_provenance_survives_a_malformed_report(tmp_path):
+    (tmp_path / "validation_report.json").write_text("{not json", encoding="utf-8")
+
+    assert data.load_provenance(tmp_path)["validation_available"] is False
+
+
+def test_load_provenance_flattens_all_four_gate_categories(tmp_path):
+    (tmp_path / "extraction_summary.json").write_text(
+        json.dumps(
+            {
+                "dataset_version": "1.2.3",
+                "generated_at_utc": "2026-01-02T00:00:00Z",
+                "sources": [{"source_name": "PokéAPI", "rows_written": 7}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "validation_report.json").write_text(
+        json.dumps(
+            {
+                "generated_at_utc": "2026-01-03T00:00:00Z",
+                "coverage_checks": [
+                    {
+                        "check_name": "pokeapi_artwork_coverage",
+                        "description": "d",
+                        "threshold": ">=0.95",
+                        "metric_value": 1.0,
+                        "status": "pass",
+                    }
+                ],
+                "null_rate_checks": [
+                    {
+                        "table_name": "pokemon_asset",
+                        "metric_value": 0.0,
+                        "threshold": "<=0.01",
+                        "status": "pass",
+                    }
+                ],
+                "duplicate_key_checks": [
+                    {
+                        "table_name": "pokemon_asset",
+                        "primary_key": "pokemon_asset_key",
+                        "duplicate_count": 0,
+                        "status": "pass",
+                    }
+                ],
+                "referential_integrity_checks": [
+                    {
+                        "check_name": "pokemon_asset_resolves_to_pokemon",
+                        "violation_count": 0,
+                        "status": "pass",
+                    }
+                ],
+                "release_blocking_findings": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prov = data.load_provenance(tmp_path)
+
+    assert prov["dataset_version"] == "1.2.3"
+    assert prov["validation_available"] is True
+    assert prov["sources"] == [{"source_name": "PokéAPI", "rows_written": 7}]
+    assert [gate["category"] for gate in prov["gates"]] == [
+        "coverage",
+        "null_rate",
+        "duplicate_key",
+        "referential_integrity",
+    ]
+    # The gate results are baked into the payload here precisely because
+    # validation_report.json itself is gitignored and never reaches the
+    # published site.
+    assert prov["gates"][0]["name"] == "pokeapi_artwork_coverage"
+    assert prov["gates"][2]["threshold"] == "=0"

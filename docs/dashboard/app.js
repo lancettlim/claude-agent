@@ -1,7 +1,9 @@
 /* Plain vanilla JS — no bundler, no framework, no charting library. Reads
- * window.DASHBOARD_DATA (baked into index.html by pipelines/dashboard/
- * build.py) and wires up the tabs/filters/tables/grids declared in
- * index.html.jinja.
+ * window.DASHBOARD_DATA (the critical payload baked into index.html by
+ * pipelines/dashboard/build.py) and wires up the tabs/filters/tables/grids
+ * declared in index.html.jinja. The marts themselves are not inlined —
+ * they are fetched once from the sibling data.json on the first activation
+ * of a tab that needs them (see ensureData below).
  *
  * This file owns the core framework (tabs, tables, the shared .grid-6xn
  * component) plus the Overview/Usage/Pokémon Profile/Speed Tiers/Players &
@@ -21,14 +23,18 @@
     marts: {},
     kpis: {},
     sprites: {},
+    hero_art: {},
     type_icons: {},
+    type_colors: {},
     item_icons: {},
     reference_teams: [],
     pokemon_names: {},
   };
   var marts = DATA.marts || {};
   var sprites = DATA.sprites || {};
+  var heroArt = DATA.hero_art || {};
   var typeIcons = DATA.type_icons || {};
+  var typeColors = DATA.type_colors || {};
   var itemIcons = DATA.item_icons || {};
   var pokemonNames = DATA.pokemon_names || {};
 
@@ -234,7 +240,26 @@
     var size = sizePx || ICON_SIZES.sm;
     return (
       '<img class="cell-icon" style="width:' + size + "px;height:" + size + 'px" src="' +
-      src + '" alt="">'
+      src + '" width="' + size + '" height="' + size +
+      '" loading="lazy" decoding="async" alt="">'
+    );
+  }
+
+  // The hero-slot counterpart to spriteImg: a 256px downscale of the
+  // Pokémon's 512x512 HOME render (pokemon_asset's home_render kind)
+  // instead of its 128x128 menu sprite, for the --icon-lg/--icon-xl boxes
+  // where a menu sprite is being upscaled and visibly blurs. Falls back to
+  // the menu sprite when a Pokémon has no render, and to nothing at all
+  // when it has neither — a Pokémon never renders as a broken image
+  // (docs/design-system.md's "Representing Pokémon").
+  function heroImg(pokemonKey, sizePx) {
+    var src = heroArt[pokemonKey];
+    if (!src) return spriteImg(pokemonKey, sizePx || ICON_SIZES.lg);
+    var size = sizePx || ICON_SIZES.lg;
+    return (
+      '<img class="cell-icon hero-art" style="width:' + size + "px;height:" + size + 'px" src="' +
+      src + '" width="' + size + '" height="' + size +
+      '" loading="lazy" decoding="async" alt="">'
     );
   }
 
@@ -243,6 +268,91 @@
       '<div class="cell-with-icon">' + spriteImg(pokemonKey) + "<span>" +
       escapeHtml(pokemonName) + "</span></div>"
     );
+  }
+
+  // A team drawn as the six Pokémon it actually is. `pokemonKeys` is the
+  // pipe-delimited, slot-ordered string the team marts publish
+  // (top_tournament_teams.pokemon_keys, team_list_convergence.pokemon_keys).
+  // Before this existed, a six-Pokémon team was rendered as its first
+  // slot's sprite alone, which misrepresented the team rather than merely
+  // under-illustrating it.
+  function teamCompositionHtml(pokemonKeys, sizePx) {
+    var keys = String(pokemonKeys || "")
+      .split("|")
+      .filter(Boolean);
+    if (!keys.length) return "";
+    var size = sizePx || ICON_SIZES.sm;
+    return (
+      '<div class="team-comp">' +
+      keys
+        .map(function (key) {
+          var img = spriteImg(key, size);
+          // Keep the slot even when its sprite is unresolvable, so the
+          // composition still reads as six Pokémon rather than silently
+          // shrinking to five.
+          return (
+            '<span class="team-comp-slot" title="' +
+            escapeHtml(pokemonNames[key] || key) +
+            '">' +
+            (img || '<span class="team-comp-blank"></span>') +
+            "</span>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+  // A `typeFn` for renderGrid6xn that resolves a row's types through
+  // pokemon_champions_profile, so usage/win-rate grids (whose own marts
+  // carry no type columns) can still take a type accent.
+  function typeFnFromProfile() {
+    var profiles = championsProfileByKey();
+    return function (row) {
+      return profiles[row.pokemon_key] || {};
+    };
+  }
+
+  // A country's flag as a Unicode regional-indicator pair, derived from its
+  // ISO 3166-1 alpha-2 code — no asset, no network, no lookup table.
+  // Deliberately strict: anything that isn't exactly two ASCII letters
+  // returns "" rather than a guess, because a *wrong* flag misattributes a
+  // real player to a country they don't represent, which is worse than no
+  // flag at all.
+  function countryFlag(code) {
+    var value = String(code || "").trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(value)) return "";
+    return String.fromCodePoint(
+      0x1f1e6 + value.charCodeAt(0) - 65,
+      0x1f1e6 + value.charCodeAt(1) - 65
+    );
+  }
+
+  // Country cell: flag glyph plus the code itself. The code always stays
+  // visible — a flag emoji renders as tofu on some platforms, and two
+  // letters are unambiguous where a small flag is not.
+  function countryCell(code) {
+    var flag = countryFlag(code);
+    var label = escapeHtml(code || "—");
+    return flag ? '<span class="country-flag" aria-hidden="true">' + flag + "</span> " + label : label;
+  }
+
+  // Per-type accent color (docs/design-system.md's "Type color accents"),
+  // from the palette pipelines/render/template.py owns and build.py emits
+  // into the payload. Unknown/absent types fall back to the neutral
+  // --type-unknown rather than to a random hue.
+  function typeColor(typeName) {
+    if (!typeName) return "var(--type-unknown)";
+    return typeColors[String(typeName).toLowerCase()] || "var(--type-unknown)";
+  }
+
+  // A left-edge accent bar built from a Pokémon's one or two types, as an
+  // inline style value. Two types blend at the midpoint so a dual-type
+  // Pokémon reads as both rather than as its primary only.
+  function typeAccentGradient(type1, type2) {
+    var c1 = typeColor(type1);
+    var c2 = type2 ? typeColor(type2) : c1;
+    return "linear-gradient(180deg, " + c1 + " 0%, " + c1 + " 50%, " + c2 + " 50%, " + c2 + " 100%)";
   }
 
   // The committed type-icon PNGs (static/icons/types/) are wide 200x40
@@ -280,11 +390,17 @@
       return;
     }
     if (large) {
+      // --icon-md, not --icon-xl: on the Profile header these sit beside
+      // the Pokémon's hero art, and at 128px two type emblems were larger
+      // than the Pokémon itself — the subject of the page losing to its
+      // own metadata. They keep a type-colored ring so they still read as
+      // hero-level information at the smaller size.
       container.className = "type-badge-row type-badge-lg";
       container.innerHTML = types
         .map(function (t) {
-          return '<div class="type-pill-lg" role="img" aria-label="' + escapeHtml(t) + ' type">' +
-            typeIconImg(t, ICON_SIZES.xl) + "</div>";
+          return '<div class="type-pill-lg" role="img" aria-label="' + escapeHtml(t) +
+            ' type" style="--pill-type-color:' + typeColor(t) + '">' +
+            typeIconImg(t, ICON_SIZES.md) + "</div>";
         })
         .join("");
     } else {
@@ -345,13 +461,47 @@
       container.innerHTML = '<p class="empty-state">No data yet.</p>';
       return;
     }
+    // Type accent resolution, decided once per call rather than per row.
+    // Any Pokémon-keyed grid gets it automatically — passing typeFn: false
+    // opts out, and an explicit typeFn overrides the default lookup. Doing
+    // it here rather than at each of the call sites is what makes
+    // docs/design-system.md's "every Pokémon-keyed tile carries its type
+    // accent" true by construction instead of by remembering.
+    var typeFn = opts.typeFn;
+    if (typeFn === undefined && opts.keyFn) typeFn = typeFnFromProfile();
+
     rows.forEach(function (row, i) {
-      var iconSrc = opts.iconFn ? opts.iconFn(row) : opts.keyFn ? sprites[opts.keyFn(row)] : null;
+      // Three ways to give a tile its visual, most specific first:
+      //   iconHtmlFn -> arbitrary markup (a six-sprite team composition)
+      //   iconFn     -> a direct src (a move-type or item icon)
+      //   keyFn      -> a pokemon_key resolved against the sprite map
+      var iconHtml = opts.iconHtmlFn ? opts.iconHtmlFn(row) : null;
+      var iconSrc =
+        iconHtml == null
+          ? opts.iconFn
+            ? opts.iconFn(row)
+            : opts.keyFn
+              ? sprites[opts.keyFn(row)]
+              : null
+          : null;
       var tile = document.createElement("div");
       tile.className = "grid-6xn-tile" + (i === 0 && opts.showLeader !== false ? " is-leader" : "");
+      // Type accent: a left-edge bar in the Pokémon's own type colors, on
+      // tiles whose row carries type data. Purely additive — a row without
+      // types renders exactly as before.
+      if (typeFn) {
+        var types = typeFn(row) || {};
+        if (types.type_1) {
+          tile.classList.add("has-type-accent");
+          tile.style.setProperty(
+            "--tile-accent",
+            typeAccentGradient(types.type_1, types.type_2)
+          );
+        }
+      }
       tile.innerHTML =
         (opts.showRank !== false ? '<span class="badge badge-rank">#' + (i + 1) + "</span>" : "") +
-        (iconSrc ? '<img src="' + iconSrc + '" alt="">' : "") +
+        (iconHtml || (iconSrc ? '<img src="' + iconSrc + '" alt="" loading="lazy" decoding="async">' : "")) +
         '<div class="grid-6xn-label">' + escapeHtml(opts.labelFn(row)) + "</div>" +
         '<div class="grid-6xn-value">' + escapeHtml(opts.displayFn(row)) + "</div>" +
         (opts.subFn && opts.subFn(row) ? '<div class="grid-6xn-sub">' + escapeHtml(opts.subFn(row)) + "</div>" : "");
@@ -425,9 +575,65 @@
 
   var tabInitializers = {};
   var initialized = {};
+  var tabNeedsMarts = {};
 
-  function registerTab(tabId, initFn) {
+  // opts.needsMarts === false marks a tab that renders entirely from the
+  // inline critical payload (kpis/sprites/names) and so must not wait on
+  // the data.json fetch — Overview is the one such tab today, which is why
+  // the landing view paints with no network at all.
+  function registerTab(tabId, initFn, opts) {
     tabInitializers[tabId] = initFn;
+    tabNeedsMarts[tabId] = !(opts && opts.needsMarts === false);
+  }
+
+  // ---------- lazy mart payload ----------
+
+  // index.html inlines only the critical payload (KPIs, sprite/hero/type
+  // icon maps, display names) — a few hundred KB. The marts themselves are
+  // ~8MB and live in the sibling data.json, fetched once on the first
+  // activation of a tab that needs them. Before this split the whole
+  // payload was inlined, so first paint blocked on parsing 8MB of JSON.
+  var martsPromise = null;
+
+  function ensureData() {
+    if (martsPromise) return martsPromise;
+    if (Object.keys(marts).length) {
+      martsPromise = Promise.resolve(marts);
+      return martsPromise;
+    }
+    martsPromise = fetch("data.json")
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
+      })
+      .then(function (full) {
+        // Mutated in place, never reassigned: matchup.js and teams.js hold
+        // a reference to this same object via window.DashboardApp.marts.
+        var loaded = (full && full.marts) || {};
+        Object.keys(loaded).forEach(function (name) {
+          marts[name] = loaded[name];
+        });
+        return marts;
+      });
+    return martsPromise;
+  }
+
+  // fetch() against a file:// URL is blocked as a cross-origin request, so
+  // a page opened by double-clicking index.html can load the inline
+  // critical payload but never the marts. Say so, with the fix, rather
+  // than leaving a permanently empty panel.
+  function renderDataLoadError(tabId, error) {
+    var panel = document.querySelector('.tab-panel[data-panel="' + tabId + '"]');
+    if (!panel || panel.querySelector(".data-load-error")) return;
+    var isFileProtocol = window.location.protocol === "file:";
+    var message = isFileProtocol
+      ? "This page loads its data from data.json, which a browser will not fetch over file://. " +
+        "Serve the directory instead: python -m http.server -d docs/dashboard"
+      : "Could not load data.json (" + escapeHtml(String(error && error.message)) + ").";
+    var box = document.createElement("p");
+    box.className = "empty-state data-load-error";
+    box.textContent = message;
+    panel.insertBefore(box, panel.firstChild);
   }
 
   function setupTabs(onActivate) {
@@ -457,7 +663,7 @@
   // rate-leaders, Pokémon Profile's Items/Ability/Moves/Team Cores.
   // buttons/panels are NodeLists or arrays; buttons carry data-subtab,
   // panels carry data-subpanel, matched by that id. Defaults to the first
-  // button. Distinct from setupTabs (the page's eight top-level tabs).
+  // button. Distinct from setupTabs (the page's nine top-level tabs).
   function setupSubTabs(buttons, panels, onActivate) {
     buttons = Array.prototype.slice.call(buttons);
     panels = Array.prototype.slice.call(panels);
@@ -485,6 +691,12 @@
     renderGrid6xn(document.getElementById("overview-top-12"), top12, {
       keyFn: function (r) {
         return r.pokemon_key;
+      },
+      // Read off the row itself, not through pokemon_champions_profile:
+      // this tab renders before the marts are fetched, so the types are
+      // joined into the KPI rows server-side (see compute_kpis).
+      typeFn: function (r) {
+        return { type_1: r.type_1, type_2: r.type_2 };
       },
       labelFn: function (r) {
         return r.pokemon_name;
@@ -1005,9 +1217,20 @@
           statsEl.textContent = "Select a Pokémon to see its profile.";
         } else {
           statsEl.className = "";
+          // Hero slot: --icon-lg is where a 128px menu sprite was being
+          // upscaled, so this reads the 256px HOME render instead.
+          statsEl.style.setProperty(
+            "--tile-accent",
+            typeAccentGradient(profile.type_1, profile.type_2)
+          );
+          statsEl.classList.add("has-type-accent");
           statsEl.innerHTML =
             '<div class="cell-with-icon">' +
-            spriteImg(profile.pokemon_key, ICON_SIZES.lg) +
+            // --icon-xl belongs to the Pokémon here: this is the one view
+            // whose whole subject is a single Pokémon, and hero art is a
+            // 256px render, so 128px is a downscale rather than the blurry
+            // upscale a menu sprite would be at this size.
+            heroImg(profile.pokemon_key, ICON_SIZES.xl) +
             "<div><strong>" + escapeHtml(profile.pokemon_name) + "</strong> " +
             speedTierBadge(profile.speed) +
             '<div class="type-badge-row type-badge-lg" id="profile-type-badge"></div>' +
@@ -1240,7 +1463,7 @@
   // what" from pokemon_usage_by_country, and "does this player have a
   // signature Pokémon" from player_signature_pokemon. Both are
   // whole-history views, not per-event ones. The player list is already
-  // floored at 3 recorded teams in pipelines/dashboard/data.py — see
+  // floored at 2 recorded teams in pipelines/dashboard/data.py — see
   // MART_SLICERS there for why that floor is analytical, not cosmetic.
   function setupPlayers() {
     setupPlayerRegions();
@@ -1276,7 +1499,10 @@
     countries.forEach(function (country) {
       var opt = document.createElement("option");
       opt.value = country;
-      opt.textContent = country + " (" + appearancesByCountry[country].toLocaleString() + " picks)";
+      var countryFlagGlyph = countryFlag(country);
+      opt.textContent =
+        (countryFlagGlyph ? countryFlagGlyph + " " : "") + country +
+        " (" + appearancesByCountry[country].toLocaleString() + " picks)";
       select.appendChild(opt);
     });
 
@@ -1363,8 +1589,12 @@
       var first = byPlayer[playerId][0];
       var opt = document.createElement("option");
       opt.value = playerId;
+      // textContent, not innerHTML — a <select> option can hold the flag
+      // glyph itself but not countryCell()'s markup.
+      var flag = countryFlag(first.player_country);
       opt.textContent =
-        first.player_name + (first.player_country ? " (" + first.player_country + ")" : "") +
+        first.player_name +
+        (first.player_country ? " (" + (flag ? flag + " " : "") + first.player_country + ")" : "") +
         " — " + first.player_team_count + " teams";
       select.appendChild(opt);
     });
@@ -1396,7 +1626,7 @@
           return (
             '<td><span class="badge badge-rank">#' + (i + 1) + "</span></td>" +
             "<td>" + escapeHtml(r.player_name) + "</td>" +
-            "<td>" + escapeHtml(r.player_country || "—") + "</td>" +
+            "<td>" + countryCell(r.player_country) + "</td>" +
             "<td>" + pokemonCell(r.pokemon_key, r.pokemon_name) + "</td>" +
             "<td>" + formatPercent(r.team_share) + "</td>" +
             "<td>" + r.usage_count + " of " + r.player_team_count + "</td>"
@@ -1437,17 +1667,126 @@
     draw();
   }
 
-  registerTab("overview", setupOverview);
+  // ---------- Data & Sources ----------
+
+  // The provenance surface. Feeds: reports/validation/extraction_summary.json
+  // (committed) for per-source health, the validation report's gates (baked
+  // into the payload at build time, since the report itself is gitignored),
+  // build-time asset coverage, and the roster_source_agreement mart.
+  function setupDataSources() {
+    var prov = DATA.provenance || {};
+
+    var sourcesTable = document.getElementById("ds-sources-table");
+    if (sourcesTable) {
+      makeSortableTable(sourcesTable, prov.sources || [], function (row) {
+        return (
+          "<td>" + escapeHtml(row.source_name || "—") + "</td>" +
+          '<td class="wrap-cell"><code>' + escapeHtml(row.endpoint || "—") + "</code></td>" +
+          "<td>" + escapeHtml(row.availability || "—") + "</td>" +
+          "<td>" + formatPercent(row.request_success_rate) + "</td>" +
+          "<td>" + (row.rows_written == null ? "—" : row.rows_written) + "</td>" +
+          "<td>" + formatPercent(row.required_field_null_rate) + "</td>" +
+          "<td>" + escapeHtml((row.checked_at_utc || "—").slice(0, 10)) + "</td>"
+        );
+      });
+    }
+
+    var statusEl = document.getElementById("ds-gates-status");
+    if (statusEl) {
+      if (!prov.validation_available) {
+        statusEl.textContent =
+          "Gate results are not available in this build — reports/validation/" +
+          "validation_report.json is regenerated by `make validate` and is not committed.";
+      } else {
+        var blocking = prov.release_blocking_findings || [];
+        statusEl.textContent = blocking.length
+          ? blocking.length + " release-blocking finding(s): " + blocking.join("; ")
+          : "All release gates passing — no blocking findings. Validated " +
+            String(prov.validation_generated_at_utc || "").slice(0, 10) + ".";
+      }
+    }
+
+    var gatesTable = document.getElementById("ds-gates-table");
+    if (gatesTable) {
+      makeSortableTable(gatesTable, prov.gates || [], function (row) {
+        var status = String(row.status || "").toLowerCase();
+        var badgeClass = status === "pass" ? "badge-positive" : "badge-negative";
+        return (
+          "<td>" + escapeHtml(row.category || "—") + "</td>" +
+          "<td>" + escapeHtml(row.name || "—") + "</td>" +
+          '<td class="wrap-cell">' + escapeHtml(row.description || "—") + "</td>" +
+          "<td>" + escapeHtml(row.threshold || "—") + "</td>" +
+          "<td>" + (row.metric_value == null ? "—" : row.metric_value) + "</td>" +
+          '<td><span class="badge ' + badgeClass + '">' + escapeHtml(row.status || "—") +
+          "</span></td>"
+        );
+      });
+    }
+
+    renderGrid6xn(document.getElementById("ds-assets-grid"), prov.asset_coverage || [], {
+      showRank: false,
+      showLeader: false,
+      labelFn: function (r) {
+        return r.asset;
+      },
+      displayFn: function (r) {
+        return r.referenced ? formatPercent(r.resolved / r.referenced) : "—";
+      },
+      subFn: function (r) {
+        return r.resolved + " of " + r.referenced + " resolved";
+      },
+    });
+
+    var agreementTable = document.getElementById("ds-agreement-table");
+    if (agreementTable) {
+      makeSortableTable(
+        agreementTable,
+        marts.roster_source_agreement || [],
+        function (row) {
+          return (
+            "<td>" + escapeHtml(row.event_name || row.event_id || "—") + "</td>" +
+            "<td>" + (row.covered_players == null ? "—" : row.covered_players) + "</td>" +
+            "<td>" + formatPercent(row.exact_agreement_rate) + "</td>" +
+            "<td>" + formatPercent(row.slot_agreement_rate) + "</td>"
+          );
+        },
+        { defaultKey: "covered_players", defaultDir: "desc" }
+      );
+    }
+
+    var subtabs = document.querySelectorAll('[data-panel="data-sources"] .subtab-btn');
+    var subpanels = document.querySelectorAll('[data-panel="data-sources"] .subtab-panel');
+    setupSubTabs(subtabs, subpanels);
+  }
+
+  // Overview reads only DATA.kpis, which is inlined — it renders with no
+  // network round-trip, so the landing view is never waiting on data.json.
+  registerTab("overview", setupOverview, { needsMarts: false });
+  registerTab("data-sources", setupDataSources);
   registerTab("usage", setupUsage);
   registerTab("pokemon-profile", setupPokemonProfile);
   registerTab("speed-tiers", setupSpeedTiers);
   registerTab("players", setupPlayers);
 
   setupTabs(function (tabId) {
-    if (!initialized[tabId] && tabInitializers[tabId]) {
-      initialized[tabId] = true;
+    if (initialized[tabId] || !tabInitializers[tabId]) return;
+    initialized[tabId] = true;
+    if (!tabNeedsMarts[tabId]) {
       tabInitializers[tabId]();
+      return;
     }
+    ensureData().then(
+      function () {
+        tabInitializers[tabId]();
+      },
+      function (error) {
+        // Un-mark so a retry (re-clicking the tab) can try the fetch again
+        // rather than silently doing nothing forever.
+        initialized[tabId] = false;
+        martsPromise = null;
+        renderDataLoadError(tabId, error);
+      }
+    );
   });
 
   // Shared namespace for matchup.js/teams.js (loaded right after this
@@ -1475,6 +1814,13 @@
     passesTypeFilter: passesTypeFilter,
     setupDrilldown: setupDrilldown,
     spriteImg: spriteImg,
+    heroImg: heroImg,
+    teamCompositionHtml: teamCompositionHtml,
+    typeColor: typeColor,
+    typeAccentGradient: typeAccentGradient,
+    typeFnFromProfile: typeFnFromProfile,
+    countryFlag: countryFlag,
+    countryCell: countryCell,
     pokemonCell: pokemonCell,
     itemCell: itemCell,
     typeIconImg: typeIconImg,
@@ -1487,5 +1833,6 @@
     makeSortableTable: makeSortableTable,
     registerTab: registerTab,
     setupSubTabs: setupSubTabs,
+    ensureData: ensureData,
   };
 })();

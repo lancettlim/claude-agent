@@ -40,8 +40,9 @@ def test_extractor_fieldnames_match_schema_contract(module, schema_stem):
         (pokeapi.MOVE_FIELDNAMES, "pokeapi_move"),
         (pokeapi.ABILITY_FIELDNAMES, "pokeapi_ability"),
         (pokeapi.ITEM_FIELDNAMES, "pokeapi_item"),
+        (pokeapi.ARTWORK_FIELDNAMES, "pokeapi_artwork"),
     ],
-    ids=["pokeapi_move", "pokeapi_ability", "pokeapi_item"],
+    ids=["pokeapi_move", "pokeapi_ability", "pokeapi_item", "pokeapi_artwork"],
 )
 def test_pokeapi_detail_fieldnames_match_schema_contract(module_fieldnames, schema_stem):
     schema_path = STAGING_SCHEMA_DIR / f"{schema_stem}.schema.json"

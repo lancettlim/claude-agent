@@ -3,7 +3,8 @@
 Contract: data/staging/pokeapi.schema.json,
 data/staging/pokeapi_move.schema.json,
 data/staging/pokeapi_ability.schema.json,
-data/staging/pokeapi_item.schema.json
+data/staging/pokeapi_item.schema.json,
+data/staging/pokeapi_artwork.schema.json
 Spec reference: docs/dataset-spec.md, "Source-specific extraction contracts > PokéAPI"
 
 Captures Pokémon/form identity rows and base stat rows, weekly refresh
@@ -33,11 +34,23 @@ MunchStats tournament roster data — `data/staging/munchstats.csv`'s
 `moves`/`ability`/`item_name` fields) rather than PokéAPI's full
 ~900-move/~370-item catalog, since the dashboard only ever needs detail
 for names that already appear in real tournament roster data.
+
+`extract_artwork` is a fifth staging file at yet another grain: one
+high-resolution PokéMon HOME render per form, downloaded from PokéAPI's
+sprite *repository* rather than its JSON API. It exists because the
+Bulbagarden menu sprites that back `pokemon_asset` today are 128x128 —
+fine in a 40px table cell, blurry in the dashboard's 96px/128px hero
+slots. Like the detail fetches it is scoped to an explicit iterable
+(the forms that already have a Champions menu sprite) rather than
+PokéAPI's full ~1,350-form list, and like `bulbagarden.py` it writes
+binary image bytes alongside its CSV.
 """
 
 from __future__ import annotations
 
 import csv
+import hashlib
+import struct
 import sys
 from collections.abc import Iterable
 from datetime import datetime, timezone
@@ -54,6 +67,20 @@ DEFAULT_DATASET_VERSION = "0.0.0-dev"
 # Large enough to cover PokéAPI's full /pokemon list (base species plus
 # Mega/regional/alternate forms) in a single page.
 _LIST_PAGE_SIZE = 5000
+
+# PokéAPI's sprite bundle is published as a plain GitHub repo, not through
+# the JSON API, so artwork is fetched from raw.githubusercontent.com rather
+# than API_BASE_URL. `other/home` (512x512) is used over
+# `other/official-artwork` (475x475) because HOME renders are a uniform
+# square with a transparent background and cover Mega/regional/alternate
+# forms under their own 10xxx resource ids.
+ARTWORK_BASE_URL = (
+    "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home"
+)
+ARTWORK_IMAGE_KIND = "home_render"
+DEFAULT_ARTWORK_CACHE_DIR = Path("data") / "assets" / "pokeapi_artwork"
+
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 FIELDNAMES = [
     "pokemon_id",
@@ -104,6 +131,27 @@ ABILITY_FIELDNAMES = [
 ITEM_FIELDNAMES = [
     "item_name",
     "short_effect",
+    "source_name",
+    "source_url",
+    "source_record_id",
+    "extracted_at_utc",
+    "dataset_version",
+]
+
+# Deliberately parallel to bulbagarden.py's FIELDNAMES: both are image
+# manifests feeding the same `pokemon_asset` entity, differing only in how
+# the form is identified (a PokéAPI form slug here, a Bulbagarden file title
+# there), so the two staging models stay near-copies of each other.
+ARTWORK_FIELDNAMES = [
+    "form_name",
+    "pokeapi_resource_id",
+    "image_kind",
+    "local_cache_path",
+    "sha1",
+    "width",
+    "height",
+    "mime_type",
+    "file_size_bytes",
     "source_name",
     "source_url",
     "source_record_id",
@@ -383,5 +431,132 @@ def extract_items(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=ITEM_FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _png_dimensions(data: bytes) -> tuple[int, int] | None:
+    """Width/height straight out of the PNG IHDR chunk: after the 8-byte
+    signature and the 8-byte chunk length/type header, the first two fields
+    are big-endian uint32 width and height. Reading the header directly
+    keeps extraction dependency-free -- Pillow is only needed for the
+    dashboard's downscale step, not for recording an image's real size.
+    Returns None for anything that isn't a PNG, so a truncated or
+    HTML-error-page response is skipped rather than recorded with garbage
+    dimensions.
+    """
+    if len(data) < 24 or not data.startswith(_PNG_SIGNATURE):
+        return None
+    width, height = struct.unpack(">II", data[16:24])
+    return width, height
+
+
+def _fetch_artwork_or_none(session: requests.Session, url: str) -> bytes | None:
+    """Same graceful-skip contract as _fetch_resource_or_none: a form whose
+    artwork isn't published (404) or never recovers from a transient error
+    is skipped, so one missing render doesn't lose every other form already
+    fetched. Missing rows then show up as a coverage-gate number rather
+    than as an aborted run."""
+    try:
+        response = get_with_retry(session, url, timeout=30)
+    except requests.exceptions.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 404:
+            return None
+        print(f"Giving up on artwork {url}: {exc}", file=sys.stderr)
+        return None
+    except requests.exceptions.RequestException as exc:
+        print(f"Giving up on artwork {url}: {exc}", file=sys.stderr)
+        return None
+    return response.content
+
+
+def extract_artwork(
+    output_path: Path,
+    form_resource_ids: Iterable[tuple[str, str]],
+    *,
+    dataset_version: str = DEFAULT_DATASET_VERSION,
+    session: requests.Session | None = None,
+    cache_dir: Path = DEFAULT_ARTWORK_CACHE_DIR,
+    skip_existing: bool = True,
+) -> None:
+    """Download high-resolution PokéMon HOME renders and write a manifest CSV
+    to output_path matching data/staging/pokeapi_artwork.schema.json,
+    including provenance fields.
+
+    `form_resource_ids` is an iterable of `(form_name, pokeapi_resource_id)`
+    pairs. The resource id is the form's *own* PokéAPI id (10034 for
+    `charizard-mega-x`), not the species' National Dex number -- PokéAPI's
+    sprite repo is keyed by the former, and `extract()` already records it
+    as `source_record_id`, so no extra lookup or mapping seed is needed to
+    resolve one from the other.
+
+    Like bulbagarden.py, this is one of only two extractors that writes
+    binary image bytes (to cache_dir) alongside its CSV row. `skip_existing`
+    reuses an already-cached file instead of re-downloading; unlike
+    Bulbagarden there's no upstream sha1 to compare against, so a cached
+    file is trusted on presence and re-verified only for its own digest.
+    """
+    http = session if session is not None else requests.Session()
+    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+
+    rows = []
+    for form_name, resource_id in form_resource_ids:
+        local_cache_path = f"{form_name}.png"
+        dest_path = cache_dir / local_cache_path
+        url = f"{ARTWORK_BASE_URL}/{resource_id}.png"
+
+        reused_cache = skip_existing and dest_path.exists()
+        if reused_cache:
+            data = dest_path.read_bytes()
+        else:
+            data = _fetch_artwork_or_none(http, url)
+            if data is None:
+                print(
+                    f"Skipping unresolved artwork: {form_name!r} (resource id {resource_id!r})",
+                    file=sys.stderr,
+                )
+                continue
+
+        dimensions = _png_dimensions(data)
+        if dimensions is None:
+            print(
+                f"Skipping non-PNG artwork response: {form_name!r} "
+                f"(resource id {resource_id!r}, {len(data)} bytes)",
+                file=sys.stderr,
+            )
+            continue
+        width, height = dimensions
+
+        # Write whenever the bytes came off the network, not just when the
+        # destination is absent: a skip_existing=False run exists precisely
+        # to replace a stale cached file, and skipping the write there would
+        # leave the old bytes on disk under a manifest describing the new
+        # ones.
+        if not reused_cache:
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path.write_bytes(data)
+
+        rows.append(
+            {
+                "form_name": form_name,
+                "pokeapi_resource_id": resource_id,
+                "image_kind": ARTWORK_IMAGE_KIND,
+                "local_cache_path": local_cache_path,
+                "sha1": hashlib.sha1(data).hexdigest(),
+                "width": width,
+                "height": height,
+                "mime_type": "image/png",
+                "file_size_bytes": len(data),
+                "source_name": SOURCE_NAME,
+                "source_url": url,
+                "source_record_id": resource_id,
+                "extracted_at_utc": extracted_at_utc,
+                "dataset_version": dataset_version,
+            }
+        )
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=ARTWORK_FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows)

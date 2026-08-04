@@ -28,6 +28,11 @@ from (
   from {{ source('staging', 'bulbagarden') }}
 ) total
 cross join (
+  -- Filtered to menu_sprite: pokemon_asset now also carries home_render
+  -- rows from PokéAPI (see pokemon_asset.sql), and counting those here
+  -- would report this Bulbagarden-specific gate at roughly double its
+  -- real coverage.
   select count(*) as asset_count
   from {{ ref('pokemon_asset') }}
+  where image_kind = 'menu_sprite'
 ) mapped

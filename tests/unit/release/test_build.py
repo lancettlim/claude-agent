@@ -59,24 +59,48 @@ def _populate_normalized_and_staging(tmp_path, *, include_missing_asset=False):
     normalized_dir = tmp_path / "normalized"
     staging_dir = tmp_path / "staging"
     asset_cache_dir = tmp_path / "assets" / "bulbagarden"
+    artwork_cache_dir = tmp_path / "assets" / "pokeapi_artwork"
     for table_name, primary_key in build.TABLES.items():
         if table_name == "pokemon_asset":
             # pokemon_asset rows need a real local_cache_path so
-            # _copy_referenced_images has something to copy.
+            # _copy_referenced_images has something to copy. Both image
+            # kinds are represented so the per-kind cache routing and
+            # images/<image_kind>/ layout are exercised rather than assumed.
             rows = [
-                {primary_key: "k1", "local_cache_path": "0001.png"},
-                {primary_key: "k2", "local_cache_path": "0002.png"},
+                {
+                    primary_key: "k1::menu_sprite",
+                    "image_kind": "menu_sprite",
+                    "local_cache_path": "0001.png",
+                },
+                {
+                    primary_key: "k2::menu_sprite",
+                    "image_kind": "menu_sprite",
+                    "local_cache_path": "0002.png",
+                },
+                {
+                    primary_key: "k1::home_render",
+                    "image_kind": "home_render",
+                    "local_cache_path": "k1.png",
+                },
             ]
             if include_missing_asset:
                 # References a cache file that was never downloaded/was
                 # pruned (coverage gate is only >=85%, not 100%).
-                rows.append({primary_key: "k3", "local_cache_path": "0003.png"})
+                rows.append(
+                    {
+                        primary_key: "k3::menu_sprite",
+                        "image_kind": "menu_sprite",
+                        "local_cache_path": "0003.png",
+                    }
+                )
         else:
             rows = [{primary_key: "k1"}, {primary_key: "k2"}]
         _write_csv(normalized_dir / f"{table_name}.csv", rows)
     asset_cache_dir.mkdir(parents=True, exist_ok=True)
     (asset_cache_dir / "0001.png").write_bytes(b"fake-png-1")
     (asset_cache_dir / "0002.png").write_bytes(b"fake-png-2")
+    artwork_cache_dir.mkdir(parents=True, exist_ok=True)
+    (artwork_cache_dir / "k1.png").write_bytes(b"fake-render-1")
     # Staging is date-partitioned per source (backlog.md #1), so each
     # source is a directory of YYYY-MM-DD.csv snapshots, not a flat file.
     # Two snapshots for pokeapi so the "newest wins" resolution is exercised
@@ -121,7 +145,7 @@ def _populate_normalized_and_staging(tmp_path, *, include_missing_asset=False):
         staging_dir / "limitless" / "2026-01-01.csv",
         [{"extracted_at_utc": "2026-01-01T06:00:00Z", "limitless_team_id": "1"}],
     )
-    return normalized_dir, staging_dir, asset_cache_dir
+    return normalized_dir, staging_dir, asset_cache_dir, artwork_cache_dir
 
 
 def test_build_raises_when_validation_report_missing(tmp_path):
@@ -158,7 +182,9 @@ def test_build_raises_when_gates_failing(tmp_path):
 def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     report_path = tmp_path / "validation_report.json"
     report_path.write_text(json.dumps(_passing_validation_report()))
-    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(tmp_path)
+    normalized_dir, staging_dir, asset_cache_dir, artwork_cache_dir = (
+        _populate_normalized_and_staging(tmp_path)
+    )
     releases_data_dir = tmp_path / "releases" / "data"
     manifests_dir = tmp_path / "releases" / "manifests"
     changelogs_dir = tmp_path / "releases" / "changelogs"
@@ -173,12 +199,18 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
         manifests_dir=manifests_dir,
         changelogs_dir=changelogs_dir,
         asset_cache_dir=asset_cache_dir,
+        artwork_cache_dir=artwork_cache_dir,
     )
 
     assert manifest["dataset_version"] == "0.1.0"
     assert manifest["known_limitations"] == ["example limitation"]
     assert len(manifest["tables"]) == len(build.TABLES)
-    assert all(t["row_count"] == 2 for t in manifest["tables"])
+    # Two rows per table, except pokemon_asset: it carries one row per
+    # Pokémon per image_kind, and the fixture gives k1 both kinds.
+    assert all(
+        t["row_count"] == (3 if t["table_name"] == "pokemon_asset" else 2)
+        for t in manifest["tables"]
+    )
     assert {s["source_name"] for s in manifest["sources"]} == set(build.SOURCES)
     # Each source's row count/timestamp comes from its NEWEST dated snapshot,
     # not the first or an arbitrary one: pokeapi has two, and the later one
@@ -186,14 +218,21 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
     pokeapi_source = next(s for s in manifest["sources"] if s["source_name"] == "PokéAPI")
     assert pokeapi_source["record_count"] == 2
     assert pokeapi_source["extracted_at_utc"] == "2026-01-02T00:00:00Z"
-    assert manifest["images"] == {"count": 2, "missing": 0, "directory": "images/"}
+    assert manifest["images"] == {
+        "count": 3,
+        "missing": 0,
+        "directory": "images/",
+        "by_image_kind": {"home_render": 1, "menu_sprite": 2},
+    }
 
     for table_name in build.TABLES:
         assert (releases_data_dir / "0.1.0" / f"{table_name}.csv").exists()
 
+    # Laid out per image_kind, sourced from that kind's own cache dir.
     images_dir = releases_data_dir / "0.1.0" / "images"
-    assert (images_dir / "0001.png").read_bytes() == b"fake-png-1"
-    assert (images_dir / "0002.png").read_bytes() == b"fake-png-2"
+    assert (images_dir / "menu_sprite" / "0001.png").read_bytes() == b"fake-png-1"
+    assert (images_dir / "menu_sprite" / "0002.png").read_bytes() == b"fake-png-2"
+    assert (images_dir / "home_render" / "k1.png").read_bytes() == b"fake-render-1"
 
     manifest_path = manifests_dir / "manifest-0.1.0.json"
     assert manifest_path.exists()
@@ -210,8 +249,8 @@ def test_build_writes_manifest_changelog_and_copies_tables(tmp_path):
 def test_build_skips_missing_cached_images(tmp_path):
     report_path = tmp_path / "validation_report.json"
     report_path.write_text(json.dumps(_passing_validation_report()))
-    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(
-        tmp_path, include_missing_asset=True
+    normalized_dir, staging_dir, asset_cache_dir, artwork_cache_dir = (
+        _populate_normalized_and_staging(tmp_path, include_missing_asset=True)
     )
     releases_data_dir = tmp_path / "releases" / "data"
 
@@ -224,20 +263,28 @@ def test_build_skips_missing_cached_images(tmp_path):
         manifests_dir=tmp_path / "releases" / "manifests",
         changelogs_dir=tmp_path / "releases" / "changelogs",
         asset_cache_dir=asset_cache_dir,
+        artwork_cache_dir=artwork_cache_dir,
     )
 
-    assert manifest["images"] == {"count": 2, "missing": 1, "directory": "images/"}
+    assert manifest["images"] == {
+        "count": 3,
+        "missing": 1,
+        "directory": "images/",
+        "by_image_kind": {"home_render": 1, "menu_sprite": 2},
+    }
     images_dir = releases_data_dir / "0.1.0" / "images"
-    assert (images_dir / "0001.png").exists()
-    assert (images_dir / "0002.png").exists()
-    assert not (images_dir / "0003.png").exists()
+    assert (images_dir / "menu_sprite" / "0001.png").exists()
+    assert (images_dir / "menu_sprite" / "0002.png").exists()
+    assert not (images_dir / "menu_sprite" / "0003.png").exists()
 
 
 def test_build_quality_checks_reflect_report(tmp_path):
     report = _passing_validation_report()
     report_path = tmp_path / "validation_report.json"
     report_path.write_text(json.dumps(report))
-    normalized_dir, staging_dir, asset_cache_dir = _populate_normalized_and_staging(tmp_path)
+    normalized_dir, staging_dir, asset_cache_dir, artwork_cache_dir = (
+        _populate_normalized_and_staging(tmp_path)
+    )
 
     manifest = build.build(
         "0.2.0",
@@ -248,6 +295,7 @@ def test_build_quality_checks_reflect_report(tmp_path):
         manifests_dir=tmp_path / "releases" / "manifests",
         changelogs_dir=tmp_path / "releases" / "changelogs",
         asset_cache_dir=asset_cache_dir,
+        artwork_cache_dir=artwork_cache_dir,
     )
 
     checks_by_name = {c["check_name"]: c for c in manifest["quality_checks"]}

@@ -176,6 +176,30 @@ models:
           - not_null:
               config:
                 meta: {category: mart_quality, table_name: top_tournament_teams}
+  - name: team_list_convergence
+    description: >
+      Top Teams tab's "Converged lists" feed: one row per canonical
+      Limitless team-list id, ranked by how many distinct players fielded
+      that same six-Pokémon composition (player_count), with
+      tournament_count, best_placement, first_seen_date and the full
+      roster (pokemon_keys, pipe-delimited in slot order). Surfaces the
+      team_list/team_list_member layer, which no other mart reads.
+      Scoping note: Limitless is a Champions-only source and this mart's
+      grain is team_list_member, so it does not (and cannot) route through
+      int_champions_roster — see the model header. Coverage caveat:
+      Limitless publishes the day-2 cut only (~93 distinct Pokémon against
+      203 in the full Champions roster), so this describes what converged
+      at the top of the field, not the meta. Written to
+      data/marts/team_list_convergence.csv.
+    columns:
+      - name: team_list_id
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: team_list_convergence}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: team_list_convergence}
   - name: pokemon_team_core_usage
     description: >
       Team-core drill-down (docs/prd.md's "Drill-down by Pokémon, team

@@ -73,7 +73,13 @@ def _populate_normalized(tmp_path):
     )
     _write_csv(
         normalized_dir / "pokemon_asset.csv",
-        [{"pokemon_key": "incineroar", "local_cache_path": "0727.png"}],
+        [
+            {
+                "pokemon_key": "incineroar",
+                "image_kind": "menu_sprite",
+                "local_cache_path": "0727.png",
+            }
+        ],
     )
     asset_cache_dir = tmp_path / "assets" / "bulbagarden"
     asset_cache_dir.mkdir(parents=True)

@@ -73,6 +73,10 @@ _RETENTION_COUNTS = {
     "pokeapi_move": 12,
     "pokeapi_ability": 12,
     "pokeapi_item": 12,
+    # Artwork refreshes on-demand rather than weekly (a published HOME
+    # render never changes), so it keeps the same history as the sprite
+    # manifest it sits beside rather than the weekly sources' 12.
+    "pokeapi_artwork": 10,
     "opgg_champions": 14,
     "munchstats": 7,
     "rk9_pairings": 7,
@@ -94,6 +98,8 @@ _ENDPOINTS = {
     "pokeapi_move": "https://pokeapi.co/api/v2/move/{move_name}",
     "pokeapi_ability": "https://pokeapi.co/api/v2/ability/{ability_name}",
     "pokeapi_item": "https://pokeapi.co/api/v2/item/{item_name}",
+    "pokeapi_artwork": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/"
+    "pokemon/other/home/{pokeapi_resource_id}.png",
     "opgg_champions": "https://op.gg/pokemon-champions/pokedex",
     "munchstats": "https://raw.githubusercontent.com/PizzaTimeJoshua/munchstats/main/"
     "stats/tournaments/",
@@ -107,6 +113,7 @@ _SOURCE_NAME_SUFFIXES = {
     "pokeapi_move": " (move detail)",
     "pokeapi_ability": " (ability detail)",
     "pokeapi_item": " (item detail)",
+    "pokeapi_artwork": " (artwork)",
 }
 
 
@@ -163,6 +170,49 @@ def _referenced_move_ability_item_names() -> tuple[set[str], set[str], set[str]]
             if row.get("moves"):
                 moves.update(name.strip() for name in row["moves"].split("|") if name.strip())
     return moves, abilities, items
+
+
+def _champions_form_resource_ids() -> list[tuple[str, str]]:
+    """Resolve the `(form_name, pokeapi_resource_id)` pairs `extract pokeapi`
+    should fetch high-resolution artwork for.
+
+    Scoped to the forms that already have a Bulbagarden Champions menu
+    sprite, read from the controlled `bulbagarden_title_to_pokeapi_form`
+    seed: that category *is* the Champions pool, so this fetches artwork for
+    exactly the set `pokemon_asset` already carries a sprite for -- roughly
+    317 forms rather than PokéAPI's full ~1,350, and with no chance of the
+    two image kinds covering different Pokémon. The seed is read directly
+    (not the dbt-built `pokemon_asset` table) to avoid a circular dependency
+    on `dbt build` running before `extract pokeapi`, the same reasoning
+    _referenced_move_ability_item_names() applies to munchstats.
+
+    The resource id comes from the pokeapi snapshot just written by this
+    same invocation, where `extract()` records each form's own PokéAPI id as
+    `source_record_id` -- so no extra HTTP lookup and no new mapping seed
+    are needed to go from a form slug to the id the sprite repository is
+    keyed by.
+    """
+    seed_path = DBT_PROJECT_DIR / "seeds" / "bulbagarden_title_to_pokeapi_form.csv"
+    pokeapi_path = _latest_snapshot_path("pokeapi")
+    if not seed_path.exists() or pokeapi_path is None:
+        return []
+
+    with seed_path.open(newline="", encoding="utf-8") as fh:
+        champions_forms = {
+            row["pokeapi_form_name"] for row in csv.DictReader(fh) if row.get("pokeapi_form_name")
+        }
+
+    resource_id_by_form: dict[str, str] = {}
+    with pokeapi_path.open(newline="", encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("form_name") and row.get("source_record_id"):
+                resource_id_by_form[row["form_name"]] = row["source_record_id"]
+
+    return sorted(
+        (form_name, resource_id_by_form[form_name])
+        for form_name in champions_forms
+        if form_name in resource_id_by_form
+    )
 
 
 def _source_display_name(module, staging_subdir: str) -> str:
@@ -235,6 +285,32 @@ def _run_extract(source: str, dataset_version: str) -> int:
         return 1
     _prune_old_snapshots(staging_subdir)
     if source == "pokeapi":
+        # Artwork is scoped to the bulbagarden mapping seed and this run's
+        # own pokeapi snapshot, so unlike the move/ability/item detail
+        # fetches below it doesn't depend on munchstats having run first --
+        # it goes before their early return rather than after it.
+        form_resource_ids = _champions_form_resource_ids()
+        if not form_resource_ids:
+            print(
+                "Skipping artwork extraction: no form/resource-id pairs resolved from "
+                "dbt/seeds/bulbagarden_title_to_pokeapi_form.csv and the pokeapi snapshot.",
+                file=sys.stderr,
+            )
+        else:
+            artwork_output_path = _dated_snapshot_path("pokeapi_artwork", date_str)
+            ok = _run_tracked_extract(
+                source_name=_source_display_name(pokeapi, "pokeapi_artwork"),
+                staging_subdir="pokeapi_artwork",
+                output_path=artwork_output_path,
+                dataset_version=dataset_version,
+                call=lambda: pokeapi.extract_artwork(
+                    artwork_output_path, form_resource_ids, dataset_version=dataset_version
+                ),
+            )
+            if not ok:
+                return 1
+            _prune_old_snapshots("pokeapi_artwork")
+
         moves, abilities, items = _referenced_move_ability_item_names()
         if not moves and not abilities and not items:
             print(
