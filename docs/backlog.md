@@ -1764,14 +1764,10 @@ recorded here rather than as item resolutions.
    sprites" → 312, the signature floor comment's 3 → 2, and
    `docs/dashboard.md`'s incomplete committed-files list).
 
-**Considered and deliberately not built:**
+**Not a future-work candidate:**
 
-- **Tera-type analytics.** `tournament_team_member.tera_type` is populated
-  on **82.8%** of roster rows (87,796), appears in zero marts and zero UI,
-  needs no new extraction, and maps 1:1 onto the 18 type icons already
-  committed. This is the strongest remaining candidate for a future pass —
-  scoped out of this one by explicit user decision, not by a blocker. Size
-  **M** (a `pokemon_tera_usage` mart plus a Profile sub-tab or its own
-  filter dimension). The one design question to settle first: the 82.8%
-  coverage must be shown rather than hidden, since an unlabeled Tera
-  distribution over a 17% gap would read as complete.
+- **Tera-type analytics.** Champions does not currently have the Tera
+  mechanic. The apparent 82.8% coverage came from standard VGC rows outside
+  this dataset's scope; Champions-scoped coverage is 0%. The experimental
+  mart was removed under backlog #10 and should be reconsidered only if the
+  Champions format adds Tera.
