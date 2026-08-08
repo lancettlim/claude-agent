@@ -473,6 +473,33 @@ https://lancettlim.github.io/claude-agent/dashboard/.
 `https://<owner>.github.io/<repo>/` itself to `dashboard/` — the site root
 would otherwise 404, since nothing else lives at `docs/`'s top level.
 
+## Triple cores and detected archetypes
+
+Pokémon Profile's Team Cores sub-tab now has two independent controls:
+pair/triple core size and co-occurrence/synergy ranking. Triple rows come
+from `pokemon_team_core_triple_usage`, where every six-member Champions
+roster produces 20 canonical combinations. The mart retains the full result;
+the dashboard payload applies a five-team support floor before rendering.
+
+The **Archetypes** tab is a new experimental, sourced alternative to the
+removed curated Archetype Explorer. Its pipeline is deliberately
+interpretable:
+
+1. triples with at least five teams and above-chance triple/average-pair
+   lift become candidates;
+2. candidates sharing two members consolidate under the strongest one-hop
+   neighbour;
+3. teams receive one primary assignment and at most one secondary assignment
+   within 90% of the primary score;
+4. the dashboard displays the top 24 groups that span at least two events
+   and ten teams.
+
+The UI uses neutral three-member core names. Weather, balance, offense, and
+similar labels remain editorial judgments, not facts that can be inferred
+solely from co-occurrence. The existing curated seed and drift check remain
+in place as a comparison surface until additional events establish stable
+generated clusters.
+
 ## Data-reality caveats
 
 As of this writing:
@@ -482,8 +509,9 @@ As of this writing:
   though there's no longer a dedicated tab surfacing per-regulation detail.
 - **Cumulative legal pool**: see "Cumulative legal pool" above — can only
   grow, never confirmed to reflect a real later-regulation ban.
-- **Archetype Explorer**: removed — see "Archetype Explorer (removed)"
-  above. Was always curated editorial data, not sourced tournament data.
+- **Curated Archetype Explorer**: remains removed. The replacement
+  **Detected Archetypes** tab uses sourced Champions rosters and neutral
+  core names; the curated seed remains only as a validation comparison.
 - **Matchup tab**: type effectiveness and the damage calculator's type/
   move-power inputs are real PokéAPI data; the co-usage panel is an
   explicitly-labeled teammate-pairing proxy, not real battle-outcome data
