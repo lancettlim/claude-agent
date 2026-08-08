@@ -722,8 +722,18 @@ item's `docs/backlog.md` entry.
   `pokemon_team_core_usage`'s mirrored pairs, with `pair_team_count`
   exposed since lift is noisy at low counts. Verified against real data
   (10,336 pair rows) that lift surfaces a genuinely different, less
-  generically-popular partner set than raw co-occurrence does. Extending
-  past pairs to triples stays open, as the backlog entry itself flags.
+  generically-popular partner set than raw co-occurrence does. Extended on
+  2026-08-09 with `pokemon_team_core_triple_usage`: canonical three-member
+  cores with support, expected share, triple lift, constituent pair lift,
+  event/player coverage, placement, and win-rate context; Pokémon Profile
+  now switches between pair and triple cores.
+- [x] Backlog #15: Experimental data-derived archetypes — qualifying triple
+  cores consolidate when they share two members; every matched team gets a
+  primary assignment and only a near-tied (>=90%) secondary assignment.
+  `detected_archetype_summary` feeds a neutral-name dashboard view while the
+  curated seed remains available for comparison. Against release 0.3.0,
+  2,940/3,048 Champions teams receive a primary assignment and 38 groups
+  span multiple events; the dashboard shows the top 24 cross-event groups.
 
 ## Backlog #25-#27 — the last three blocked items (2026-08-03)
 
