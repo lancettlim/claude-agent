@@ -1096,6 +1096,7 @@
     var moveRows = marts.pokemon_move_usage || [];
     var coreRows = marts.pokemon_team_core_usage || [];
     var synergyRows = marts.pokemon_team_synergy || [];
+    var tripleRows = marts.pokemon_team_core_triple_usage || [];
     var concentrationByKey = {};
     (marts.pokemon_build_concentration || []).forEach(function (r) {
       concentrationByKey[r.pokemon_key] = r;
@@ -1140,6 +1141,7 @@
       : null;
     var coreGrid = document.getElementById("profile-team-core-grid");
     var coreMetricSelect = document.getElementById("profile-team-core-metric");
+    var coreSizeSelect = document.getElementById("profile-team-core-size");
     var itemConcentrationEl = document.getElementById("profile-item-concentration");
     var abilityConcentrationEl = document.getElementById("profile-ability-concentration");
 
@@ -1152,6 +1154,39 @@
     // dashboard where the headline number isn't a percentage, because
     // there is no whole for it to be a share of.
     function coreRowsFor(pokemonKey) {
+      if (coreSizeSelect && coreSizeSelect.value === "triples") {
+        var metric = coreMetricSelect && coreMetricSelect.value === "synergy"
+          ? "triple_lift"
+          : "triple_team_count";
+        return tripleRows
+          .filter(function (r) {
+            return r.triple_team_count >= 5 &&
+              (r.pokemon_key_a === pokemonKey ||
+                r.pokemon_key_b === pokemonKey ||
+                r.pokemon_key_c === pokemonKey);
+          })
+          .sort(function (a, b) {
+            return (b[metric] || 0) - (a[metric] || 0);
+          })
+          .slice(0, 12)
+          .map(function (r) {
+            var keys = [r.pokemon_key_a, r.pokemon_key_b, r.pokemon_key_c].filter(function (key) {
+              return key !== pokemonKey;
+            });
+            return {
+              partner_pokemon_key: keys[0],
+              pokemon_keys: keys.join("|"),
+              partner_pokemon_name: keys.map(function (key) {
+                return pokemonNames[key] || key;
+              }).join(" + "),
+              display: metric === "triple_lift"
+                ? "×" + (r.triple_lift || 0).toFixed(1)
+                : formatPercent(r.triple_team_share),
+              sub: r.triple_team_count + " teams · " + r.event_count + " events",
+              is_triple: true,
+            };
+          });
+      }
       if (coreMetricSelect && coreMetricSelect.value === "synergy") {
         return synergyRows
           .filter(function (r) {
@@ -1316,6 +1351,9 @@
 
       var cores = profile ? coreRowsFor(profile.pokemon_key) : [];
       renderGrid6xn(coreGrid, cores, {
+        iconHtmlFn: function (r) {
+          return r.is_triple ? teamCompositionHtml(r.pokemon_keys, ICON_SIZES.sm) : null;
+        },
         keyFn: function (r) {
           return r.partner_pokemon_key;
         },
@@ -1339,6 +1377,11 @@
         render(select.value);
       });
     }
+    if (coreSizeSelect) {
+      coreSizeSelect.addEventListener("change", function () {
+        render(select.value);
+      });
+    }
     if (sortedProfiles.length) select.value = sortedProfiles[0].pokemon_name;
     render(select.value);
 
@@ -1346,6 +1389,37 @@
       document.querySelectorAll('.tab-panel[data-panel="pokemon-profile"] .subtab-btn'),
       document.querySelectorAll('.tab-panel[data-panel="pokemon-profile"] .subtab-panel')
     );
+  }
+
+  function setupDetectedArchetypes() {
+    var rows = (marts.detected_archetype_summary || [])
+      .slice()
+      .sort(function (a, b) {
+        return a.archetype_rank - b.archetype_rank;
+      });
+    renderGrid6xn(document.getElementById("detected-archetype-grid"), rows, {
+      iconHtmlFn: function (r) {
+        return teamCompositionHtml(
+          [r.pokemon_key_a, r.pokemon_key_b, r.pokemon_key_c].join("|"),
+          ICON_SIZES.sm
+        );
+      },
+      labelFn: function (r) {
+        return [r.pokemon_name_a, r.pokemon_name_b, r.pokemon_name_c].join(" / ");
+      },
+      displayFn: function (r) {
+        return formatPercent(r.team_share);
+      },
+      subFn: function (r) {
+        var extension = r.top_extension_pokemon_name
+          ? " · + " + r.top_extension_pokemon_name + " on " + formatPercent(r.top_extension_share)
+          : "";
+        return r.team_count + " teams · " + r.player_count + " players · " +
+          r.stability_label + extension;
+      },
+      showLeader: false,
+      typeFn: false,
+    });
   }
 
   // Speed Tiers now reads pokemon_speed_tiers (backlog #16) rather than
@@ -1765,6 +1839,7 @@
   registerTab("data-sources", setupDataSources);
   registerTab("usage", setupUsage);
   registerTab("pokemon-profile", setupPokemonProfile);
+  registerTab("archetypes", setupDetectedArchetypes);
   registerTab("speed-tiers", setupSpeedTiers);
   registerTab("players", setupPlayers);
 
