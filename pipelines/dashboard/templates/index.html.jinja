@@ -171,7 +171,7 @@
      Moves/Team Cores), so several equally-important views can share one
      section instead of stacking. Deliberately visually lighter than the
      top-level `.tabs` row above, which stays reserved for the page's
-     nine main tabs. --- */
+     ten main tabs. --- */
   .subtabs {
     display: flex;
     gap: var(--space-2);
@@ -701,6 +701,7 @@
     <button class="tab-btn" role="tab" data-tab="overview" aria-selected="true">Overview</button>
     <button class="tab-btn" role="tab" data-tab="usage" aria-selected="false">Usage</button>
     <button class="tab-btn" role="tab" data-tab="pokemon-profile" aria-selected="false">Pokémon Profile</button>
+    <button class="tab-btn" role="tab" data-tab="archetypes" aria-selected="false">Archetypes</button>
     <button class="tab-btn" role="tab" data-tab="speed-tiers" aria-selected="false">Speed Tiers</button>
     <button class="tab-btn" role="tab" data-tab="matchup" aria-selected="false">Matchup</button>
     <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
@@ -899,6 +900,12 @@
         since lift is noisy below that.
       </p>
       <div class="controls">
+        <label>Core size
+          <select id="profile-team-core-size">
+            <option value="pairs">Pairs</option>
+            <option value="triples">Triples</option>
+          </select>
+        </label>
         <label>Ranked by
           <select id="profile-team-core-metric">
             <option value="co_occurrence">Co-occurrence</option>
@@ -908,6 +915,20 @@
       </div>
       <div class="grid-6xn" id="profile-team-core-grid"></div>
     </div>
+  </section>
+
+  <section class="tab-panel" data-panel="archetypes" hidden>
+    <h2>Detected Archetypes</h2>
+    <p class="sub">
+      Experimental, data-derived team identities anchored by three-Pokémon
+      cores from real Champions rosters. Qualifying cores appear on at least
+      five teams and have above-chance three-way and average pair lift. Cores
+      sharing two members consolidate under their strongest neighbour; teams
+      receive one primary assignment and may retain one near-tied secondary
+      assignment. Neutral core names are deliberate—composition alone does
+      not prove an editorial label such as “Rain” or “Balance.”
+    </p>
+    <div class="grid-6xn" id="detected-archetype-grid"></div>
   </section>
 
   <section class="tab-panel" data-panel="speed-tiers" hidden>
