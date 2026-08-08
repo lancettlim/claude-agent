@@ -409,6 +409,99 @@ models:
           - not_null:
               config:
                 meta: {category: mart_quality, table_name: pokemon_team_synergy}
+  - name: pokemon_team_core_triple_usage
+    description: >
+      Canonical three-Pokemon Champions team cores. Each row is one
+      pokemon_key_a < pokemon_key_b < pokemon_key_c triple with distinct
+      team/player/event support, observed and expected team share,
+      three-way lift, constituent pair-lift summaries, placement/win-rate
+      context, and support/lift ranks. Written to
+      data/marts/pokemon_team_core_triple_usage.csv.
+    data_tests:
+      - unique_combination_of_columns:
+          arguments:
+            combination_of_columns: ['pokemon_key_a', 'pokemon_key_b', 'pokemon_key_c']
+          config:
+            meta: {category: mart_quality, table_name: pokemon_team_core_triple_usage}
+    columns:
+      - name: pokemon_key_a
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_core_triple_usage}
+      - name: pokemon_key_b
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_core_triple_usage}
+      - name: pokemon_key_c
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: pokemon_team_core_triple_usage}
+  - name: detected_archetype_candidates
+    description: >
+      Experimental data-derived archetype cores. Qualifying triples have
+      at least five teams and above-chance triple/average-pair lift;
+      candidates sharing two Pokemon consolidate under their strongest
+      one-hop neighbour. Written to
+      data/marts/detected_archetype_candidates.csv.
+    columns:
+      - name: candidate_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_candidates}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_candidates}
+      - name: archetype_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_candidates}
+  - name: detected_archetype_team_membership
+    description: >
+      Experimental team assignments to detected archetypes. Every matched
+      team has one primary assignment; a secondary assignment is retained
+      only when its score is within 90% of the primary score. Written to
+      data/marts/detected_archetype_team_membership.csv.
+    columns:
+      - name: archetype_assignment_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_team_membership}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_team_membership}
+      - name: team_id
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_team_membership}
+      - name: archetype_key
+        data_tests:
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_team_membership}
+  - name: detected_archetype_summary
+    description: >
+      Dashboard-facing experimental archetype summary using primary team
+      assignments only: representative core, usage/player/event support,
+      placement and win-rate context, top extension, and a simple stability
+      label. Neutral core names are intentional; editorial labels are not
+      inferred from composition alone. Written to
+      data/marts/detected_archetype_summary.csv.
+    columns:
+      - name: archetype_key
+        data_tests:
+          - unique:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_summary}
+          - not_null:
+              config:
+                meta: {category: mart_quality, table_name: detected_archetype_summary}
   - name: pokemon_usage_by_country
     description: >
       Country-grain half of backlog.md #7 ("which regions favor which
