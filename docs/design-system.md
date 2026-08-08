@@ -867,6 +867,22 @@ If a future pass wants deeper mechanics fidelity, extend `TOGGLES` and
 `computeDamage()` in `matchup.js` rather than adding new dbt models —
 none of this is data-layer work.
 
+## Detected archetypes and triple cores
+
+Triple-core tiles reuse the `.team-comp` visual with the selected Pokémon
+omitted, so the two partners read as a unit instead of a misleading single
+sprite. The existing percentage/multiplier convention still applies:
+co-occurrence shows team share and synergy shows `×N.N` lift, always paired
+with its real team/event sample.
+
+Detected-archetype tiles show the representative three-Pokémon composition,
+primary-assignment team share, sample size, stability label, and most common
+extension. They intentionally do not use themed names or illustrations:
+the visual language must make clear that these are measured composition
+groups, not editorial claims about play style. Only cross-event groups enter
+the dashboard, capped at 24; emerging and single-event groups remain in the
+mart for analysis.
+
 ## Responsive behavior
 
 Breakpoints match `docs/dashboard.md`'s existing convention: 720px (KPI

@@ -347,7 +347,7 @@ both views" note above is from the pre-#25 format-mixed corpus; on the
 Champions-scoped data it's Kingambit, with Incineroar +3 places on top-cut
 share.)
 
-#### 9. Team synergy beyond raw co-occurrence — DONE (pairs; triples still open)
+#### 9. Team synergy beyond raw co-occurrence — DONE (pairs and triples)
 
 - **Size**: M
 - **Value**: `pokemon_team_core_usage` reports how often two Pokémon appear
@@ -371,10 +371,16 @@ Profile tab's Team Cores section is now rankable by co-occurrence or by
 lift, showing `×N.N` with `pair_team_count` alongside it (the dashboard's
 one non-percentage headline value — see `docs/design-system.md`'s
 "Multiplier values"). The floor this entry asks consumers to apply is
-applied there: pairs below 5 shared teams never reach the page. Still
-open: extending past pairs to triples for real
-"core" detection, as this entry originally suggested — a bigger
-combinatorial problem than the pairwise case, left for a follow-up.
+applied there: pairs below 5 shared teams never reach the page.
+
+**Extended to triples on 2026-08-09.**
+`pokemon_team_core_triple_usage` generates the 20 canonical three-Pokémon
+combinations from each six-member Champions roster and reports team/player/
+event support, observed and expected team share, three-way lift, constituent
+pair-lift summaries, placement, and win rate. Pokémon Profile's Team Cores
+view now switches between pairs and triples while retaining the existing
+co-occurrence/lift choice. Triples below five real teams stay in the mart
+for local analysis but do not enter the browser payload.
 
 #### 10. Tera type usage mart — REMOVED; the Champions format has no Tera
 
@@ -490,7 +496,7 @@ the Pokémon Profile tab's Items and Ability grids, with the "only one
 recorded" case labelled separately for exactly the reason this entry
 gives — see `docs/design-system.md`'s "Build-concentration badge".
 
-#### 15. Data-derived archetype clustering — SOFTER STEP DONE, full clustering still open
+#### 15. Data-derived archetype clustering — EXPERIMENTAL DERIVATION DONE
 
 - **Size**: L
 - **Value**: `archetype_pokemon_map` is a 33-row hand-curated seed and the
@@ -537,9 +543,24 @@ its other pairs is weak) and the two single-member archetypes
 is real evidence for this item's own "encodes your opinion rather than the
 data's" concern, not just a theoretical risk.
 
-Full data-derived clustering (replacing the curated seed outright) is
-still open -- this only adds a signal for when the curated seed disagrees
-with real data, not a replacement for it.
+An experimental data-derived path shipped on 2026-08-09 without prematurely
+deleting the curated seed. `detected_archetype_candidates` promotes triples
+seen on at least five teams with above-chance triple and average-pair lift,
+then consolidates cores sharing two members under their strongest one-hop
+neighbour. `detected_archetype_team_membership` assigns one primary identity
+per team and retains one secondary identity only when it scores within 90%
+of the primary. `detected_archetype_summary` exposes representative cores,
+team/player/event support, performance, top extensions, and stability.
+
+Measured against the committed 0.3.0 release data: 2,940 of 3,048 Champions
+teams receive a primary assignment (96.5%), 377 receive a near-tied
+secondary assignment, and 38 detected groups meet the cross-event stability
+label. The dashboard deliberately shows only the top 24 cross-event groups
+and uses neutral core names; composition alone does not prove an editorial
+label such as “Rain.” The curated seed remains as a comparison surface until
+future events establish that the generated groups are stable enough to
+replace it, so retirement of the seed—not data-derived discovery—is the
+remaining decision.
 
 #### 16. Speed-tier bracket mart — DONE
 
