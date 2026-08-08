@@ -88,6 +88,39 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("item_hhi", "ability_hhi"),
     ),
     "pokemon_team_synergy": (("pair_team_count", "lift_rank"), ("lift",)),
+    "pokemon_team_core_triple_usage": (
+        (
+            "triple_team_count",
+            "player_count",
+            "event_count",
+            "total_wins",
+            "total_losses",
+            "support_rank",
+            "lift_rank",
+        ),
+        (
+            "triple_team_share",
+            "expected_team_share",
+            "triple_lift",
+            "min_pair_lift",
+            "avg_pair_lift",
+            "win_rate",
+            "avg_placement",
+        ),
+    ),
+    "detected_archetype_summary": (
+        (
+            "candidate_count",
+            "team_count",
+            "player_count",
+            "event_count",
+            "total_wins",
+            "total_losses",
+            "extension_team_count",
+            "archetype_rank",
+        ),
+        ("team_share", "win_rate", "avg_placement", "top_extension_share"),
+    ),
     "pokemon_speed_tiers": (
         (
             "base_speed",
@@ -144,6 +177,8 @@ MART_FIELDS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
 # docs/local-queries.md's ad-hoc querying.
 MIN_SYNERGY_PAIR_TEAMS = 5
 MAX_SYNERGY_PARTNERS_PER_POKEMON = 12
+MIN_TRIPLE_CORE_TEAMS = 5
+MAX_DETECTED_ARCHETYPES = 24
 # Deliberately 2, not a larger "established player" number: only three
 # Champions-format events exist anywhere (see backlog.md #26), so three
 # recorded teams is the ceiling, not a modest bar. Measured against the
@@ -177,8 +212,26 @@ def _slice_player_signature(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
+def _slice_team_core_triples(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep the mart complete on disk while excluding one-off triple lift
+    noise from the browser payload."""
+    return [row for row in rows if (row.get("triple_team_count") or 0) >= MIN_TRIPLE_CORE_TEAMS]
+
+
+def _slice_detected_archetypes(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The experimental UI leads with cross-event groups, not single-event
+    or tiny emerging fragments. The complete candidate/membership/summary
+    marts remain queryable locally."""
+    stable = [row for row in rows if row.get("stability_label") == "cross-event"]
+    return sorted(stable, key=lambda row: row.get("archetype_rank") or 10**9)[
+        :MAX_DETECTED_ARCHETYPES
+    ]
+
+
 MART_SLICERS = {
     "pokemon_team_synergy": _slice_team_synergy,
+    "pokemon_team_core_triple_usage": _slice_team_core_triples,
+    "detected_archetype_summary": _slice_detected_archetypes,
     "player_signature_pokemon": _slice_player_signature,
 }
 
@@ -254,6 +307,10 @@ _NAME_JOINS = (
     ("opponent_pokemon_key", "opponent_pokemon_name"),
     ("best_matchup_pokemon_key", "best_matchup_pokemon_name"),
     ("worst_matchup_pokemon_key", "worst_matchup_pokemon_name"),
+    ("pokemon_key_a", "pokemon_name_a"),
+    ("pokemon_key_b", "pokemon_name_b"),
+    ("pokemon_key_c", "pokemon_name_c"),
+    ("top_extension_pokemon_key", "top_extension_pokemon_name"),
 )
 
 
