@@ -679,10 +679,11 @@ dashboard UI yet (`pipelines/dashboard/data.py`'s `MART_FIELDS` and
 `docs/dashboard.md`) — that's separate, still-open follow-up work; see each
 item's `docs/backlog.md` entry.
 
-- [x] Backlog #10: Tera type usage mart — new
-  `dbt/models/marts/pokemon_tera_type_usage.sql`, mirroring
-  `pokemon_item_usage`/`pokemon_ability_usage`'s usage-count-and-
-  share-of-own-total pattern for `tournament_team_member.tera_type`.
+- [x] Backlog #10: Tera type usage mart — initially built, then removed
+  after event-format scoping established that Champions has no Tera mechanic
+  and Champions-scoped coverage is 0%. The apparent 82.8% coverage belonged
+  to standard VGC rows outside this dataset's scope. Reconsider only if the
+  Champions format adds Tera.
 - [x] Backlog #12: Usage × regulation cross-tab — new
   `dbt/models/marts/pokemon_usage_by_regulation.sql`. `tournament_event`
   carries no `regulation_code` of its own, so this isn't a temporal "usage
