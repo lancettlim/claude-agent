@@ -187,6 +187,108 @@ def test_load_mart_coerces_team_core_usage_fields(tmp_path):
     ]
 
 
+def test_load_mart_coerces_team_core_triple_fields(tmp_path):
+    _write_csv(
+        tmp_path / "pokemon_team_core_triple_usage.csv",
+        [
+            {
+                "pokemon_key_a": "archaludon",
+                "pokemon_key_b": "pelipper",
+                "pokemon_key_c": "rillaboom",
+                "triple_team_count": "12",
+                "player_count": "11",
+                "event_count": "3",
+                "triple_team_share": "0.021",
+                "expected_team_share": "0.004",
+                "triple_lift": "5.25",
+                "min_pair_lift": "1.2",
+                "avg_pair_lift": "2.4",
+                "total_wins": "80",
+                "total_losses": "40",
+                "win_rate": "0.6667",
+                "avg_placement": "18.5",
+                "support_rank": "2",
+                "lift_rank": "8",
+            }
+        ],
+    )
+
+    row = data.load_mart(tmp_path, "pokemon_team_core_triple_usage")[0]
+
+    assert row["triple_team_count"] == 12
+    assert row["event_count"] == 3
+    assert row["triple_lift"] == 5.25
+    assert row["avg_placement"] == 18.5
+
+
+def test_load_mart_coerces_detected_archetype_summary_fields(tmp_path):
+    _write_csv(
+        tmp_path / "detected_archetype_summary.csv",
+        [
+            {
+                "archetype_key": "detected-rain",
+                "pokemon_key_a": "archaludon",
+                "pokemon_key_b": "pelipper",
+                "pokemon_key_c": "rillaboom",
+                "candidate_count": "3",
+                "team_count": "20",
+                "player_count": "18",
+                "event_count": "3",
+                "team_share": "0.04",
+                "total_wins": "120",
+                "total_losses": "80",
+                "win_rate": "0.6",
+                "avg_placement": "24.2",
+                "top_extension_pokemon_key": "incineroar",
+                "extension_team_count": "12",
+                "top_extension_share": "0.6",
+                "stability_label": "cross-event",
+                "archetype_rank": "1",
+            }
+        ],
+    )
+
+    row = data.load_mart(tmp_path, "detected_archetype_summary")[0]
+
+    assert row["team_count"] == 20
+    assert row["team_share"] == 0.04
+    assert row["top_extension_share"] == 0.6
+
+
+def test_detected_archetype_payload_keeps_only_ranked_cross_event_groups(tmp_path):
+    rows = []
+    for rank in range(1, data.MAX_DETECTED_ARCHETYPES + 3):
+        rows.append(
+            {
+                "archetype_key": f"stable-{rank}",
+                "team_count": "20",
+                "player_count": "18",
+                "event_count": "3",
+                "team_share": "0.04",
+                "stability_label": "cross-event",
+                "archetype_rank": str(rank),
+            }
+        )
+    rows.append(
+        {
+            "archetype_key": "emerging",
+            "team_count": "5",
+            "player_count": "5",
+            "event_count": "1",
+            "team_share": "0.001",
+            "stability_label": "emerging",
+            "archetype_rank": "0",
+        }
+    )
+    _write_csv(tmp_path / "detected_archetype_summary.csv", rows)
+
+    sliced = data.load_mart(tmp_path, "detected_archetype_summary")
+
+    assert len(sliced) == data.MAX_DETECTED_ARCHETYPES
+    assert sliced[0]["archetype_key"] == "stable-1"
+    assert all(row["stability_label"] == "cross-event" for row in sliced)
+
+
 def test_load_mart_coerces_usage_by_event_date_fields(tmp_path):
     _write_csv(
         tmp_path / "pokemon_usage_by_event_date.csv",
