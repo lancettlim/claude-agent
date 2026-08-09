@@ -1828,6 +1828,57 @@
       );
     }
 
+    // Snapshot/release history is intentionally compact metadata: raw
+    // snapshots stay in the scheduled-extraction cache, while published
+    // manifests are already committed. This makes the waiting period for
+    // real longitudinal analytics visible instead of silent.
+    var history = prov.snapshot_history || {};
+    var historyStatus = document.getElementById("ds-history-status");
+    if (historyStatus) {
+      if (!history.snapshot_count) {
+        historyStatus.textContent =
+          "No retained extraction snapshots are present in this dashboard build. " +
+          "The scheduled workflow stores them in its cache; run a refresh before expecting snapshot-over-snapshot trends.";
+      } else if (history.has_multiple_snapshots) {
+        historyStatus.textContent =
+          history.snapshot_count + " distinct snapshot dates retained from " +
+          history.first_snapshot_date + " through " + history.latest_snapshot_date + ".";
+      } else {
+        historyStatus.textContent =
+          "One snapshot date is currently available (" + history.latest_snapshot_date + "). " +
+          "Snapshot-over-snapshot trends need at least two dates.";
+      }
+    }
+
+    var snapshotTable = document.getElementById("ds-snapshot-table");
+    if (snapshotTable) {
+      makeSortableTable(snapshotTable, history.sources || [], function (row) {
+        return (
+          "<td>" + escapeHtml(row.source_name || row.staging_subdir || "—") + "</td>" +
+          "<td>" + (row.snapshot_count == null ? "—" : row.snapshot_count) + "</td>" +
+          "<td>" + escapeHtml(row.first_snapshot_date || "—") + "</td>" +
+          "<td>" + escapeHtml(row.latest_snapshot_date || "—") + "</td>" +
+          "<td>" + (row.history_days == null ? "—" : row.history_days) + "</td>"
+        );
+      }, { defaultKey: "snapshot_count", defaultDir: "desc" });
+    }
+
+    var releaseTable = document.getElementById("ds-release-table");
+    if (releaseTable) {
+      makeSortableTable(releaseTable, prov.release_history || [], function (row) {
+        var failures = row.quality_failure_count || 0;
+        return (
+          "<td>" + escapeHtml(row.dataset_version || "—") + "</td>" +
+          "<td>" + escapeHtml(String(row.published_at_utc || "—").slice(0, 10)) + "</td>" +
+          "<td>" + (row.table_count == null ? "—" : row.table_count) + "</td>" +
+          "<td>" + (row.image_count == null ? "—" : row.image_count) + "</td>" +
+          '<td><span class="badge ' + (failures ? "badge-negative" : "badge-positive") + '">' +
+          failures + "</span></td>" +
+          "<td>" + (row.known_limitation_count == null ? "—" : row.known_limitation_count) + "</td>"
+        );
+      }, { defaultKey: "published_at_utc", defaultDir: "desc" });
+    }
+
     var subtabs = document.querySelectorAll('[data-panel="data-sources"] .subtab-btn');
     var subpanels = document.querySelectorAll('[data-panel="data-sources"] .subtab-panel');
     setupSubTabs(subtabs, subpanels);

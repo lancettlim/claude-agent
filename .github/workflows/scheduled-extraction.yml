@@ -72,3 +72,16 @@ jobs:
             uv run python -m pipelines.cli extract "$source"
             echo "::endgroup::"
           done
+
+      # Keep refresh health inspectable even though raw snapshots remain in
+      # the cache rather than git. This artifact is deliberately metadata
+      # only: it contains request/row/null-rate diagnostics, not the large
+      # source snapshots themselves.
+      - name: Upload extraction diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extraction-diagnostics-${{ github.run_id }}
+          path: reports/validation/extraction_summary.json
+          if-no-files-found: ignore
+          retention-days: 14

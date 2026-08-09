@@ -25,6 +25,22 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_MARTS_DIR = REPO_ROOT / "data" / "marts"
 DEFAULT_NORMALIZED_DIR = REPO_ROOT / "data" / "normalized"
 DEFAULT_REPORTS_DIR = REPO_ROOT / "reports" / "validation"
+DEFAULT_STAGING_DIR = REPO_ROOT / "data" / "staging"
+DEFAULT_MANIFESTS_DIR = REPO_ROOT / "releases" / "manifests"
+
+_STAGING_LABELS = {
+    "bulbagarden": "Bulbagarden Archives",
+    "limitless": "Limitless VGC",
+    "munchstats": "MunchStats",
+    "opgg_champions": "OP.GG Pokémon Champions",
+    "pokeapi": "PokéAPI",
+    "pokeapi_ability": "PokéAPI (ability detail)",
+    "pokeapi_artwork": "PokéAPI (artwork)",
+    "pokeapi_item": "PokéAPI (item detail)",
+    "pokeapi_move": "PokéAPI (move detail)",
+    "pokebase": "PokéBase",
+    "rk9_pairings": "RK9.gg",
+}
 
 # mart_name -> (int_fields, float_fields) for numeric coercion; every other
 # column is left as a string.
@@ -298,6 +314,82 @@ def load_marts(marts_dir: Path = DEFAULT_MARTS_DIR) -> dict[str, list[dict[str, 
     return {mart_name: load_mart(marts_dir, mart_name) for mart_name in MART_FIELDS}
 
 
+def load_snapshot_history(staging_dir: Path = DEFAULT_STAGING_DIR) -> dict[str, Any]:
+    """Summarize retained extraction snapshots without reading their rows.
+
+    Snapshot CSVs are deliberately gitignored and may be absent from a clean
+    checkout, so this is an optional observability feed. Filenames are the
+    extractor's UTC dates (YYYY-MM-DD.csv); malformed filenames are ignored so
+    a stray file cannot break a dashboard build.
+    """
+    source_rows: list[dict[str, Any]] = []
+    all_dates: set[str] = set()
+    if staging_dir.exists():
+        for source_dir in sorted(path for path in staging_dir.iterdir() if path.is_dir()):
+            dates = []
+            for path in source_dir.glob("*.csv"):
+                candidate = path.stem
+                if len(candidate) != 10 or candidate[4] != "-" or candidate[7] != "-":
+                    continue
+                try:
+                    datetime.fromisoformat(candidate)
+                except ValueError:
+                    continue
+                dates.append(candidate)
+            dates.sort()
+            if not dates:
+                continue
+            all_dates.update(dates)
+            source_key = source_dir.name
+            source_rows.append(
+                {
+                    "source_name": _STAGING_LABELS.get(source_key, source_key),
+                    "staging_subdir": source_key,
+                    "snapshot_count": len(dates),
+                    "first_snapshot_date": dates[0],
+                    "latest_snapshot_date": dates[-1],
+                    "history_days": (
+                        (datetime.fromisoformat(dates[-1]) - datetime.fromisoformat(dates[0])).days
+                        if len(dates) > 1
+                        else 0
+                    ),
+                }
+            )
+    return {
+        "snapshot_count": len(all_dates),
+        "first_snapshot_date": min(all_dates) if all_dates else None,
+        "latest_snapshot_date": max(all_dates) if all_dates else None,
+        "has_multiple_snapshots": len(all_dates) > 1,
+        "sources": source_rows,
+    }
+
+
+def load_release_history(manifests_dir: Path = DEFAULT_MANIFESTS_DIR) -> list[dict[str, Any]]:
+    """Read compact release metadata for the Data & Sources history view."""
+    releases: list[dict[str, Any]] = []
+    if not manifests_dir.exists():
+        return releases
+    for path in sorted(manifests_dir.glob("manifest-*.json")):
+        manifest = _read_json(path)
+        if not manifest.get("dataset_version"):
+            continue
+        quality_checks = manifest.get("quality_checks") or []
+        releases.append(
+            {
+                "dataset_version": manifest["dataset_version"],
+                "published_at_utc": manifest.get("published_at_utc"),
+                "table_count": len(manifest.get("tables") or []),
+                "image_count": (manifest.get("images") or {}).get("count"),
+                "quality_check_count": len(quality_checks),
+                "quality_failure_count": sum(
+                    1 for check in quality_checks if check.get("status") != "pass"
+                ),
+                "known_limitation_count": len(manifest.get("known_limitations") or []),
+            }
+        )
+    return sorted(releases, key=lambda row: (row.get("published_at_utc") or "", row["dataset_version"]))
+
+
 # <key column> -> <display-name column> pairs resolved against the
 # pokemon_key -> PascalCase name map, so every mart row carries a
 # ready-to-render name rather than each view looking it up client-side.
@@ -406,7 +498,11 @@ def _read_json(path: Path) -> dict[str, Any]:
         return {}
 
 
-def load_provenance(reports_dir: Path = DEFAULT_REPORTS_DIR) -> dict[str, Any]:
+def load_provenance(
+    reports_dir: Path = DEFAULT_REPORTS_DIR,
+    staging_dir: Path = DEFAULT_STAGING_DIR,
+    manifests_dir: Path = DEFAULT_MANIFESTS_DIR,
+) -> dict[str, Any]:
     """The Data & Sources tab's feed: where the numbers came from and
     whether they passed their gates.
 
@@ -481,6 +577,8 @@ def load_provenance(reports_dir: Path = DEFAULT_REPORTS_DIR) -> dict[str, Any]:
         "gates": gates,
         "release_blocking_findings": report.get("release_blocking_findings", []),
         "validation_available": bool(report),
+        "snapshot_history": load_snapshot_history(staging_dir),
+        "release_history": load_release_history(manifests_dir),
     }
 
 
@@ -488,6 +586,8 @@ def build_payload(
     marts_dir: Path = DEFAULT_MARTS_DIR,
     normalized_dir: Path = DEFAULT_NORMALIZED_DIR,
     reports_dir: Path = DEFAULT_REPORTS_DIR,
+    staging_dir: Path = DEFAULT_STAGING_DIR,
+    manifests_dir: Path = DEFAULT_MANIFESTS_DIR,
 ) -> dict[str, Any]:
     marts = load_marts(marts_dir)
     pokemon_names = load_pokemon_names(normalized_dir)
@@ -495,7 +595,7 @@ def build_payload(
     return {
         "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "kpis": compute_kpis(marts),
-        "provenance": load_provenance(reports_dir),
+        "provenance": load_provenance(reports_dir, staging_dir, manifests_dir),
         "marts": marts,
         # Full pokemon_key -> display name map, needed client-side wherever
         # a row can't be joined 1:1 by _join_pokemon_names -- e.g.

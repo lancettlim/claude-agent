@@ -841,6 +841,59 @@ def test_load_provenance_flattens_all_four_gate_categories(tmp_path):
         "duplicate_key",
         "referential_integrity",
     ]
+
+
+def test_load_snapshot_history_summarizes_retained_dates(tmp_path):
+    source_dir = tmp_path / "munchstats"
+    source_dir.mkdir(parents=True)
+    (source_dir / "2026-01-01.csv").write_text("x\n", encoding="utf-8")
+    (source_dir / "2026-01-08.csv").write_text("x\n", encoding="utf-8")
+    (source_dir / "notes.csv").write_text("x\n", encoding="utf-8")
+
+    history = data.load_snapshot_history(tmp_path)
+
+    assert history["snapshot_count"] == 2
+    assert history["has_multiple_snapshots"] is True
+    assert history["first_snapshot_date"] == "2026-01-01"
+    assert history["latest_snapshot_date"] == "2026-01-08"
+    assert history["sources"] == [
+        {
+            "source_name": "MunchStats",
+            "staging_subdir": "munchstats",
+            "snapshot_count": 2,
+            "first_snapshot_date": "2026-01-01",
+            "latest_snapshot_date": "2026-01-08",
+            "history_days": 7,
+        }
+    ]
+
+
+def test_load_release_history_reads_compact_manifest_metadata(tmp_path):
+    (tmp_path / "manifest-0.1.0.json").write_text(
+        json.dumps(
+            {
+                "dataset_version": "0.1.0",
+                "published_at_utc": "2026-01-01T00:00:00Z",
+                "tables": [{"name": "pokemon"}],
+                "images": {"count": 0},
+                "quality_checks": [{"status": "pass"}],
+                "known_limitations": ["example"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert data.load_release_history(tmp_path) == [
+        {
+            "dataset_version": "0.1.0",
+            "published_at_utc": "2026-01-01T00:00:00Z",
+            "table_count": 1,
+            "image_count": 0,
+            "quality_check_count": 1,
+            "quality_failure_count": 0,
+            "known_limitation_count": 1,
+        }
+    ]
     # The gate results are baked into the payload here precisely because
     # validation_report.json itself is gitignored and never reaches the
     # published site.

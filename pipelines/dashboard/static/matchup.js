@@ -65,6 +65,10 @@
     return multiplier;
   }
 
+  // Shared by Team Builder's Team Analyst. Keeping one chart implementation
+  // prevents the dashboard's matchup and team-coverage screens from drifting.
+  App.typeEffectiveness = typeEffectiveness;
+
   function effectClass(m) {
     if (m === 0) return "type-effect-0x";
     if (m === 0.25) return "type-effect-quarter";

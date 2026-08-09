@@ -724,6 +724,12 @@ sorts/type-filters the legal pool, adds up to 6 to a team, and sees:
   mart filtered to the selected keys.
 - a **summary row** (`.stat-summary-row`) of the team's average
   speed/usage share/win rate.
+- a **Team Analyst** panel (`#team-builder-analysis`) with four screening
+  cards, defensive pressure points, and a common-threat table. Coverage is
+  computed from the slot's selected recorded damaging moves against the
+  standard type chart; exposure is computed from the threat's recorded move
+  types. It is intentionally labeled as a screening tool, not a battle
+  simulator or an EV/IV recommendation engine.
 - an **"Export as pokepaste text"** button (`#team-builder-export`) —
   see "Pokepaste import/export" below.
 

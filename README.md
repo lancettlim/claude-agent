@@ -5,13 +5,13 @@ Champions competitive data platform and its first dataset artifact.
 
 ## Current focus
 
-`dataset_version 0.1.0` (and `0.2.0`, adding Bulbagarden sprite imagery) have
-shipped — the core ingestion → normalization → release pipeline is done, and
-the Phase 4 team-card renderer and M6 analytics dashboard are both built.
-Current work is upstream of these: expanding the dataset (more extraction
-runs, richer tournament coverage, an eventual Champions rebalance) so the
-still-degenerate views (stat-change trends, legal-pool trends over time) have
-real data to show. See `docs/todo.md` for current status.
+`dataset_version 0.3.0` is the current published release — the core ingestion
+→ normalization → release pipeline, Phase 4 team-card renderer, and M6
+analytics dashboard are all built. Current development is focused on Team
+Analyst workflows, refresh/history observability, and accumulating enough
+snapshot history to support honest release-to-release comparisons. See
+`docs/roadmap.md` for the active next-development plan and `docs/todo.md` for
+repository status.
 
 **Live dashboard:** https://lancettlim.github.io/claude-agent/dashboard/
 
@@ -26,6 +26,8 @@ See `docs/` for the full document set:
 - `docs/business-case.md` — supporting business case document
 - `docs/dashboard.md` — the M6 analytics dashboard's architecture, stack
   decision, and how to build/view/publish it
+- `docs/roadmap.md` — the next development cycle: Team Analyst, historical
+  operations, snapshot comparisons, and the battle-log/replay research plan
 - `docs/todo.md` — outstanding work items and definition of done for the v1
   release
 - `docs/backlog.md` — post-v1 feature wish list, sized and dependency-tagged

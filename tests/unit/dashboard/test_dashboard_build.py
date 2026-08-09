@@ -207,6 +207,9 @@ def test_build_has_tab_markup_for_all_tabs(tmp_path):
 
     assert 'id="profile-team-core-size"' in html
     assert 'id="detected-archetype-grid"' in html
+    assert 'id="team-builder-analysis"' in html
+    assert 'id="ds-snapshot-table"' in html
+    assert 'id="ds-release-table"' in html
 
 
 def test_build_populates_sprites_and_type_icons(tmp_path):
