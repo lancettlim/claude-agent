@@ -17,7 +17,7 @@ import csv
 import json
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -324,7 +324,7 @@ def build(
     """
     validation_report = _load_validation_report(validation_report_path)
 
-    published_at_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    published_at_utc = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     sources = _build_sources(staging_dir)
     release_dir = releases_data_dir / dataset_version
     tables = _copy_tables(normalized_dir, release_dir)

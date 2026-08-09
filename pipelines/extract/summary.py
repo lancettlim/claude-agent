@@ -34,7 +34,7 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -135,7 +135,7 @@ def build_source_entry(result: SourceRunResult) -> dict[str, Any]:
         ),
         "rows_written": rows_written,
         "required_field_null_rate": null_rate,
-        "checked_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "checked_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
 
 
@@ -181,6 +181,6 @@ def update(
     document = merge_source_entry(document, entry)
     document["description"] = DESCRIPTION
     document["dataset_version"] = dataset_version
-    document["generated_at_utc"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    document["generated_at_utc"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_document(document, path)
     return document

@@ -295,7 +295,7 @@ def _run_results_path(dbt_project_dir):
 def test_run_validate_passes_when_gates_clean(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
         _run_results_path(tmp_path).write_text("{}")
         return subprocess.CompletedProcess(cmd, returncode=0)
@@ -309,7 +309,7 @@ def test_run_validate_passes_when_gates_clean(tmp_path, monkeypatch):
 def test_run_validate_fails_when_gates_report_findings(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
         _run_results_path(tmp_path).write_text("{}")
         return subprocess.CompletedProcess(cmd, returncode=1)
@@ -326,7 +326,7 @@ def test_run_validate_propagates_unexpected_dbt_crash_code(tmp_path, monkeypatch
     monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
     calls = []
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         return subprocess.CompletedProcess(cmd, returncode=2)
 
     monkeypatch.setattr(cli.subprocess, "run", fake_run)
@@ -347,7 +347,7 @@ def test_run_validate_refuses_stale_run_results_after_compile_error(tmp_path, mo
     os.utime(stale_path, (old_time, old_time))
     calls = []
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         return subprocess.CompletedProcess(cmd, returncode=1)
 
     monkeypatch.setattr(cli.subprocess, "run", fake_run)
@@ -368,7 +368,7 @@ def test_run_validate_runs_source_freshness_and_still_passes(tmp_path, monkeypat
     monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
     calls = []
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         calls.append(cmd)
         if cmd[-2:] == ["source", "freshness"]:
             _sources_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)
@@ -395,7 +395,7 @@ def test_run_validate_proceeds_when_source_freshness_produces_no_artifact(tmp_pa
     prerequisite for the rest of the report."""
     monkeypatch.setattr(cli, "DBT_PROJECT_DIR", tmp_path)
 
-    def fake_run(cmd, cwd):
+    def fake_run(cmd, cwd, **_kwargs):
         if cmd[-2:] == ["source", "freshness"]:
             return subprocess.CompletedProcess(cmd, returncode=2)
         _run_results_path(tmp_path).parent.mkdir(parents=True, exist_ok=True)

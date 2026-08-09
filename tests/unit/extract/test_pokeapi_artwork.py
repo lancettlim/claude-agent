@@ -41,7 +41,9 @@ class _FakeResponse:
 
 
 class _FakeSession:
-    def __init__(self, *, content_by_url: dict[str, bytes], status_by_url: dict[str, int] = None):
+    def __init__(
+        self, *, content_by_url: dict[str, bytes], status_by_url: dict[str, int] | None = None
+    ):
         self._content_by_url = content_by_url
         self._status_by_url = status_by_url or {}
         self.requested_urls: list[str] = []

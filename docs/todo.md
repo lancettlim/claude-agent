@@ -194,7 +194,7 @@ holds everything not yet committed to.
   "Removed sections" note; re-add once a rebalance + multiple snapshots
   make the underlying data real
 - [x] Dashboard full redesign (live at
-  https://lancettlim.github.io/claude-agent/dashboard/): tabbed navigation
+  https://lancettlim.github.io/pokemon-agent/dashboard/): tabbed navigation
   (Overview/Usage/Builds/Moves/Team Cores) replacing the single scrolling
   page; Pokémon sprites, move-type icons, and item icons throughout (KPI
   cards, tables, chart axes, chart tooltips — see `docs/dashboard.md`'s

@@ -170,9 +170,12 @@ added Players & Regions and extended four of the existing tabs:
 - **Team Builder** — a fully client-side roster builder: search/sort/
   type-filter the legal pool, add up to 6 Pokémon, see each slot's stats/
   top ability/top-4-move picker, their speed order, usage/win-rate/speed
-  averages, and an "Export as pokepaste text" button (see
+  averages, a Team Analyst screen for type coverage/shared weaknesses/common
+  threats, and an "Export as pokepaste text" button (see
   `docs/design-system.md`'s "Team Builder"); the team persists to
-  `localStorage` only, never sent anywhere.
+  `localStorage` only, never sent anywhere. The analyst is deliberately a
+  screening tool based on selected recorded moves and type mechanics, not an
+  EV/IV or full battle simulator.
 - **Top Teams** *(new)* — a pokepaste (Showdown-export-text) paste-in box
   that loads a team into Team Builder, a `.grid-6xn` leaderboard fed by the
   new `top_tournament_teams` mart (real MunchStats team data, ranked by
@@ -466,7 +469,7 @@ source to "GitHub Actions" (not "Deploy from a branch" — that's the older
 mode this workflow replaces). Once set, every push to `main` that touches
 `docs/` redeploys via the workflow above, and the dashboard is reachable at
 `https://<owner>.github.io/<repo>/dashboard/` — for this repo, that's
-https://lancettlim.github.io/claude-agent/dashboard/.
+https://lancettlim.github.io/pokemon-agent/dashboard/.
 
 `docs/index.html` is a static redirect stub (meta-refresh + JS
 `location.replace`, so it works with JS disabled too) that sends

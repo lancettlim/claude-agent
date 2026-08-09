@@ -52,9 +52,9 @@ from __future__ import annotations
 import csv
 import html
 import re
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 import requests
 
@@ -248,7 +248,7 @@ def extract(
     elif format_filter is not None:
         tournaments = [t for t in tournaments if t["regulation_set"] == format_filter]
 
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     # (tournament, standings entry) pairs first, so team lists can be
     # fetched once per distinct team rather than once per player.

@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -152,7 +152,7 @@ def extract(
     http = session if session is not None else requests.Session()
     html = _fetch_page_html(http)
     payloads = _extract_pokemon_payloads(html)
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = [
         _row_from_pokemon(

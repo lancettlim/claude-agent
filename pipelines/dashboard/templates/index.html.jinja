@@ -603,9 +603,23 @@
   }
   .stat-summary-row .stat strong { display: block; font-size: var(--font-lg); color: var(--navy); }
 
+  /* --- Team Analyst --- */
+  .team-analysis { margin-top: var(--space-6); border-top: 2px solid var(--light-blue); padding-top: var(--space-4); }
+  .team-analysis h3 { margin-top: 0; }
+  .team-analysis h4 { margin-bottom: var(--space-2); }
+  .team-analysis-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+  .analysis-card { background: var(--light-blue); border-radius: var(--radius-md); padding: var(--space-3); }
+  .analysis-card strong { display: block; color: var(--navy); font-size: var(--font-lg); }
+  .analysis-card span { color: var(--muted); font-size: var(--font-xs); }
+  .team-analysis-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); margin-top: var(--space-5); }
+  .team-analysis table { font-size: var(--font-sm); }
+  .team-analysis .status-good { color: var(--positive); font-weight: 700; }
+  .team-analysis .status-warn { color: var(--warning); font-weight: 700; }
+
   @media (max-width: 720px) {
     .team-builder-grid { grid-template-columns: 1fr; }
     .team-slots { grid-template-columns: repeat(2, 1fr); }
+    .team-analysis-grid, .team-analysis-columns { grid-template-columns: 1fr; }
     .grid-6xn { grid-template-columns: repeat(3, 1fr); }
     .matchup-picker-grid { grid-template-columns: 1fr; }
   }
@@ -1104,6 +1118,38 @@
         <ol class="speed-order-list" id="team-builder-speed-order"></ol>
 
         <div class="stat-summary-row" id="team-builder-summary"></div>
+
+        <div class="team-analysis" id="team-builder-analysis">
+          <h3>Team analyst</h3>
+          <p class="sub">
+            Fast, source-backed checks for the current six. Coverage uses your
+            selected recorded moves and the standard type chart; threat checks
+            use the most-used Pokémon in this dataset. These are screening
+            signals, not battle simulations.
+          </p>
+          <div class="team-analysis-grid" id="team-analysis-summary"></div>
+          <div class="team-analysis-columns">
+            <div>
+              <h4>Defensive pressure points</h4>
+              <div class="table-scroll">
+                <table id="team-analysis-defense-table">
+                  <thead><tr><th>Attack type</th><th>Weak members</th><th>Resist / immune</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <div>
+              <h4>Common-threat screen</h4>
+              <div class="table-scroll">
+                <table id="team-analysis-threat-table">
+                  <thead><tr><th>Threat</th><th>Super-effective answers</th><th>Team members exposed</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <p class="source-note" id="team-analysis-note"></p>
+        </div>
       </div>
     </div>
   </section>
@@ -1251,6 +1297,7 @@
       <button class="subtab-btn" role="tab" data-subtab="ds-gates" aria-selected="false">Release gates</button>
       <button class="subtab-btn" role="tab" data-subtab="ds-assets" aria-selected="false">Image coverage</button>
       <button class="subtab-btn" role="tab" data-subtab="ds-agreement" aria-selected="false">Source agreement</button>
+      <button class="subtab-btn" role="tab" data-subtab="ds-history" aria-selected="false">History</button>
       <button class="subtab-btn" role="tab" data-subtab="ds-caveats" aria-selected="false">Caveats</button>
     </div>
 
@@ -1295,6 +1342,24 @@
       <div class="table-scroll">
         <table id="ds-agreement-table">
           <thead><tr><th>Event</th><th class="sortable" data-sort-key="covered_players">Players covered by both</th><th class="sortable" data-sort-key="exact_agreement_rate">Exact roster agreement</th><th class="sortable" data-sort-key="slot_agreement_rate">Slot agreement</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="subtab-panel" data-subpanel="ds-history" hidden>
+      <p class="sub" id="ds-history-status"></p>
+      <h3>Retained extraction snapshots</h3>
+      <div class="table-scroll">
+        <table id="ds-snapshot-table">
+          <thead><tr><th>Source</th><th class="sortable" data-sort-key="snapshot_count">Snapshots</th><th>First date</th><th>Latest date</th><th class="sortable" data-sort-key="history_days">Days covered</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h3>Published releases</h3>
+      <div class="table-scroll">
+        <table id="ds-release-table">
+          <thead><tr><th>Version</th><th class="sortable" data-sort-key="published_at_utc">Published</th><th class="sortable" data-sort-key="table_count">Tables</th><th>Images</th><th>Quality failures</th><th>Limitations</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

@@ -218,7 +218,138 @@
     var clearBtn = document.getElementById("team-builder-clear");
     var exportBtn = document.getElementById("team-builder-export");
     var exportOutput = document.getElementById("team-builder-export-output");
+    var analysisSummaryEl = document.getElementById("team-analysis-summary");
+    var analysisDefenseTable = document.getElementById("team-analysis-defense-table");
+    var analysisThreatTable = document.getElementById("team-analysis-threat-table");
+    var analysisNoteEl = document.getElementById("team-analysis-note");
     var selectedTypes = {};
+
+    function typeMultiplier(attackType, defendTypes) {
+      return App.typeEffectiveness
+        ? App.typeEffectiveness(attackType, defendTypes)
+        : 1;
+    }
+
+    function offensiveMoves(slot) {
+      var selected = (slot.moves || []).filter(Boolean);
+      return (movesByKey[slot.key] || []).filter(function (move, index, rowsForPokemon) {
+        return (
+          selected.indexOf(move.move_name) !== -1 &&
+          move.category !== "status" &&
+          Number(move.power || 0) > 0 &&
+          rowsForPokemon.findIndex(function (candidate) {
+            return candidate.move_name === move.move_name;
+          }) === index
+        );
+      });
+    }
+
+    function teamMembers() {
+      return team.map(function (slot) {
+        return { slot: slot, profile: byKey[slot.key], moves: offensiveMoves(slot) };
+      }).filter(function (member) {
+        return member.profile;
+      });
+    }
+
+    function typeLabel(type) {
+      return type ? type.charAt(0).toUpperCase() + type.slice(1) : "—";
+    }
+
+    function renderAnalysis() {
+      if (!analysisSummaryEl) return;
+      var members = teamMembers();
+      if (!members.length) {
+        analysisSummaryEl.innerHTML = '<p class="empty-state">Add Pokémon to see coverage, weakness, and threat checks.</p>';
+        if (analysisDefenseTable) analysisDefenseTable.querySelector("tbody").innerHTML = "";
+        if (analysisThreatTable) analysisThreatTable.querySelector("tbody").innerHTML = "";
+        if (analysisNoteEl) analysisNoteEl.textContent = "";
+        return;
+      }
+
+      var coveredTypes = App.ALL_TYPES.filter(function (defendType) {
+        return members.some(function (member) {
+          return member.moves.some(function (move) {
+            return typeMultiplier(move.move_type, [defendType]) > 1;
+          });
+        });
+      });
+      var defensiveRows = App.ALL_TYPES.map(function (attackType) {
+        var weak = 0;
+        var resistOrImmune = 0;
+        members.forEach(function (member) {
+          var multiplier = typeMultiplier(attackType, [member.profile.type_1, member.profile.type_2]);
+          if (multiplier > 1) weak += 1;
+          if (multiplier < 1) resistOrImmune += 1;
+        });
+        return { type: attackType, weak: weak, resistOrImmune: resistOrImmune };
+      }).filter(function (row) {
+        return row.weak > 0;
+      }).sort(function (a, b) {
+        return b.weak - a.weak || a.resistOrImmune - b.resistOrImmune;
+      });
+      var speeds = members.map(function (member) { return Number(member.profile.speed || 0); });
+      var fastest = Math.max.apply(null, speeds);
+      var slowest = Math.min.apply(null, speeds);
+      var speedTools = {};
+      members.forEach(function (member) {
+        (movesByKey[member.slot.key] || []).forEach(function (move) {
+          var effect = String(move.short_effect || "").toLowerCase();
+          if (Number(move.priority || 0) > 0 || /speed|tailwind|trick room|priority/.test(effect)) {
+            speedTools[move.move_name] = true;
+          }
+        });
+      });
+
+      var threatRows = sortByUsageRank(rows).slice(0, 12).map(function (threat) {
+        var threatTypes = [threat.type_1, threat.type_2].filter(Boolean);
+        var threatMoveTypes = (movesByKey[threat.pokemon_key] || []).filter(function (move) {
+          return move.category !== "status" && Number(move.power || 0) > 0 && move.move_type;
+        });
+        var answers = members.filter(function (member) {
+          return member.moves.some(function (move) {
+            return typeMultiplier(move.move_type, threatTypes) > 1;
+          });
+        }).length;
+        var exposed = members.filter(function (member) {
+          return threatMoveTypes.some(function (move) {
+            return typeMultiplier(move.move_type, [member.profile.type_1, member.profile.type_2]) > 1;
+          });
+        }).length;
+        return { threat: threat, answers: answers, exposed: exposed };
+      });
+
+      analysisSummaryEl.innerHTML =
+        '<div class="analysis-card"><strong>' + coveredTypes.length + "/" + App.ALL_TYPES.length +
+        '</strong><span>defending types hit super-effectively</span></div>' +
+        '<div class="analysis-card"><strong>' + (defensiveRows[0] ? defensiveRows[0].weak + "/" + members.length : "0") +
+        '</strong><span>members exposed to the biggest shared weakness</span></div>' +
+        '<div class="analysis-card"><strong>' + fastest + "–" + slowest +
+        '</strong><span>base Speed range</span></div>' +
+        '<div class="analysis-card"><strong>' + Object.keys(speedTools).length +
+        '</strong><span>recorded speed / priority tools</span></div>';
+
+      if (analysisDefenseTable) {
+        var defenseBody = analysisDefenseTable.querySelector("tbody");
+        defenseBody.innerHTML = defensiveRows.slice(0, 8).map(function (row) {
+          var cls = row.weak >= Math.max(2, Math.ceil(members.length / 2)) ? "status-warn" : "";
+          return '<tr><td>' + App.escapeHtml(typeLabel(row.type)) + "</td><td class=\"" + cls + "\">" +
+            row.weak + " / " + members.length + "</td><td>" + row.resistOrImmune + " / " + members.length + "</td></tr>";
+        }).join("") || '<tr><td colspan="3">No shared weaknesses detected.</td></tr>';
+      }
+      if (analysisThreatTable) {
+        var threatBody = analysisThreatTable.querySelector("tbody");
+        threatBody.innerHTML = threatRows.map(function (row) {
+          var cls = row.answers === 0 || row.exposed >= Math.max(2, Math.ceil(members.length / 2)) ? "status-warn" : "status-good";
+          return '<tr><td>' + App.escapeHtml(row.threat.pokemon_name) + "</td><td class=\"" + cls + "\">" +
+            row.answers + " / " + members.length + "</td><td>" + row.exposed + " / " + members.length + "</td></tr>";
+        }).join("");
+      }
+      if (analysisNoteEl) {
+        analysisNoteEl.textContent =
+          "Coverage checks selected recorded damaging moves against single defending types. Threat exposure uses the threat Pokémon's recorded damaging move types; it is a screening heuristic, not a full moveset or battle simulation.";
+      }
+    }
 
     function persist() {
       try {
@@ -412,11 +543,12 @@
               current,
               "— Move " + (moveIndex + 1) + " —",
               "No recorded moves",
-              function (value) {
-                slot.moves[moveIndex] = value || "";
-                persist();
-                renderSlots();
-              }
+                function (value) {
+                  slot.moves[moveIndex] = value || "";
+                  persist();
+                  renderSlots();
+                  renderAnalysis();
+                }
             );
             moveSelect.setAttribute("aria-label", "Move " + (moveIndex + 1));
             moveContainer.appendChild(moveSelect);
@@ -516,6 +648,7 @@
       renderSlots();
       renderSpeedOrder();
       renderSummary();
+      renderAnalysis();
       if (exportOutput) exportOutput.style.display = "none";
     }
 
