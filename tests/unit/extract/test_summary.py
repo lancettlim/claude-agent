@@ -69,14 +69,14 @@ def test_rows_and_null_rate_zero_when_output_missing(tmp_path):
 
 
 def _result(**overrides):
-    defaults = dict(
-        source_name="Fake Source",
-        endpoint="https://example.test/fake",
-        staging_subdir="fake_source",
-        output_path=None,
-        stats=RequestStats(),
-        error=None,
-    )
+    defaults = {
+        "source_name": "Fake Source",
+        "endpoint": "https://example.test/fake",
+        "staging_subdir": "fake_source",
+        "output_path": None,
+        "stats": RequestStats(),
+        "error": None,
+    }
     defaults.update(overrides)
     return summary.SourceRunResult(**defaults)
 

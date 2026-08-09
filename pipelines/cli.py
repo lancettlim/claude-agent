@@ -25,7 +25,7 @@ import csv
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pipelines import versioning
@@ -118,7 +118,7 @@ _SOURCE_NAME_SUFFIXES = {
 
 
 def _snapshot_date() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def _dated_snapshot_path(staging_subdir: str, date_str: str) -> Path:
@@ -331,9 +331,7 @@ def _run_extract(source: str, dataset_version: str) -> int:
                 output_path=detail_output_path,
                 dataset_version=dataset_version,
                 call=lambda extract_fn=extract_fn, detail_output_path=detail_output_path, names=names: (
-                    extract_fn(  # noqa: E501
-                        detail_output_path, names, dataset_version=dataset_version
-                    )
+                    extract_fn(detail_output_path, names, dataset_version=dataset_version)
                 ),
             )
             if not ok:
@@ -352,7 +350,7 @@ def _run_validate() -> int:
     # rewritten by this invocation before reading it.
     run_results_path = DBT_PROJECT_DIR / "target" / "run_results.json"
     started_at = time.time()
-    result = subprocess.run(["uv", "run", "dbt", "build"], cwd=DBT_PROJECT_DIR)
+    result = subprocess.run(["uv", "run", "dbt", "build"], cwd=DBT_PROJECT_DIR, check=False)
     if result.returncode not in (0, 1):
         print(f"dbt build crashed unexpectedly (exit {result.returncode})", file=sys.stderr)
         return result.returncode
@@ -376,7 +374,7 @@ def _run_validate() -> int:
     # than blocking the whole validate run over a best-effort extra gate.
     sources_path = DBT_PROJECT_DIR / "target" / "sources.json"
     freshness_started_at = time.time()
-    subprocess.run(["uv", "run", "dbt", "source", "freshness"], cwd=DBT_PROJECT_DIR)
+    subprocess.run(["uv", "run", "dbt", "source", "freshness"], cwd=DBT_PROJECT_DIR, check=False)
     if not sources_path.exists() or sources_path.stat().st_mtime < freshness_started_at:
         print(
             "`dbt source freshness` did not produce a fresh target/sources.json -- "

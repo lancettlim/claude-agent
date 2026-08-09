@@ -53,7 +53,7 @@ import hashlib
 import struct
 import sys
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -238,7 +238,7 @@ def extract(
     identifiers = (
         pokemon_identifiers if pokemon_identifiers is not None else _fetch_pokemon_list(http)
     )
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = [
         _row_from_payload(
@@ -321,7 +321,7 @@ def extract_moves(
     tournament roster data) rather than PokéAPI's full move catalog.
     """
     http = session if session is not None else requests.Session()
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = []
     for move_name in move_names:
@@ -367,7 +367,7 @@ def extract_abilities(
     data/staging/pokeapi_ability.schema.json.
     """
     http = session if session is not None else requests.Session()
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = []
     for ability_name in ability_names:
@@ -407,7 +407,7 @@ def extract_items(
     data/staging/pokeapi_item.schema.json.
     """
     http = session if session is not None else requests.Session()
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = []
     for item_name in item_names:
@@ -497,7 +497,7 @@ def extract_artwork(
     file is trusted on presence and re-verified only for its own digest.
     """
     http = session if session is not None else requests.Session()
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = []
     for form_name, resource_id in form_resource_ids:

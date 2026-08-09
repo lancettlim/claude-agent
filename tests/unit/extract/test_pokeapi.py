@@ -2,8 +2,8 @@ import csv
 
 import requests
 
-from pipelines.extract import pokeapi
 from pipelines.extract import http as extract_http
+from pipelines.extract import pokeapi
 
 
 class _FakeResponse:

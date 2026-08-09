@@ -137,7 +137,7 @@ def test_parse_round_keeps_a_player_with_no_reported_country():
 def test_bye_keeps_the_player_and_blanks_the_opponent(tmp_path):
     output_path = tmp_path / "rk9.csv"
     rk9.extract(output_path, session=_FakeSession(), dataset_version="9.9.9")
-    bye = [row for row in _read(output_path) if row["outcome"] == "bye"][0]
+    bye = next(row for row in _read(output_path) if row["outcome"] == "bye")
     assert bye["player1_name"] == "Colleen Viets"
     assert bye["player2_name"] == ""
     assert bye["table_number"] == ""

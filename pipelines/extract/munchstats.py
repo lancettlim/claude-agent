@@ -66,7 +66,7 @@ from __future__ import annotations
 import csv
 import hashlib
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -264,7 +264,7 @@ def extract(
         if tournament_ids is not None
         else [entry["id"] for entry in _fetch_json(http, TOURNAMENTS_INDEX_URL)]
     )
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
     cached_rows_by_tournament = _load_cached_rows_by_tournament(previous_snapshot_path)
 
     rows = []

@@ -62,9 +62,9 @@ from __future__ import annotations
 import csv
 import html
 import re
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 import requests
 
@@ -356,7 +356,7 @@ def extract(
             for entry in index
             if format_filter is None or entry.get("format") == format_filter
         ]
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
     cached_rows_by_event = _load_cached_rows_by_event(previous_snapshot_path)
 
     rows: list[dict] = []

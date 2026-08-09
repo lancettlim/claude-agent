@@ -47,7 +47,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
@@ -172,7 +172,7 @@ def extract(
     members = _list_category_members(http)
     titles = [member["title"] for member in members]
     imageinfo_by_title = _resolve_file_info(http, titles)
-    extracted_at_utc = datetime.now(timezone.utc).isoformat()
+    extracted_at_utc = datetime.now(UTC).isoformat()
 
     rows = []
     for title in titles:

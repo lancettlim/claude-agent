@@ -237,7 +237,7 @@ def test_build_populates_sprites_and_type_icons(tmp_path):
     assert set(payload["type_icons"].keys()) == {
         p.stem for p in (build.STATIC_ICONS_DIR / "types").glob("*.png")
     }
-    for type_name, rel_path in payload["type_icons"].items():
+    for rel_path in payload["type_icons"].values():
         assert (output_dir / rel_path).exists()
 
 

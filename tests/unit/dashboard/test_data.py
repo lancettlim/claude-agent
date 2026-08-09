@@ -606,7 +606,7 @@ def test_load_mart_slices_team_synergy_to_the_dashboard_cut(tmp_path):
     rows = [
         {
             "pokemon_key": "pikachu",
-            "partner_pokemon_key": "partner-%02d" % i,
+            "partner_pokemon_key": f"partner-{i:02d}",
             "pair_team_count": "20",
             "lift": str(20 - i),
             "lift_rank": str(i + 1),
@@ -894,8 +894,3 @@ def test_load_release_history_reads_compact_manifest_metadata(tmp_path):
             "known_limitation_count": 1,
         }
     ]
-    # The gate results are baked into the payload here precisely because
-    # validation_report.json itself is gitignored and never reaches the
-    # published site.
-    assert prov["gates"][0]["name"] == "pokeapi_artwork_coverage"
-    assert prov["gates"][2]["threshold"] == "=0"

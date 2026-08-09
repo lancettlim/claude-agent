@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import csv
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -387,7 +387,9 @@ def load_release_history(manifests_dir: Path = DEFAULT_MANIFESTS_DIR) -> list[di
                 "known_limitation_count": len(manifest.get("known_limitations") or []),
             }
         )
-    return sorted(releases, key=lambda row: (row.get("published_at_utc") or "", row["dataset_version"]))
+    return sorted(
+        releases, key=lambda row: (row.get("published_at_utc") or "", row["dataset_version"])
+    )
 
 
 # <key column> -> <display-name column> pairs resolved against the
@@ -593,7 +595,7 @@ def build_payload(
     pokemon_names = load_pokemon_names(normalized_dir)
     marts = _join_pokemon_names(marts, pokemon_names)
     return {
-        "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "kpis": compute_kpis(marts),
         "provenance": load_provenance(reports_dir, staging_dir, manifests_dir),
         "marts": marts,

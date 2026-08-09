@@ -60,7 +60,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -429,7 +429,7 @@ def build_report(
 
     return {
         "dataset_version": dataset_version,
-        "generated_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "coverage_checks": coverage_checks,
         "null_rate_checks": null_rate_checks,
         "duplicate_key_checks": duplicate_key_checks,
