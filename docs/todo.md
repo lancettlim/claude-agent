@@ -627,7 +627,8 @@ All five are now shipped.
   `docs/local-queries.md`: how to open `dbt/data/warehouse.duckdb`
   directly (DuckDB CLI or Python) and seven starter queries, each verified
   against a real, freshly-extracted snapshot. Several of the queries
-  (team synergy lift, placement-weighted usage, build concentration) surface marts not yet wired into the dashboard UI at
+  (team synergy lift, placement-weighted usage, build concentration)
+  surface marts not yet wired into the dashboard UI at
   all, so this doc is currently the only way to see their output.
 - [x] Backlog #34: Pokémon Profile empty state — decided to keep the
   current default-to-highest-usage behavior rather than build an empty
