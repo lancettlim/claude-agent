@@ -13,7 +13,7 @@ runs, richer tournament coverage, an eventual Champions rebalance) so the
 still-degenerate views (stat-change trends, legal-pool trends over time) have
 real data to show. See `docs/todo.md` for current status.
 
-**Live dashboard:** https://lancettlim.github.io/claude-agent/dashboard/
+**Live dashboard:** https://lancettlim.github.io/pokemon-agent/dashboard/
 
 ## Repository documents
 
