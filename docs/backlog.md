@@ -934,8 +934,8 @@ Python, both from `dbt/`, since external tables resolve paths relative to
 that working directory), how to list every queryable table, and seven
 starter queries — each run against a real, freshly-extracted snapshot to
 confirm non-degenerate output, not just checked for syntax. Several of the
-queries (tera type usage, team synergy lift, placement-weighted usage,
-build concentration) surface marts that still aren't wired into the
+queries (team synergy lift, placement-weighted usage, build
+concentration) surface marts that still aren't wired into the
 dashboard UI at all, so this doc is currently the only way to see their
 output.
 
