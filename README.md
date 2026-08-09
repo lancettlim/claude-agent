@@ -1,4 +1,4 @@
-# claude-agent
+# pkmn-agent
 
 This repository contains planning and specification documents for the Pokémon
 Champions competitive data platform and its first dataset artifact.
