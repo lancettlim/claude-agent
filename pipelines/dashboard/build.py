@@ -316,7 +316,7 @@ def build(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "index.html").write_text(html, encoding="utf-8")
-    for script_name in ("app.js", "matchup.js", "teams.js"):
+    for script_name in ("app.js", "matchup.js", "teams.js", "expansions.js"):
         shutil.copyfile(STATIC_DIR / script_name, output_dir / script_name)
     # backlog.md #32: a sibling JSON feed carrying the *complete* payload —
     # both the critical keys index.html already inlines and the marts it
