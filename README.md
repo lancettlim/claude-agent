@@ -13,7 +13,7 @@ snapshot history to support honest release-to-release comparisons. See
 `docs/roadmap.md` for the active next-development plan and `docs/todo.md` for
 repository status.
 
-**Live dashboard:** https://lancettlim.github.io/claude-agent/dashboard/
+**Live dashboard:** https://lancettlim.github.io/pokemon-agent/dashboard/
 
 ## Repository documents
 

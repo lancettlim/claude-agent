@@ -469,7 +469,7 @@ source to "GitHub Actions" (not "Deploy from a branch" — that's the older
 mode this workflow replaces). Once set, every push to `main` that touches
 `docs/` redeploys via the workflow above, and the dashboard is reachable at
 `https://<owner>.github.io/<repo>/dashboard/` — for this repo, that's
-https://lancettlim.github.io/claude-agent/dashboard/.
+https://lancettlim.github.io/pokemon-agent/dashboard/.
 
 `docs/index.html` is a static redirect stub (meta-refresh + JS
 `location.replace`, so it works with JS disabled too) that sends
