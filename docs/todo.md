@@ -627,8 +627,8 @@ All five are now shipped.
   `docs/local-queries.md`: how to open `dbt/data/warehouse.duckdb`
   directly (DuckDB CLI or Python) and seven starter queries, each verified
   against a real, freshly-extracted snapshot. Several of the queries
-  (tera type usage, team synergy lift, placement-weighted usage, build
-  concentration) surface marts not yet wired into the dashboard UI at
+  (team synergy lift, placement-weighted usage, build concentration)
+  surface marts not yet wired into the dashboard UI at
   all, so this doc is currently the only way to see their output.
 - [x] Backlog #34: Pokémon Profile empty state — decided to keep the
   current default-to-highest-usage behavior rather than build an empty
@@ -668,21 +668,17 @@ All five are now shipped.
 
 ## Analytics depth (backlog Section 1, "buildable today")
 
-Seven of the "no new data required" items from `docs/backlog.md`'s Section
+Six of the "no new data required" items from `docs/backlog.md`'s Section
 1 — the highest value-to-effort ratio in the backlog since every input
 already existed in the normalized layer. Verified against a real,
 freshly-run `extract all` + `dbt build` pass (not just synthetic
 fixtures); all 91 dbt nodes (30 external models, 6 seeds, 35 data tests, 20
 view models) pass, and `reports/validation/validation_report.json` reports
-zero `release_blocking_findings`. None of the seven are wired into the
+zero `release_blocking_findings`. None of the six are wired into the
 dashboard UI yet (`pipelines/dashboard/data.py`'s `MART_FIELDS` and
 `docs/dashboard.md`) — that's separate, still-open follow-up work; see each
 item's `docs/backlog.md` entry.
 
-- [x] Backlog #10: Tera type usage mart — new
-  `dbt/models/marts/pokemon_tera_type_usage.sql`, mirroring
-  `pokemon_item_usage`/`pokemon_ability_usage`'s usage-count-and-
-  share-of-own-total pattern for `tournament_team_member.tera_type`.
 - [x] Backlog #12: Usage × regulation cross-tab — new
   `dbt/models/marts/pokemon_usage_by_regulation.sql`. `tournament_event`
   carries no `regulation_code` of its own, so this isn't a temporal "usage
