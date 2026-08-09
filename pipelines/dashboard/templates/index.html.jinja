@@ -610,7 +610,14 @@
     .matchup-picker-grid { grid-template-columns: 1fr; }
   }
 
-  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
+
+  .compare-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:16px 0; }
+  .compare-card, .expansion-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px; }
+  .compare-card h3, .expansion-card h3 { margin-top:0; }
+  .expansion-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .link-button { border:0; background:none; color:var(--blue); padding:0; cursor:pointer; text-decoration:underline; }
+  .source-note { color:var(--muted); font-size:var(--font-sm); }
+  @media (max-width:720px) { .compare-columns, .expansion-grid { grid-template-columns:1fr; } }\n  footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 24px; }
 
   @media (max-width: 720px) {
     main { padding: 16px; }
@@ -707,7 +714,9 @@
     <button class="tab-btn" role="tab" data-tab="team-builder" aria-selected="false">Team Builder</button>
     <button class="tab-btn" role="tab" data-tab="top-teams" aria-selected="false">Top Teams</button>
     <button class="tab-btn" role="tab" data-tab="players" aria-selected="false">Players &amp; Regions</button>
-    <button class="tab-btn" role="tab" data-tab="data-sources" aria-selected="false">Data &amp; Sources</button>
+
+    <button class="tab-btn" role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    <button class="tab-btn" role="tab" data-tab="core-explorer" aria-selected="false">Core Explorer</button>\n    <button class="tab-btn" role="tab" data-tab="data-sources" aria-selected="false">Data &amp; Sources</button>
   </nav>
 
   <section class="tab-panel" data-panel="overview">
@@ -1208,7 +1217,26 @@
     </div>
   </section>
 
-  <section class="tab-panel" data-panel="data-sources" hidden>
+
+  <section class="tab-panel" data-panel="compare" hidden>
+    <h2>Compare Pokémon</h2>
+    <p class="section-intro">Compare sourced competitive profiles side by side, then share the exact view with a URL.</p>
+    <div class="filters">
+      <label>Pokémon A <select id="compare-a"></select></label>
+      <label>Pokémon B <select id="compare-b"></select></label>
+      <button class="button" id="compare-copy" type="button">Copy view link</button>
+    </div>
+    <div id="compare-results"></div>
+  </section>
+  <section class="tab-panel" data-panel="core-explorer" hidden>
+    <h2>Team Core Explorer</h2>
+    <p class="section-intro">Search observed pair and triple composition patterns, with sample size and lift kept visible.</p>
+    <div class="filters">
+      <label>Anchor Pokémon <select id="core-anchor"></select></label>
+      <label>Core size <select id="core-size"><option value="pair">Pairs</option><option value="triple">Triples</option></select></label>
+    </div>
+    <div id="core-results"></div>
+  </section>\n  <section class="tab-panel" data-panel="data-sources" hidden>
     <h2>Data &amp; Sources</h2>
     <p class="sub">
       Where every number on this dashboard comes from, and whether it passed
@@ -1333,6 +1361,6 @@
 <script>window.DASHBOARD_DATA = {{ data_json | safe }};</script>
 <script src="app.js"></script>
 <script src="matchup.js"></script>
-<script src="teams.js"></script>
+<script src="teams.js"></script>\n<script src="expansions.js"></script>
 </body>
 </html>
